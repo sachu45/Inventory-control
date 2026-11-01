@@ -8,7 +8,7 @@ import {
   loadInvoiceForPdf,
   renderInvoiceHtml,
 } from '../../common/pdf/builders/invoice.builder';
-import { asBrandingSnapshotOrNull } from '../../common/branding/branding.utils';
+import { asBrandingSnapshotOrNull } from '../../common/branding/branding-utils';
 import type { DocumentType } from '@prisma/client';
 
 /**

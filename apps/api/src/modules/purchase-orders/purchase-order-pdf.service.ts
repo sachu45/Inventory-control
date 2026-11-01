@@ -8,7 +8,7 @@ import {
   loadPurchaseOrderForPdf,
   renderPurchaseOrderHtml,
 } from '../../common/pdf/builders/purchase-order.builder';
-import { asBrandingSnapshotOrNull } from '../../common/branding/branding.utils';
+import { asBrandingSnapshotOrNull } from '../../common/branding/branding-utils';
 import type { DocumentType } from '@prisma/client';
 
 /**
