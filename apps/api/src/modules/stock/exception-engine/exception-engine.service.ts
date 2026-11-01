@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ExceptionType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ExceptionRule, ExceptionInput, RuleContext } from './exception.rule';
@@ -16,6 +16,7 @@ function dedupeKey(entityType: string, entityId: string, metadata: unknown): str
 
 @Injectable()
 export class ExceptionEngineService {
+  private readonly logger = new Logger(ExceptionEngineService.name);
   private rules: Map<string, ExceptionRule> = new Map();
 
   constructor(private readonly prisma: PrismaService) {}
@@ -38,7 +39,7 @@ export class ExceptionEngineService {
         }
         detectedByType.set(rule.type, detected);
       } catch (error) {
-        console.error(`Failed to execute rule ${rule.name}:`, error);
+        this.logger.error(`Failed to execute rule ${rule.name}: ${error instanceof Error ? error.message : error}`, error instanceof Error ? error.stack : undefined);
       }
     }
 

@@ -1,4 +1,4 @@
-import { Module, OnModuleInit } from '@nestjs/common';
+import { Logger, Module, OnModuleInit } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { DocumentSeriesModule } from '../document-series/document-series.module';
@@ -53,6 +53,8 @@ import { IntegrityRule } from './exception-engine/rules/integrity.rule';
   ],
 })
 export class StockModule implements OnModuleInit {
+  private readonly logger = new Logger(StockModule.name);
+
   constructor(
     private readonly exceptionEngine: ExceptionEngineService,
     private readonly expiryRule: ExpiryRule,
@@ -60,17 +62,14 @@ export class StockModule implements OnModuleInit {
     private readonly transferRule: TransferRule,
     private readonly blockedLotRule: BlockedLotRule,
     private readonly integrityRule: IntegrityRule,
-  ) {
-    console.log('[✓ StockModule] Constructed with exception engine and 5 rules');
-  }
+  ) {}
 
   onModuleInit() {
-    console.log('[✓ StockModule.onModuleInit] Registering 5 exception rules...');
     this.exceptionEngine.registerRule(this.expiryRule);
     this.exceptionEngine.registerRule(this.lowStockRule);
     this.exceptionEngine.registerRule(this.transferRule);
     this.exceptionEngine.registerRule(this.blockedLotRule);
     this.exceptionEngine.registerRule(this.integrityRule);
-    console.log('[✓ StockModule] All rules registered');
+    this.logger.log('Registered 5 exception rules');
   }
 }

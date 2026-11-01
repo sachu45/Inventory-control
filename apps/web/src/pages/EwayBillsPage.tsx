@@ -119,7 +119,6 @@ export function EwayBillsPage({ createOnly = false }: { createOnly?: boolean }) 
       }
 
       const url = `/api/v1/eway-bills/${active.id}/pdf`;
-      console.log('[EwayBillsPDF] Downloading:', { billId: active.id, billNumber: active.ewayBillNumber, url });
 
       const response = await fetch(url, {
         method: 'GET',
@@ -129,16 +128,12 @@ export function EwayBillsPage({ createOnly = false }: { createOnly?: boolean }) 
         credentials: 'include',
       });
 
-      console.log('[EwayBillsPDF] Response:', { status: response.status, contentType: response.headers.get('content-type') });
-
       if (!response.ok) {
         const text = await response.text();
-        console.error('[EwayBillsPDF] Error response:', text);
         throw new Error(`HTTP ${response.status}: ${text}`);
       }
 
       const blob = await response.blob();
-      console.log('[EwayBillsPDF] Blob received:', { size: blob.size, type: blob.type });
 
       if (blob.size === 0) {
         throw new Error('PDF is empty');
@@ -156,7 +151,6 @@ export function EwayBillsPage({ createOnly = false }: { createOnly?: boolean }) 
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       toast.error(`Failed to download PDF: ${message}`);
-      console.error('[EwayBillsPDF] Error:', error);
     }
   }
 
