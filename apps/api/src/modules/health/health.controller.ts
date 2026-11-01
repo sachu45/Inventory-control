@@ -1,7 +1,9 @@
-import { Controller, Get, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, HttpCode, HttpStatus, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { HealthService } from './health.service';
 import { RequestContextStore } from '@/common/context/request-context';
 import { Public } from '@/common/decorators/public.decorator';
+import { SkipEnvelope } from '@/common/decorators/skip-envelope.decorator';
 
 @Controller('health')
 export class HealthController {
@@ -28,13 +30,15 @@ export class HealthController {
   }
 
   @Public()
+  @SkipEnvelope()
   @Get('ready')
-  async ready() {
-    const healthStatus = await this.healthService.getReady();
-    return {
-      ...healthStatus,
+  async ready(@Res() res: Response) {
+    const result = await this.healthService.getReady();
+    const status = result.status === 'ready' ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE;
+    res.status(status).json({
+      ...result,
       requestId: RequestContextStore.getRequestId(),
       timestamp: new Date().toISOString(),
-    };
+    });
   }
 }
