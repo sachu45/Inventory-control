@@ -9,7 +9,7 @@ import {
   Plus,
   Trash2,
   Truck,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import { toast } from 'sonner';
 import { AppLayout } from '@/components/AppLayout';
 import { PageHeader } from '@/components/shared/page-header';

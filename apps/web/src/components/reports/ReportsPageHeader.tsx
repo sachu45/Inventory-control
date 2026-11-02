@@ -1,4 +1,4 @@
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
 import { Breadcrumbs } from '@/components/navigation/Breadcrumbs';

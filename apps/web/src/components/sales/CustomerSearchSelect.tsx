@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useCustomer, useCustomerSearch, type Customer } from '@/hooks/use-customers';

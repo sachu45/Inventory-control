@@ -1,6 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { ListFilter } from 'lucide-react';
+import { ListFilter } from '@/components/ui/icons';
 import { cn } from '@/lib/cn';
 
 export type ColumnFilterOption = {

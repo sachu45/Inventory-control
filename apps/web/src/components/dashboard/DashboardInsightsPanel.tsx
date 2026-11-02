@@ -1,6 +1,6 @@
 import { useMemo, type ElementType } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ClipboardList, ShoppingCart, Zap } from 'lucide-react';
+import { ClipboardList, ShoppingCart, Zap } from '@/components/ui/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -112,7 +112,7 @@ export function DashboardInsightsPanel({
   }, [fastMovingRaw]);
 
   return (
-    <section aria-label="Operational insights" className="space-y-3">
+    <section aria-label="Operational insights" className="insights-panel space-y-3">
       <div>
         <h2 className="text-sm font-semibold text-foreground">Operational Insights</h2>
         <p className="text-xs text-muted-foreground">
@@ -143,8 +143,8 @@ export function DashboardInsightsPanel({
               value={ctx.pendingSalesOrders}
               hint="Confirmed orders not yet fulfilled"
               icon={ShoppingCart}
-              iconClassName="text-violet-600 dark:text-violet-400"
-              iconWrapClassName="bg-violet-500/15 border border-violet-400/20"
+              iconClassName="text-primary"
+              iconWrapClassName="bg-accent border border-border"
               onClick={() => navigate('/sales')}
             />
             <Card className="surface-1 lg:col-span-1">

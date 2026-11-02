@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ImageIcon, Loader2, Trash2, Upload } from 'lucide-react';
+import { ImageIcon, Loader2, Trash2, Upload } from '@/components/ui/icons';
 import { api } from '@/api/client';
 import { productKeys } from '@/hooks/use-products';
 import { uploadAssetUrl } from '@/lib/upload-url';

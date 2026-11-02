@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeftRight, Plus, Send } from 'lucide-react';
+import { ArrowLeftRight, Plus, Send } from '@/components/ui/icons';
 import { toast } from 'sonner';
 import { AppLayout } from '@/components/AppLayout';
 import { PageHeader } from '@/components/shared/page-header';

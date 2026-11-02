@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Check, X } from 'lucide-react';
+import { Check, X } from '@/components/ui/icons';
 import { toast } from 'sonner';
 import { cn } from '@/lib/cn';
 import { Reveal } from '@/components/motion';

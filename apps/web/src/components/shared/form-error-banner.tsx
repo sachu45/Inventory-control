@@ -1,4 +1,4 @@
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
 

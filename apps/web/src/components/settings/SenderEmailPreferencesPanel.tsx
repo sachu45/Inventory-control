@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CheckCircle2, Copy, Mail, Pencil, Plus, Trash2, XCircle } from 'lucide-react';
+import { CheckCircle2, Copy, Mail, Pencil, Plus, Trash2, XCircle } from '@/components/ui/icons';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

@@ -65,6 +65,17 @@ function makeService() {
 }
 
 describe('DashboardService', () => {
+  it('anchors monthly buckets at UTC month starts without overflowing a short month', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-31T12:00:00Z'));
+    try {
+      const { service, queryRaw, user } = makeService();
+      queryRaw.mockResolvedValue([]);
+      const summary = await service.summary(user, 'shop-1');
+      const monthlyCall = queryRaw.mock.calls.find(call => Array.isArray(call[0]) && call[0].join('').includes('generate_series'));
+      expect(monthlyCall?.[1].toISOString()).toBe('2026-02-01T00:00:00.000Z');
+      expect(summary.monthlyMovement.map(row => row.month)).toEqual(['Feb 2026','Mar 2026','Apr 2026','May 2026','Jun 2026','Jul 2026']);
+    } finally { jest.useRealTimers(); }
+  });
   it('uses current_stock and avg_cost (not selling_price) for stock value', async () => {
     const { service, queryRaw, user } = makeService();
 

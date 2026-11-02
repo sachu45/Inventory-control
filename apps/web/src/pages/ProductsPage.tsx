@@ -20,7 +20,7 @@ import {
   CheckCircle2,
   Shapes,
   ShoppingCart,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 
 import { cn } from '@/lib/cn';
 import { ProductImageUpload } from '@/components/products/ProductImageUpload';
@@ -34,6 +34,7 @@ import { resolveHsnSuggestion, type HsnSuggestion } from '@/lib/hsn-suggest';
 import { useAuthStore } from '@/store/authStore';
 import {
   useProducts,
+  useProduct,
   useProductDeletionImpact,
   useCreateProduct,
   useUpdateProduct,
@@ -683,13 +684,17 @@ export function ProductsPage({ createOnly = false }: { createOnly?: boolean }) {
   const listShopId = productListShopId(user, listShopFilter);
 
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => searchParams.get('search') ?? '');
+  useEffect(() => { setSearch(searchParams.get('search') ?? ''); setPage(1); }, [searchParams]);
   const debouncedSearch = useDebouncedValue(search, 300);
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [viewingProduct, setViewingProduct] = useState<Product | null>(null);
+  const linkedProduct = useProduct(createOnly ? '' : searchParams.get('record') ?? '');
+  useEffect(() => { if (linkedProduct.data) setViewingProduct(linkedProduct.data); }, [linkedProduct.data]);
+  useEffect(() => { if (linkedProduct.isError) toast.error('This product is unavailable or you do not have access.'); }, [linkedProduct.isError]);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deactivateTarget, setDeactivateTarget] = useState<Product | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
@@ -2492,7 +2497,7 @@ export function ProductsPage({ createOnly = false }: { createOnly?: boolean }) {
         </Card>
       </div>
 
-      <Sheet open={!!viewingProduct} onOpenChange={(open) => !open && setViewingProduct(null)}>
+      <Sheet open={!!viewingProduct} onOpenChange={(open) => { if (!open) { setViewingProduct(null); setSearchParams(params => { params.delete('record'); return params; }, { replace: true }); } }}>
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
           <SheetHeader>
             <SheetTitle>{viewingProduct?.description}</SheetTitle>

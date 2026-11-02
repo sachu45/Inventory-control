@@ -1,5 +1,5 @@
 import type { MarketingIntegration } from '@/lib/marketing-content';
-import { CreditCard, FileText, Mail, Search } from 'lucide-react';
+import { CreditCard, FileText, Mail, Search } from '@/components/ui/icons';
 import { cn } from '@/lib/cn';
 
 const ICONS: Record<string, typeof CreditCard> = {

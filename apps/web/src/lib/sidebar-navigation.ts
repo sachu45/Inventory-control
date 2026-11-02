@@ -1,4 +1,4 @@
-import type { LucideIcon } from 'lucide-react';
+import type { LucideIcon } from '@/components/ui/icons';
 import { menuIcons } from '@/config/iconMap';
 
 // Typed section IDs — no bare string literals across the codebase
@@ -69,10 +69,8 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
   },
   {
     id: SidebarSectionId.MasterData,
-    title: 'Master Data',
+    title: 'Catalog & contacts',
     children: [
-      L('Companies', '/companies', menuIcons.companies, { permission: 'company:read' }),
-      L('Plants', '/plants', menuIcons.plants, { permission: 'shop:read' }),
       L('Storage Locations', '/storage-locations', menuIcons.storageLocations, { permission: 'storage_location:read' }),
       L('Products', '/products', menuIcons.products, { permission: 'product:read' }),
       L('Suppliers', '/suppliers', menuIcons.suppliers, { permission: 'supplier:read' }),
@@ -81,13 +79,13 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
   },
   {
     id: SidebarSectionId.Procurement,
-    title: 'Procurement',
+    title: 'Purchasing',
     children: [
-      L('RFQs', '/rfqs', menuIcons.rfqs, { permission: 'rfq:read' }),
+      L('Quote Requests', '/rfqs', menuIcons.rfqs, { permission: 'rfq:read' }),
       L('Contracts', '/contracts', menuIcons.contracts, { permission: 'contract:read' }),
       L('Purchase Orders', '/purchase-orders', menuIcons.purchaseOrders, { permission: 'purchase_order:read' }),
-      L('Goods Receipt', '/goods-receipts', menuIcons.goodsReceipt),
-      L('Goods Returns', '/returns', menuIcons.goodsReturns, { permission: 'shop:read' }),
+      L('Receive Stock', '/goods-receipts', menuIcons.goodsReceipt),
+      L('Return Stock', '/returns', menuIcons.goodsReturns, { permission: 'shop:read' }),
       L('Supplier Portal', '/supplier-portal', menuIcons.supplierPortal, { permission: 'supplier:read' }),
       L('Supplier Bills', '/supplier-bills', menuIcons.supplierBills, { permission: 'shop:read' }),
       L('Supplier Payments', '/supplier-payments', menuIcons.supplierPayments, { permission: 'shop:read' }),
@@ -95,11 +93,11 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
   },
   {
     id: SidebarSectionId.SalesFinance,
-    title: 'Sales & Finance',
+    title: 'Sales & billing',
     children: [
       L('Sales Quotations', '/quotations', menuIcons.salesQuotations, { permission: 'shop:read' }),
-      L('Sales', '/sales', menuIcons.sales, { permission: 'shop:read' }),
-      L('Goods Issue', '/goods-issues', menuIcons.goodsIssue, { permission: 'goods_issue:read' }),
+      L('Sales Orders', '/sales', menuIcons.sales, { permission: 'shop:read' }),
+      L('Send Stock', '/goods-issues', menuIcons.goodsIssue, { permission: 'goods_issue:read' }),
       L('Invoices', '/invoices', menuIcons.invoices, { permission: 'shop:read' }),
       L('E-Way Bills', '/eway-bills', menuIcons.ewayBills, { permission: 'shop:read' }),
       L('Payments', '/payments', menuIcons.payments, { permission: 'shop:read' }),
@@ -107,17 +105,14 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
   },
   {
     id: SidebarSectionId.Operations,
-    title: 'Operations',
+    title: 'Inventory & tools',
     children: [
       L('Stock Transfers', '/stock-transfers', menuIcons.stockTransfers, { permission: 'stock_transfer:read' }),
       L('Warehouse', '/warehouse', menuIcons.warehouseOps, { permission: 'report:view' }),
       L('Reports', '/reports', menuIcons.reports, { permission: 'report:view' }),
-      L('Notifications', '/notifications', menuIcons.notifications, { permission: 'report:view' }),
       L('Approvals', '/approvals', menuIcons.approvals, { permission: 'shop:read', badge: { type: 'approvals' } }),
-      L('Upgrade', '/upgrade', menuIcons.upgrade, { permission: 'billing:manage' }),
       L('Platform Admin', '/platform/subscriptions', menuIcons.platformAdmin, { requirePlatformAdmin: true }),
       L('Print Labels', '/barcode-print', menuIcons.printLabels),
-      L('Settings', '/settings', menuIcons.settings),
     ],
   },
 ];

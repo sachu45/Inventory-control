@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { KeyRound, QrCode, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { KeyRound, QrCode, ShieldAlert, ShieldCheck } from '@/components/ui/icons';
 import { toast } from 'sonner';
 import { api } from '@/api/client';
 import BackupCodesCard from '@/components/auth/BackupCodesCard';

@@ -1,5 +1,8 @@
-import { HelpCircle, LogOut, Settings, UserCircle } from 'lucide-react';
+import { HelpCircle, LogOut, Settings, UserCircle, CreditCard } from '@/components/ui/icons';
+import { useAuthStore } from '@/store/authStore';
+import { isOrgAdminUser } from '@/lib/roles';
 import { cn } from '@/lib/cn';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 type ProfileMenuLinksProps = {
   onNavigate: (path: string) => void;
@@ -13,6 +16,8 @@ export function ProfileMenuLinks({
   onLogout,
   variant = 'header',
 }: ProfileMenuLinksProps) {
+  const user = useAuthStore((s) => s.user);
+  const canManageBilling = isOrgAdminUser(user) || user?.permissions?.includes('billing:manage');
   const itemClass =
     variant === 'sidebar'
       ? 'flex w-full items-center gap-2 px-4 py-2.5 text-sm text-foreground hover:bg-muted hover:text-foreground'
@@ -35,6 +40,10 @@ export function ProfileMenuLinks({
         <HelpCircle className="h-4 w-4" />
         Help & Support
       </button>
+      {canManageBilling && <button type="button" onClick={() => onNavigate('/upgrade')} className={itemClass}>
+        <CreditCard className="h-4 w-4" />
+        Plan & Upgrade
+      </button>}
       <button type="button" onClick={() => onNavigate('/settings')} className={itemClass}>
         <Settings className="h-4 w-4" />
         Settings
@@ -43,6 +52,7 @@ export function ProfileMenuLinks({
         <LogOut className="h-4 w-4" />
         Sign Out
       </button>
+      <div className="border-t border-border px-3 py-2"><p className="mb-1 text-xs text-muted-foreground">Appearance</p><ThemeToggle /></div>
     </>
   );
 }

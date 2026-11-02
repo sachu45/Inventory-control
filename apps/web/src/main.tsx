@@ -5,11 +5,12 @@ import { BrowserRouter } from 'react-router-dom';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { AppRoutes } from './routes/AppRoutes';
 import './index.css';
-import { applyAccessToken, isSessionRejected, refreshRequestOnce } from './api/client';
+import './workspace.css';
+import './enterprise.css';
 import { GoogleAnalyticsManager } from './components/analytics/GoogleAnalyticsManager';
 import { DocumentTitleManager } from './components/DocumentTitleManager';
 import { CookieConsentManager } from './components/cookies/CookieConsentManager';
-import { initializeSessionFromAuthResponse } from './lib/session';
+import { bootstrapSession } from './lib/bootstrap-session';
 import { armChunkReloadRecovery } from './lib/chunk-reload';
 import { useAuthStore } from './store/authStore';
 import { initThemeFromStorage } from './store/themeStore';
@@ -26,39 +27,6 @@ const qc = new QueryClient({
     },
   },
 });
-
-async function bootstrapSession() {
-  const state = useAuthStore.getState();
-  const tokenAtBootstrapStart = state.accessToken;
-
-  const hasEverLoggedIn = Boolean(
-    tokenAtBootstrapStart || window.localStorage.getItem('retail-ims-auth-state'),
-  );
-
-  if (tokenAtBootstrapStart) {
-    applyAccessToken(tokenAtBootstrapStart);
-  }
-
-  if (!hasEverLoggedIn) {
-    useAuthStore.getState().setInitialized(true);
-    return;
-  }
-
-  try {
-    const res = await refreshRequestOnce();
-    await initializeSessionFromAuthResponse(res.data);
-  } catch (err) {
-    const currentToken = useAuthStore.getState().accessToken;
-    // If login succeeded while refresh was in-flight, don't wipe session.
-    // An outage (network error, 5xx) keeps the stored session for a retry.
-    if (isSessionRejected(err) && (!currentToken || currentToken === tokenAtBootstrapStart)) {
-      applyAccessToken(null);
-      useAuthStore.getState().clear();
-    }
-  } finally {
-    useAuthStore.getState().setInitialized(true);
-  }
-}
 
 function restoreAuthFromStorage() {
   if (typeof window === 'undefined') return;
@@ -79,6 +47,10 @@ function restoreAuthFromStorage() {
 async function init() {
   // Restore auth from localStorage immediately (Zustand persist middleware will also do this)
   restoreAuthFromStorage();
+  // setSession restores cached identity and marks it initialized. Keep protected
+  // routes behind the startup check until the rotating refresh cookie settles.
+  // Otherwise navigation can interrupt a refresh after its old cookie was used.
+  useAuthStore.getState().setInitialized(false);
 
   function mountApp() {
     ReactDOM.createRoot(document.getElementById('root')!).render(

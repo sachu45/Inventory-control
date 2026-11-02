@@ -1,4 +1,4 @@
-import type { LucideIcon } from 'lucide-react';
+import type { LucideIcon } from '@/components/ui/icons';
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -18,7 +18,7 @@ import {
   Truck,
   Users,
   Warehouse,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 
 export type NavCommand = {
   id: string;
@@ -73,10 +73,10 @@ export function buildNavCommands(user: UserLike | null | undefined): NavCommand[
   }
 
   if (hasPerm(user, 'company:read')) {
-    push('companies', 'Companies', 'Legal entities', '/companies', 'Master Data', Building2);
+    push('companies', 'Organisation', 'Company details in Settings', '/settings?tab=organisation', 'System', Building2, ['companies']);
   }
   if (hasPerm(user, 'shop:read')) {
-    push('plants', 'Plants', 'Shops and warehouses', '/plants', 'Master Data', Factory, ['shop']);
+    push('plants', 'Locations', 'Plants, shops and warehouses in Settings', '/settings?tab=locations', 'System', Factory, ['shop', 'plants']);
     push('customers', 'Customers', 'Customer master', '/customers', 'Master Data', Users);
   }
   if (hasPerm(user, 'storage_location:read')) {
@@ -143,6 +143,7 @@ export function buildNavCommands(user: UserLike | null | undefined): NavCommand[
   }
 
   push('settings', 'Settings', 'Preferences', '/settings', 'System', Settings, ['profile']);
+  push('tools', 'More tools', 'Find a task with a simple explanation', '/tools', 'System', LayoutDashboard, ['buying', 'selling', 'people']);
   if (user?.isPlatformAdmin) {
     push(
       'platform-subscriptions',

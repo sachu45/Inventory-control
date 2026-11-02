@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown } from '@/components/ui/icons';
 import { MARKETING_FAQ } from '@/lib/marketing-content';
 import { Reveal } from '@/components/motion';
 import { cn } from '@/lib/cn';

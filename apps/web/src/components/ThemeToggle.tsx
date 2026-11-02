@@ -1,4 +1,4 @@
-import { Monitor, Moon, Sun } from 'lucide-react';
+import { Monitor, Moon, Sun } from '@/components/ui/icons';
 import { cn } from '@/lib/cn';
 import { useThemeStore, type ThemeMode } from '@/store/themeStore';
 

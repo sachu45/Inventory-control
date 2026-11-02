@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { CompaniesListView } from './CompaniesPage';
+import { PlantsListView } from './PlantsPage';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -22,7 +24,10 @@ import {
   SlidersHorizontal,
   Paintbrush,
   MessageCircle,
-} from 'lucide-react';
+  Building2,
+  MapPin,
+  AlertTriangle,
+} from '@/components/ui/icons';
 import { api, applyAccessToken } from '@/api/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -256,7 +261,7 @@ function ProfileTab() {
     if (user) {
       setUser({ ...user });
     }
-    toast.success('Animal avatar selected.');
+    toast.success('Avatar style selected.');
   };
 
   return (
@@ -302,7 +307,7 @@ function ProfileTab() {
                   className="ml-3 mt-2 inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary"
                 onClick={() => setShowAnimalPicker((v) => !v)}
               >
-                {showAnimalPicker ? 'Hide animals' : 'Choose animal avatar'}
+                {showAnimalPicker ? 'Hide styles' : 'Choose avatar style'}
               </button>
               {avatarFile && (
                 <span className="ml-2 text-xs text-muted-foreground">
@@ -1232,7 +1237,7 @@ function BrandingTab() {
           <CardTitle className="flex items-center justify-between">
             <span>Branding Status</span>
             <span className={`text-sm font-semibold ${isHealthy ? 'text-green-700 dark:text-green-300' : 'text-amber-700 dark:text-amber-300'}`}>
-              {isHealthy ? '● Complete' : `⚠ ${healthStatus?.score || 0}%`}
+              {isHealthy ? 'Complete' : `${healthStatus?.score || 0}%`}
             </span>
           </CardTitle>
         </CardHeader>
@@ -1241,13 +1246,13 @@ function BrandingTab() {
             <div className="space-y-2">
               {healthStatus.missing.map((item: string) => (
                 <div key={item} className="flex items-center text-sm text-amber-700 dark:text-amber-300">
-                  <span className="mr-2">⚠</span>
+                  <AlertTriangle className="mr-2 h-4 w-4" />
                   <span>Missing: {item}</span>
                 </div>
               ))}
             </div>
           )}
-          {isHealthy && <p className="text-sm text-green-700 dark:text-green-300">✓ All branding fields are complete</p>}
+          {isHealthy && <p className="text-sm text-green-700 dark:text-green-300">All branding fields are complete</p>}
         </CardContent>
       </Card>
 
@@ -1480,7 +1485,7 @@ function BrandingTab() {
             </div>
           ) : (
             <div className="rounded-lg border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/10 p-4 text-sm text-blue-700 dark:text-blue-300">
-              <p>⚠ Custom branding for this shop coming soon</p>
+              <p>Custom shop branding is not available here. Select Company Branding to use your organisation’s settings.</p>
             </div>
           )}
         </CardContent>
@@ -1587,6 +1592,8 @@ export function SettingsPage() {
   const activeTab = useMemo(() => {
     const requested = searchParams.get('tab');
     const allowed = new Set(['profile', 'shop', 'cookies', 'whatsapp']);
+    if (isAdmin || user?.permissions?.includes('company:read')) allowed.add('organisation');
+    if (isAdmin || user?.permissions?.includes('shop:read')) allowed.add('locations');
     if (isAdmin && backupEnabled) allowed.add('backups');
     if (isAdmin) {
       allowed.add('users');
@@ -1597,7 +1604,7 @@ export function SettingsPage() {
     }
     if (requested && allowed.has(requested)) return requested;
     return 'profile';
-  }, [backupEnabled, isAdmin, searchParams]);
+  }, [backupEnabled, isAdmin, searchParams, user?.permissions]);
 
   return (
     <AppLayout active="Settings">
@@ -1606,7 +1613,7 @@ export function SettingsPage() {
           <CardContent className="pt-6">
             <PageHeader
               title="Settings"
-              description="Manage your account, shop, users, categories, and access controls"
+              description="Your profile, organisation, locations and workspace preferences."
             />
           </CardContent>
         </Card>
@@ -1624,13 +1631,15 @@ export function SettingsPage() {
           className="space-y-4"
         >
           <TabsList className="h-auto w-full flex-wrap gap-1.5 rounded-2xl border border-border bg-card p-2">
+            {(isAdmin || user?.permissions?.includes('company:read')) && <TabsTrigger value="organisation" className="gap-1.5"><Building2 className="h-3.5 w-3.5" />Organisation</TabsTrigger>}
+            {(isAdmin || user?.permissions?.includes('shop:read')) && <TabsTrigger value="locations" className="gap-1.5"><MapPin className="h-3.5 w-3.5" />Locations</TabsTrigger>}
             <TabsTrigger value="profile" className="gap-1.5">
               <UserIcon className="h-3.5 w-3.5" />
               Profile
             </TabsTrigger>
             <TabsTrigger value="shop" className="gap-1.5">
               <Store className="h-3.5 w-3.5" />
-              Shop Details
+              My Location
             </TabsTrigger>
             <TabsTrigger value="cookies" className="gap-1.5">
               <Cookie className="h-3.5 w-3.5" />
@@ -1681,6 +1690,8 @@ export function SettingsPage() {
           <TabsContent value="profile">
             <ProfileTab />
           </TabsContent>
+          {(isAdmin || user?.permissions?.includes('company:read')) && <TabsContent value="organisation"><CompaniesListView /></TabsContent>}
+          {(isAdmin || user?.permissions?.includes('shop:read')) && <TabsContent value="locations"><PlantsListView /></TabsContent>}
 
           <TabsContent value="shop">
             <ShopDetailsTab />

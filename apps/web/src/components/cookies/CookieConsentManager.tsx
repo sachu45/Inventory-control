@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -203,8 +203,7 @@ export function CookieConsentManager() {
                   </Button>
                 </div>
               </div>
-              <div className="relative hidden min-h-[180px] overflow-hidden rounded-3xl bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.06)_0%,rgba(255,255,255,0.02)_35%,transparent_36%),radial-gradient(circle_at_center,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0.04)_16%,transparent_17%)] md:flex md:items-center md:justify-center">
-                <div className="absolute inset-0 opacity-40 [background:radial-gradient(circle_at_center,transparent_0,transparent_34%,rgba(255,255,255,0.06)_35%,transparent_36%,transparent_64%,rgba(255,255,255,0.04)_65%,transparent_66%)]" />
+              <div className="relative hidden min-h-[180px] border-l border-slate-700 md:flex md:items-center md:justify-center">
                 <div className="relative flex h-14 w-14 items-center justify-center rounded-full border border-white/15 bg-card/5">
                   <ShieldCheck className="h-6 w-6 text-slate-200" />
                 </div>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CheckCircle2, Download, Eye, ImagePlus, Pencil, Plus, Send, Trash2, XCircle } from 'lucide-react';
+import { CheckCircle2, Download, Eye, ImagePlus, Pencil, Plus, Send, Trash2, XCircle } from '@/components/ui/icons';
 import { toast } from 'sonner';
 import { AppLayout } from '@/components/AppLayout';
 import { CreatePageLayout, PageHeader } from '@/components/shared';

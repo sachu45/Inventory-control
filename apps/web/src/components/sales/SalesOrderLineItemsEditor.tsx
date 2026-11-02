@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from '@/components/ui/icons';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { BarcodeInput, BarcodeNotFoundDialog } from '@/components/shared';

@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Link2, PackagePlus, ScanLine, AlertTriangle, ChevronLeft } from 'lucide-react';
+import { Link2, PackagePlus, ScanLine, AlertTriangle, ChevronLeft } from '@/components/ui/icons';
 import { cn } from '@/lib/cn';
 import { getApiErrorMessage } from '@/lib/api-error';
 import { useAttachBarcode, useMarkInvalid } from '@/hooks/use-barcodes';

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 export type SidebarPinMode = 'pinned' | 'auto-hide';
 
-const STORAGE_KEY = 'retail-ims-sidebar';
+const STORAGE_KEY = 'retail-ims-sidebar-simple-v2';
 
 type PersistedState = {
   collapsedSections: Record<string, boolean>;
@@ -11,14 +11,14 @@ type PersistedState = {
 };
 
 function readStored(): PersistedState {
-  const defaults: PersistedState = { collapsedSections: {}, pinMode: 'pinned', width: 240 };
+  const defaults: PersistedState = { collapsedSections: { procurement: true, 'sales-finance': true, operations: true }, pinMode: 'pinned', width: 240 };
   if (typeof localStorage === 'undefined') return defaults;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaults;
     const parsed = JSON.parse(raw) as Partial<PersistedState>;
     return {
-      collapsedSections: parsed.collapsedSections ?? {},
+      collapsedSections: { ...defaults.collapsedSections, ...parsed.collapsedSections },
       pinMode: parsed.pinMode === 'auto-hide' ? 'auto-hide' : 'pinned',
       width: typeof parsed.width === 'number' ? parsed.width : 240,
     };

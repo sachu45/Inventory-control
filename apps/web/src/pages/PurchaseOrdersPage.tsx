@@ -17,7 +17,7 @@ import {
   Send,
   Download,
   ShoppingCart,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/cn';
@@ -378,7 +378,7 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
   // ---- UI state ----
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingPO, setEditingPO] = useState<PurchaseOrder | null>(null);
-  const [detailId, setDetailId] = useState<string | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(() => new URLSearchParams(location.search).get('record'));
   const [confirmState, setConfirmState] = useState<{ type: 'confirm'; id: string; poNumber: string } | null>(null);
   const [cancelDialog, setCancelDialog] = useState<{
     id: string;

@@ -6,7 +6,7 @@ import {
   ShoppingCart,
   Store,
   Truck,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import {
   Dialog,
   DialogContent,

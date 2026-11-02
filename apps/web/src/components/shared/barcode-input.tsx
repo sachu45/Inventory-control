@@ -1,5 +1,5 @@
 import { forwardRef, useCallback, useRef, useState, type KeyboardEvent } from 'react';
-import { ScanBarcode } from 'lucide-react';
+import { ScanBarcode } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/cn';
 

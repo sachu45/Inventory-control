@@ -4,6 +4,7 @@ export type ReportsDatePreset =
   | 'today'
   | '7d'
   | '30d'
+  | '90d'
   | 'this-month'
   | 'last-month'
   | 'custom';
@@ -35,9 +36,9 @@ function rangeForPreset(preset: ReportsDatePreset): { from: string; to: string }
     from.setDate(from.getDate() - 6);
     return { from: formatDateInput(from), to: formatDateInput(endOfToday) };
   }
-  if (preset === '30d') {
+  if (preset === '30d' || preset === '90d') {
     const from = new Date(startOfToday);
-    from.setDate(from.getDate() - 29);
+    from.setDate(from.getDate() - (preset === '90d' ? 89 : 29));
     return { from: formatDateInput(from), to: formatDateInput(endOfToday) };
   }
   if (preset === 'this-month') {
@@ -60,6 +61,7 @@ export function ReportsDateRangeBar({
     { key: 'today', label: 'Today' },
     { key: '7d', label: '7d' },
     { key: '30d', label: '30d' },
+    { key: '90d', label: '90d' },
     { key: 'this-month', label: 'This Month' },
     { key: 'last-month', label: 'Last Month' },
     { key: 'custom', label: 'Custom' },

@@ -8,12 +8,12 @@ export const ANIMAL_AVATARS = ['chick', 'owl', 'penguin', 'rabbit', 'eagle', 'ca
 export type AnimalAvatarKind = (typeof ANIMAL_AVATARS)[number];
 
 const ANIMAL_EMOJI: Record<AnimalAvatarKind, string> = {
-  chick: '🐥',
-  owl: '🦉',
-  penguin: '🐧',
-  rabbit: '🐰',
-  eagle: '🦅',
-  cat: '🐱',
+  chick: 'CH',
+  owl: 'OW',
+  penguin: 'PE',
+  rabbit: 'RA',
+  eagle: 'EA',
+  cat: 'CA',
 };
 
 const AVATAR_BG = [
@@ -80,7 +80,7 @@ export function animalAvatarForUser(user: BasicUser) {
   const kind = ANIMAL_AVATARS[Math.max(0, idx)];
   return {
     kind,
-    emoji: ANIMAL_EMOJI[kind],
+    emoji: (user?.name ?? 'User').split(' ').map(part => part[0]).slice(0, 2).join('').toUpperCase(),
     bgClass: AVATAR_BG[idx],
   };
 }

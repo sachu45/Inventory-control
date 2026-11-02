@@ -1,3 +1,5 @@
+import { createElement } from 'react';
+import { AlertCircle, AlertTriangle, Clock, CheckCircle2, Wallet, Package, BarChart3, DollarSign, Lightbulb } from '@/components/ui/icons';
 import { api as apiClient } from './client';
 
 export interface DeadStockItem {
@@ -57,11 +59,11 @@ export const getDeadStockReport = async (filters: DeadStockFilters): Promise<Dea
 export const getSeverityIcon = (severity: 'CRITICAL' | 'HIGH' | 'MEDIUM') => {
   switch (severity) {
     case 'CRITICAL':
-      return '🔴';
+      return createElement(AlertCircle, { size: 16, className: 'inline-block align-middle' });
     case 'HIGH':
-      return '🟠';
+      return createElement(AlertTriangle, { size: 16, className: 'inline-block align-middle' });
     case 'MEDIUM':
-      return '🟡';
+      return createElement(Clock, { size: 16, className: 'inline-block align-middle' });
   }
 };
 
@@ -149,11 +151,11 @@ export const getReorderIntelligence = async (filters: ReorderFilters): Promise<R
 export const getUrgencyIcon = (urgency: 'HIGH' | 'MEDIUM' | 'LOW') => {
   switch (urgency) {
     case 'HIGH':
-      return '🔴';
+      return createElement(AlertCircle, { size: 16, className: 'inline-block align-middle' });
     case 'MEDIUM':
-      return '🟡';
+      return createElement(Clock, { size: 16, className: 'inline-block align-middle' });
     case 'LOW':
-      return '🟢';
+      return createElement(CheckCircle2, { size: 16, className: 'inline-block align-middle' });
   }
 };
 
@@ -229,13 +231,13 @@ export const getCustomerAging = async (filters: CustomerAgingFilters): Promise<C
 export const getRiskIcon = (riskScore: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'GREEN') => {
   switch (riskScore) {
     case 'CRITICAL':
-      return '🔴';
+      return createElement(AlertCircle, { size: 16, className: 'inline-block align-middle' });
     case 'HIGH':
-      return '🟠';
+      return createElement(AlertTriangle, { size: 16, className: 'inline-block align-middle' });
     case 'MEDIUM':
-      return '🟡';
+      return createElement(Clock, { size: 16, className: 'inline-block align-middle' });
     case 'GREEN':
-      return '🟢';
+      return createElement(CheckCircle2, { size: 16, className: 'inline-block align-middle' });
   }
 };
 
@@ -380,11 +382,11 @@ export const getActionCenter = async (filters: ActionCenterFilters): Promise<Act
 export const getPriorityIcon = (priority: 'CRITICAL' | 'HIGH' | 'MEDIUM') => {
   switch (priority) {
     case 'CRITICAL':
-      return '🔴';
+      return createElement(AlertCircle, { size: 16, className: 'inline-block align-middle' });
     case 'HIGH':
-      return '🟠';
+      return createElement(AlertTriangle, { size: 16, className: 'inline-block align-middle' });
     case 'MEDIUM':
-      return '🟡';
+      return createElement(Clock, { size: 16, className: 'inline-block align-middle' });
   }
 };
 
@@ -402,15 +404,15 @@ export const getPriorityLabel = (priority: 'CRITICAL' | 'HIGH' | 'MEDIUM') => {
 export const getCategoryIcon = (category: 'cash-flow' | 'procurement' | 'inventory' | 'pricing' | 'opportunity') => {
   switch (category) {
     case 'cash-flow':
-      return '💰';
+      return createElement(Wallet, { size: 16, className: 'inline-block align-middle' });
     case 'procurement':
-      return '📦';
+      return createElement(Package, { size: 16, className: 'inline-block align-middle' });
     case 'inventory':
-      return '📊';
+      return createElement(BarChart3, { size: 16, className: 'inline-block align-middle' });
     case 'pricing':
-      return '💲';
+      return createElement(DollarSign, { size: 16, className: 'inline-block align-middle' });
     case 'opportunity':
-      return '💡';
+      return createElement(Lightbulb, { size: 16, className: 'inline-block align-middle' });
   }
 };
 

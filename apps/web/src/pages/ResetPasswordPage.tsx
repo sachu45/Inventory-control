@@ -1,10 +1,11 @@
+import { AuthLayout } from '@/components/auth/AuthLayout';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Link2, LockKeyhole } from 'lucide-react';
+import { Link2, LockKeyhole } from '@/components/ui/icons';
 import { TurnstileField } from '@/components/TurnstileField';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { getApiErrorMessage } from '@/lib/api-error';
@@ -91,46 +92,15 @@ export function ResetPasswordPage() {
     }
   }
 
-  return (
-    <div className="min-h-screen bg-muted">
-      <header className="bg-slate-900 px-4 py-4 text-white">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5">
-            <span className="text-sm font-bold text-white">SoftdigitIMS</span>
-            <span className="text-[11px] text-slate-300">Magic link reset</span>
-          </div>
-          <Link to="/login" className="inline-flex items-center gap-2 text-sm text-slate-300 hover:text-white">
-            <ArrowLeft className="h-4 w-4" />
-            Back to login
-          </Link>
-        </div>
-      </header>
-
-      <main className="mx-auto grid max-w-5xl gap-6 px-4 py-12 lg:grid-cols-[1.1fr_0.9fr]">
-        <section className="hidden rounded-3xl bg-linear-to-br from-slate-800 via-slate-900 to-slate-950 p-8 text-white shadow-xl lg:block">
-          <p className="text-sm uppercase tracking-[0.22em] text-slate-300">SoftdigitIMS</p>
-          <h1 className="mt-4 text-4xl font-semibold leading-tight">Set a new password with your secure link.</h1>
-          <p className="mt-4 max-w-md text-sm text-white/80">
-            This link works once, expires in 10 minutes, and revokes all existing sessions after
-            the reset is completed.
-          </p>
-          <div className="mt-8 grid gap-3 text-sm">
-            <div className="rounded-2xl border border-white/15 bg-card/10 p-4">Single-use magic link</div>
-            <div className="rounded-2xl border border-white/15 bg-card/10 p-4">Only hashed tokens are stored on the server</div>
-            <div className="rounded-2xl border border-white/15 bg-card/10 p-4">Automatic sign-in with a fresh session after reset</div>
-          </div>
-        </section>
-
-        <Card className="border-border shadow-xl">
-          <CardHeader>
-            <CardTitle>Reset password</CardTitle>
-          </CardHeader>
+  return <AuthLayout headline="A fresh start.\nA secure workspace." description="Get back to your business with the account recovery options already set up for your workspace.">
+    <div className="auth-form-heading"><span className="auth-eyebrow">ACCOUNT RECOVERY</span><h2>Set a new password</h2><p>Choose a strong password to protect your account.</p></div>
+    <Card className="auth-inner-card">
           <CardContent className="space-y-4">
             {state === 'loading' ? <p className="text-sm text-muted-foreground">Validating reset link...</p> : null}
 
             {state === 'error' ? (
               <>
-                <div className="rounded-md border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300">
+                <div role="alert" className="rounded-md border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300">
                   {error}
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -152,6 +122,8 @@ export function ResetPasswordPage() {
                     <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                       id="new-password"
+                  required
+                  minLength={10}
                       type="password"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
@@ -165,6 +137,8 @@ export function ResetPasswordPage() {
                   <Label htmlFor="confirm-password">Confirm password</Label>
                   <Input
                     id="confirm-password"
+                  required
+                  minLength={10}
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
@@ -173,7 +147,7 @@ export function ResetPasswordPage() {
                 </div>
 
                 {error ? (
-                  <div className="rounded-md border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300">
+                  <div role="alert" className="rounded-md border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300">
                     {error}
                   </div>
                 ) : null}
@@ -188,9 +162,7 @@ export function ResetPasswordPage() {
             ) : null}
           </CardContent>
         </Card>
-      </main>
-    </div>
-  );
+    <Link className="auth-return-link" to="/login">Back to sign in</Link>
+  </AuthLayout>;
 }
-
 export default ResetPasswordPage;

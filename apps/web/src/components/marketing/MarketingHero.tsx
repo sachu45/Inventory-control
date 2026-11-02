@@ -1,4 +1,4 @@
-import { CheckCircle2, FileCheck2, PackageCheck, Sparkles, TrendingUp } from 'lucide-react';
+import { CheckCircle2, FileCheck2, PackageCheck, BadgeCheck, TrendingUp } from '@/components/ui/icons';
 import { MARKETING_HERO } from '@/lib/marketing-content';
 import { Reveal, Tilt3D } from '@/components/motion';
 import { MarketingCtaLink } from './MarketingCtaLink';
@@ -20,15 +20,11 @@ export function MarketingHero() {
       className="relative overflow-hidden bg-linear-to-b from-white via-slate-50 to-white dark:from-background dark:via-card dark:to-background"
       aria-labelledby="hero-heading"
     >
-      {/* Animated gradient mesh + aurora + grid for layered depth */}
-      <div className="mk-mesh pointer-events-none absolute inset-0" />
-      <div className="mk-aurora pointer-events-none absolute -top-40 left-1/2 h-[520px] w-[820px] -translate-x-1/2 rounded-full opacity-70" />
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgb(15_23_42/0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgb(15_23_42/0.03)_1px,transparent_1px)] bg-size-[56px_56px] mask-[radial-gradient(ellipse_at_top,black,transparent_70%)]" />
 
       <div className="relative mx-auto grid max-w-6xl gap-10 px-4 py-16 sm:px-6 sm:py-20 lg:grid-cols-[1.02fr_1fr] lg:items-center lg:py-24">
         <Reveal>
           <span className="mk-glass inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
-            <Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden />
+            <BadgeCheck className="h-3.5 w-3.5 text-primary" aria-hidden />
             {MARKETING_HERO.badge}
           </span>
 

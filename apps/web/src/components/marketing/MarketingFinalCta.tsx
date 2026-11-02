@@ -8,7 +8,6 @@ export function MarketingFinalCta() {
 
   return (
     <section className="relative overflow-hidden bg-linear-to-br from-slate-600 via-slate-700 to-slate-800 py-16 sm:py-20" aria-labelledby="final-cta-heading">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgb(255_255_255/0.12),transparent_50%)]" />
 
       {primaryImage ? (
         <div className="pointer-events-none absolute -right-8 top-8 hidden w-[42%] max-w-md rotate-3 md:block lg:-right-4 lg:top-6">

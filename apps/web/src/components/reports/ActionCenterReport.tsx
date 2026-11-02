@@ -62,22 +62,22 @@ export default function ActionCenterReport({ shopId }: Props) {
       {/* Summary Badges */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-red-50 dark:bg-red-500/10 rounded-lg shadow-sm p-4 border-l-4 border-red-500">
-          <p className="text-sm font-medium text-red-600 dark:text-red-400">🔴 Critical</p>
+          <p className="text-sm font-medium text-red-600 dark:text-red-400">Critical</p>
           <p className="text-3xl font-bold text-red-600 dark:text-red-400">{data.actionsSummary.critical}</p>
           <p className="text-xs text-red-500 mt-1">Needs immediate action</p>
         </div>
         <div className="bg-orange-50 dark:bg-orange-500/10 rounded-lg shadow-sm p-4 border-l-4 border-orange-500">
-          <p className="text-sm font-medium text-orange-600 dark:text-orange-400">🟠 High</p>
+          <p className="text-sm font-medium text-orange-600 dark:text-orange-400">High</p>
           <p className="text-3xl font-bold text-orange-600 dark:text-orange-400">{data.actionsSummary.high}</p>
           <p className="text-xs text-orange-500 mt-1">This week</p>
         </div>
         <div className="bg-yellow-50 dark:bg-yellow-500/10 rounded-lg shadow-sm p-4 border-l-4 border-yellow-500">
-          <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">🟡 Medium</p>
+          <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">Medium</p>
           <p className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">{data.actionsSummary.medium}</p>
           <p className="text-xs text-yellow-500 mt-1">Next week</p>
         </div>
         <div className="bg-blue-50 dark:bg-blue-500/10 rounded-lg shadow-sm p-4 border-l-4 border-blue-500">
-          <p className="text-sm font-medium text-blue-600 dark:text-blue-400">📋 Total</p>
+          <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Total</p>
           <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{totalActions}</p>
           <p className="text-xs text-blue-500 mt-1">Actions to handle</p>
         </div>
@@ -87,7 +87,7 @@ export default function ActionCenterReport({ shopId }: Props) {
       <div className="space-y-3">
         {data.actions.length === 0 ? (
           <div className="bg-green-50 dark:bg-green-500/10 border-2 border-green-300 rounded-lg p-8 text-center dark:border-green-500/30">
-            <p className="text-2xl font-bold text-green-900 dark:text-green-300">✅ All Clear!</p>
+            <p className="text-2xl font-bold text-green-900 dark:text-green-300">All clear</p>
             <p className="text-sm text-green-700 dark:text-green-300 mt-2">No urgent actions needed right now.</p>
             <p className="text-xs text-green-600 dark:text-green-400 mt-1">Keep monitoring your reports regularly.</p>
           </div>
@@ -137,7 +137,7 @@ export default function ActionCenterReport({ shopId }: Props) {
 
                   <div>
                     <p className="text-sm font-semibold text-foreground mb-2">Estimated Impact</p>
-                    <p className="text-sm text-foreground bg-green-50 dark:bg-green-500/10 p-3 rounded text-green-900 dark:text-green-300">✓ {action.estimatedImpact}</p>
+                    <p className="text-sm text-foreground bg-green-50 dark:bg-green-500/10 p-3 rounded text-green-900 dark:text-green-300">{action.estimatedImpact}</p>
                   </div>
 
                   {Object.keys(action.details).length > 0 && (
@@ -171,14 +171,14 @@ export default function ActionCenterReport({ shopId }: Props) {
 
       {/* Daily Ritual Card */}
       <div className="bg-linear-to-r from-blue-500 to-blue-600 rounded-lg shadow-sm p-6 text-white">
-        <h3 className="text-lg font-bold mb-2">📍 Daily Ritual</h3>
+        <h3 className="text-lg font-bold mb-2">Daily Ritual</h3>
         <p className="text-sm mb-3">Start your day by reviewing these 5 steps:</p>
         <ol className="text-sm space-y-1">
-          <li>✓ Check Action Center (you're here!)</li>
-          <li>✓ Handle all CRITICAL items</li>
-          <li>✓ Plan HIGH priority actions for today</li>
-          <li>✓ Schedule MEDIUM priority work</li>
-          <li>✓ Update teams on progress</li>
+          <li>Check Action Center (you're here!)</li>
+          <li>Handle all CRITICAL items</li>
+          <li>Plan HIGH priority actions for today</li>
+          <li>Schedule MEDIUM priority work</li>
+          <li>Update teams on progress</li>
         </ol>
         <p className="text-xs mt-3 opacity-90">Takes ~10 minutes. Prevents problems from becoming crises.</p>
       </div>

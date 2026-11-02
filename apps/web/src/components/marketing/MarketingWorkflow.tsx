@@ -1,5 +1,5 @@
-import type { LucideIcon } from 'lucide-react';
-import { ArrowRight, PackageCheck, ReceiptText, ShoppingCart, Wallet } from 'lucide-react';
+import type { LucideIcon } from '@/components/ui/icons';
+import { ArrowRight, PackageCheck, ReceiptText, ShoppingCart, Wallet } from '@/components/ui/icons';
 import { MARKETING_WORKFLOW } from '@/lib/marketing-content';
 import { Reveal } from '@/components/motion';
 

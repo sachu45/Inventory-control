@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { CheckCircle2, FileText, IndianRupee, MessageSquare, XCircle } from 'lucide-react';
+import { CheckCircle2, FileText, IndianRupee, MessageSquare, XCircle } from '@/components/ui/icons';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

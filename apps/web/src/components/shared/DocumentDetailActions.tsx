@@ -1,4 +1,4 @@
-import { Download, Send } from 'lucide-react';
+import { Download, Send } from '@/components/ui/icons';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { DocumentEmailHistoryPanel } from '@/components/shared/DocumentEmailHistoryPanel';

@@ -7,7 +7,7 @@ import {
   ShieldAlert,
   Truck,
   type LucideIcon,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 
 /** Visual treatment for a notification, derived from its `type`/`priority`. */
 export type NotificationVisual = {

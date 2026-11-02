@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Ban, CheckCircle2, Loader2, Save } from 'lucide-react';
+import { ArrowLeft, Ban, CheckCircle2, Loader2, Save } from '@/components/ui/icons';
 import { toast } from 'sonner';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';

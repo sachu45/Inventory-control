@@ -22,7 +22,7 @@ import {
   Package,
   ShoppingCart,
   Store,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -1777,7 +1777,7 @@ export function ReportsPage() {
             <TabsTrigger value="inventory-aging" className="shrink-0">Inventory Aging</TabsTrigger>
             <TabsTrigger value="rfq-analytics" className="shrink-0">RFQ Analytics</TabsTrigger>
             <div className="mx-1 h-5 w-px self-center bg-border/60" />
-            <TabsTrigger value="action-center" className="shrink-0">⚡ Action Center</TabsTrigger>
+            <TabsTrigger value="action-center" className="shrink-0">Action Center</TabsTrigger>
             <TabsTrigger value="dead-stock" className="shrink-0">Dead Stock</TabsTrigger>
             <TabsTrigger value="reorder-intelligence" className="shrink-0">Reorder Intelligence</TabsTrigger>
             <TabsTrigger value="customer-aging" className="shrink-0">Customer Aging</TabsTrigger>

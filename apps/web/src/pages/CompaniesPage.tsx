@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import {
   Building2,
   CheckCircle2,
@@ -7,7 +7,7 @@ import {
   Pencil,
   Plus,
   Trash2,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import { toast } from 'sonner';
 import { cn } from '@/lib/cn';
 import { AppLayout } from '@/components/AppLayout';
@@ -194,7 +194,7 @@ function CompanyCard({ company, plants, onEdit, onDeactivate }: CompanyCardProps
 
         <div className="mt-4 flex-1">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Plants ({activePlants.length})
+            Locations ({activePlants.length})
           </p>
           {activePlants.length === 0 ? (
             <p className="mt-2 text-xs text-muted-foreground">No plants linked to this company</p>
@@ -219,7 +219,7 @@ function CompanyCard({ company, plants, onEdit, onDeactivate }: CompanyCardProps
             variant="ghost"
             size="icon"
             className="h-8 w-8 text-muted-foreground"
-            aria-label="Edit company"
+            aria-label="Edit organisation"
             onClick={onEdit}
           >
             <Pencil className="h-4 w-4" />
@@ -230,7 +230,7 @@ function CompanyCard({ company, plants, onEdit, onDeactivate }: CompanyCardProps
               variant="ghost"
               size="icon"
               className="h-8 w-8 text-red-600 dark:text-red-400 hover:bg-red-50 hover:text-red-700"
-              aria-label="Deactivate company"
+              aria-label="Deactivate organisation"
               onClick={onDeactivate}
             >
               <Trash2 className="h-4 w-4" />
@@ -242,7 +242,7 @@ function CompanyCard({ company, plants, onEdit, onDeactivate }: CompanyCardProps
   );
 }
 
-function CompaniesListView() {
+export function CompaniesListView() {
   const navigate = useNavigate();
   const companyId = useAuthStore((s) => s.user?.companyId);
   const canCreateCompany = !companyId;
@@ -341,7 +341,8 @@ function CompaniesListView() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Companies"
+        title="Organisation"
+        showBreadcrumbs={false}
         description={
           canCreateCompany
             ? 'Legal entities and company master for plants and suppliers'
@@ -351,14 +352,14 @@ function CompaniesListView() {
         {canCreateCompany ? (
           <Button onClick={() => navigate('/companies/new')}>
             <Plus className="mr-2 h-4 w-4" />
-            Add Company
+            Add Organisation
           </Button>
         ) : null}
       </PageHeader>
 
       <div className="grid gap-3 sm:grid-cols-3">
         <KpiCard
-          label="Total Companies"
+          label="Total Organisations"
           value={stats.total}
           accent="bg-primary"
           icon={<Building2 className="h-5 w-5 text-primary" />}
@@ -370,7 +371,7 @@ function CompaniesListView() {
           icon={<CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />}
         />
         <KpiCard
-          label="Linked Plants"
+          label="Linked Locations"
           value={stats.plants}
           accent="bg-sky-500"
           icon={<Factory className="h-5 w-5 text-sky-600 dark:text-sky-400" />}
@@ -399,7 +400,7 @@ function CompaniesListView() {
                 onClick={() => navigate('/companies/new')}
               >
                 <Plus className="mr-2 h-4 w-4" />
-                Add Company
+                Add Organisation
               </Button>
             ) : null}
           </CardContent>
@@ -449,7 +450,7 @@ function CompaniesListView() {
                   setDeactivateTarget(editing);
                 }}
               >
-                Deactivate company
+                Deactivate organisation
               </Button>
             )}
             <div className="flex gap-2 pt-2">
@@ -479,7 +480,7 @@ function CompaniesListView() {
       <AlertDialog open={!!deactivateTarget} onOpenChange={(open) => !open && setDeactivateTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Deactivate company</AlertDialogTitle>
+            <AlertDialogTitle>Deactivate organisation</AlertDialogTitle>
             <AlertDialogDescription>
               Deactivate{' '}
               <span className="font-medium text-foreground">{deactivateTarget?.companyName}</span>?
@@ -534,7 +535,7 @@ function CompaniesCreateView() {
 
   return (
     <div className="create-page-shell space-y-6 p-4 sm:p-6">
-      <PageHeader title="Add Company" description="Create a legal entity for plants and suppliers">
+      <PageHeader title="Add Organisation" description="Create a legal entity for plants and suppliers">
         <Button variant="outline" onClick={() => navigate('/companies')}>
           Back
         </Button>
@@ -558,8 +559,9 @@ function CompaniesCreateView() {
 }
 
 export function CompaniesPage({ createOnly = false }: { createOnly?: boolean }) {
+  if (!createOnly) return <Navigate to="/settings?tab=organisation" replace />;
   return (
-    <AppLayout active="Companies">
+    <AppLayout active="Organisation">
       {createOnly ? <CompaniesCreateView /> : <CompaniesListView />}
     </AppLayout>
   );

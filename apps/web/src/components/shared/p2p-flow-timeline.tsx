@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, Clock3 } from 'lucide-react';
+import { CheckCircle2, Circle, Clock3 } from '@/components/ui/icons';
 import { cn } from '@/lib/cn';
 
 export type P2PStep = {
