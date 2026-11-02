@@ -31,8 +31,8 @@ function authEnvelope(session: E2eSession) {
 }
 
 /**
- * The SPA bootstraps via POST /auth/refresh. main.tsx clears legacy localStorage, so
- * e2e uses session.json from auth.setup plus optional cookie-based refresh via preview proxy.
+ * Reuse the session from the real login setup for module-layout tests. Startup
+ * validates cached tokens via /auth/me; expired tokens can still use refresh.
  */
 export async function installAuthRefreshStub(page: Page) {
   const session = readE2eSession();
@@ -65,16 +65,12 @@ export async function installAuthRefreshStub(page: Page) {
 /** Wait until auth bootstrap finished and the app shell top bar is visible. */
 export async function waitForAppShell(page: Page) {
   await expect(page).not.toHaveURL(/\/login(?:\?|$)/, { timeout: 30_000 });
-  await expect(page.locator('header h2').first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('banner').getByRole('button', { name: 'Open application launcher' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('main').getByRole('heading', { level: 1 }).first()).toBeVisible({ timeout: 30_000 });
 }
 
 export async function gotoAuthed(page: Page, path: string) {
   await installAuthRefreshStub(page);
-  const refreshDone = page.waitForResponse(
-    (res) => res.url().includes('/api/v1/auth/refresh') && res.status() >= 200 && res.status() < 300,
-    { timeout: 30_000 },
-  );
   await page.goto(path, { waitUntil: 'domcontentloaded' });
-  await refreshDone;
   await waitForAppShell(page);
 }
