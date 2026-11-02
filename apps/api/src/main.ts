@@ -114,6 +114,25 @@ async function bootstrap() {
   // before the process exits.
   app.enableShutdownHooks();
 
+  // Stop accepting new connections immediately on shutdown signal so the load
+  // balancer drains in-flight requests to this instance while Nest tears down.
+  const shutdownLogger = new Logger('Shutdown');
+  const DRAIN_TIMEOUT_MS = Number(process.env.SHUTDOWN_DRAIN_MS ?? 10_000);
+
+  for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+    process.on(signal, () => {
+      shutdownLogger.log(`Received ${signal} — draining for up to ${DRAIN_TIMEOUT_MS}ms`);
+      const server = app.getHttpServer();
+      server.close(() => {
+        shutdownLogger.log('All connections drained');
+      });
+      setTimeout(() => {
+        shutdownLogger.warn('Drain timeout exceeded — forcing shutdown');
+        process.exit(1);
+      }, DRAIN_TIMEOUT_MS).unref();
+    });
+  }
+
   // Serve uploaded avatars under `/uploads/*` so the SPA can <img src> them.
   // Path matches AvatarStorageService.store() output. Kept outside `api/v1`
   // because these are user-generated static assets, not API endpoints.
