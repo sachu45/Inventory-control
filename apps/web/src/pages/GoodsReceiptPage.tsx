@@ -18,13 +18,14 @@ import {
   X,
   Loader2,
   Download,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 
 import { cn } from '@/lib/cn';
 import { getApiErrorMessage } from '@/lib/api-error';
 import { useAuthStore } from '@/store/authStore';
 import {
   useGoodsReceipts,
+  useGoodsReceipt,
   useCreateGoodsReceipt,
   useUpdateGoodsReceipt,
   usePostGoodsReceipt,
@@ -220,6 +221,9 @@ export function GoodsReceiptPage({ createOnly = false }: { createOnly?: boolean 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingGR, setEditingGR] = useState<GoodsReceipt | null>(null);
   const [viewingGR, setViewingGR] = useState<GoodsReceipt | null>(null);
+  const linkedReceipt = useGoodsReceipt(createOnly ? '' : searchParams.get('record') ?? '');
+  useEffect(() => { if (linkedReceipt.data) setViewingGR(linkedReceipt.data); }, [linkedReceipt.data]);
+  useEffect(() => { if (linkedReceipt.isError) toast.error('This receipt is unavailable or you do not have access.'); }, [linkedReceipt.isError]);
   const [postTarget, setPostTarget] = useState<GoodsReceipt | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<GoodsReceipt | null>(null);
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);

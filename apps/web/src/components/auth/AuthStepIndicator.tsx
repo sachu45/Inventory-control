@@ -1,44 +1,7 @@
-type AuthStepIndicatorProps = {
-  steps: Array<{ id: string; label: string }>;
-  current: string;
-};
-
+import { Check } from '@/components/ui/icons';
+type AuthStepIndicatorProps = { steps: Array<{ id: string; label: string }>; current: string };
 export function AuthStepIndicator({ steps, current }: AuthStepIndicatorProps) {
-  const currentIndex = Math.max(
-    0,
-    steps.findIndex((step) => step.id === current),
-  );
-
-  return (
-    <div className="mb-8 flex items-center justify-center">
-      {steps.map((step, index) => {
-        const completed = index < currentIndex;
-        const active = index === currentIndex;
-        return (
-          <div key={step.id} className="flex items-center">
-            <div
-              className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition ${
-                completed
-                  ? 'bg-slate-900 text-white'
-                  : active
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-slate-200 text-muted-foreground dark:bg-slate-800'
-              }`}
-            >
-              {completed ? '✓' : index + 1}
-            </div>
-            {index < steps.length - 1 ? (
-              <div
-                className={`mx-2 h-0.5 w-8 transition ${
-                  completed ? 'bg-slate-900' : 'bg-slate-200 dark:bg-slate-800'
-                }`}
-              />
-            ) : null}
-          </div>
-        );
-      })}
-    </div>
-  );
+  const currentIndex = Math.max(0, steps.findIndex(step => step.id === current));
+  return <ol className="auth-stepper" aria-label="Account setup progress">{steps.map((step,index) => <li className="auth-step" key={step.id} aria-current={step.id === current ? 'step' : undefined}><span>{index < currentIndex ? <Check size={12} /> : index + 1}</span>{step.label}</li>)}</ol>;
 }
-
 export default AuthStepIndicator;

@@ -23,7 +23,10 @@ import {
   TrendingDown,
   TrendingUp,
   ArrowRight,
-} from 'lucide-react';
+  Plus,
+  ClipboardList,
+  BarChart3,
+} from '@/components/ui/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -68,7 +71,7 @@ const CHART_THEME = {
   legend: '#475569',
 } as const;
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+const COLORS = ['#153b70', '#2459a6', '#4c83d5', '#92b4dd', '#3e9677', '#d6a23a'];
 
 function formatAmount(value: number): string {
   return new Intl.NumberFormat('en-IN', {
@@ -208,8 +211,10 @@ export function DashboardPage() {
       <div className="dashboard-normal space-y-6">
         <PageHeader
           title="Dashboard"
-          description={`Welcome back, ${user?.name ?? 'User'} — inventory overview at a glance`}
+          description={`Your inventory, at a glance. Welcome back, ${user?.name ?? 'User'}.`}
         >
+          <Button variant="outline" onClick={() => navigate('/reports')}><BarChart3 className="h-4 w-4" /> View reports</Button>
+          <Button onClick={() => navigate('/products/new')}><Plus className="h-4 w-4" /> Add product</Button>
           {isAdmin && shopList.length > 0 && (
             <Select value={shopFilter} onValueChange={setShopFilter}>
               <SelectTrigger className="h-9 w-full sm:w-[200px]">
@@ -237,30 +242,29 @@ export function DashboardPage() {
           </div>
         )}
 
-        {/* KPI cards */}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {!isError && <>
+        {/* KPI strip */}
+        <div className="metric-strip">
           {isLoading
             ? Array.from({ length: 4 }).map((_, i) => <DashboardKpiCardSkeleton key={i} />)
             : kpiCards.map((card) => <DashboardKpiCard {...card} key={card.key} />)}
         </div>
 
-        <DashboardInsightsPanel
-          dashboard={dashboard}
-          shopId={dashboardShopId}
-          isLoading={isLoading}
-        />
+        <div className="dashboard-workspace"><div className="dashboard-main">
 
         {/* Charts */}
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="dashboard-charts">
           <Card interactive className="surface-1">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold text-foreground">
-                Stock Movement (Last 6 Months)
+                Inventory movement · last 6 months
               </CardTitle>
             </CardHeader>
             <CardContent>
               {isLoading ? (
                 <Skeleton className="h-[300px] w-full" />
+              ) : !(dashboard?.monthlyMovement ?? []).some((m) => m.receipts > 0 || m.issues > 0) ? (
+                <div className="chart-empty"><BarChart3 /><strong>No stock movement yet</strong><span>Record a receipt or issue to start tracking movement.</span><Button variant="outline" size="sm" onClick={() => navigate('/goods-receipts/new')}>Record goods receipt</Button></div>
               ) : (
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={dashboard?.monthlyMovement ?? []}>
@@ -290,7 +294,7 @@ export function DashboardPage() {
                     <Bar
                       dataKey="receipts"
                       name="Receipts"
-                      fill="#3b82f6"
+                      fill="#2459a6"
                       radius={[4, 4, 0, 0]}
                       isAnimationActive={chartAnimate}
                       animationDuration={600}
@@ -298,7 +302,7 @@ export function DashboardPage() {
                     <Bar
                       dataKey="issues"
                       name="Issues"
-                      fill="#f59e0b"
+                      fill="#92b4dd"
                       radius={[4, 4, 0, 0]}
                       isAnimationActive={chartAnimate}
                       animationDuration={600}
@@ -313,13 +317,14 @@ export function DashboardPage() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold text-foreground">Products by Category</CardTitle>
               <p className="text-xs text-muted-foreground font-normal">
-                Counts come from each product&apos;s saved category in the database (not the Settings
-                category list).
+                Your catalog mix, grouped by product category.
               </p>
             </CardHeader>
             <CardContent>
               {isLoading ? (
                 <Skeleton className="h-[300px] w-full" />
+              ) : !dashboard?.categoryBreakdown?.length ? (
+                <div className="chart-empty"><Package /><strong>Your catalog starts here</strong><span>Add products with categories to see your inventory mix.</span><Button variant="outline" size="sm" onClick={() => navigate('/products/new')}>Add product</Button></div>
               ) : (
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
@@ -358,6 +363,7 @@ export function DashboardPage() {
           </Card>
         </div>
 
+        <DashboardInsightsPanel dashboard={dashboard} shopId={dashboardShopId} isLoading={isLoading} />
         {/* Recent activity */}
         <div className="grid gap-4 lg:grid-cols-2">
           <Card interactive className="surface-1">
@@ -602,6 +608,32 @@ export function DashboardPage() {
             )}
           </CardContent>
         </Card>
+        </div>
+        <aside className="dashboard-context" aria-label="Workspace shortcuts">
+          <section className="context-panel">
+            <h2>Keep things moving</h2><p>Your most-used inventory actions, a click away.</p>
+            <div className="context-actions">
+              <button onClick={() => navigate('/goods-receipts/new')}><Package />Record goods receipt</button>
+              <button onClick={() => navigate('/purchase-orders/new')}><ClipboardList />Create purchase order</button>
+              <button onClick={() => navigate('/goods-issues/new')}><ArrowRightLeft />Record goods issue</button>
+              <button onClick={() => navigate('/reports?tab=stock-ledger')}><BarChart3 />Open stock ledger</button>
+            </div>
+          </section>
+          <section className="context-panel">
+            <h2>Needs your attention</h2>
+            {isLoading ? <Skeleton className="mt-4 h-16 w-full" /> : isError ? <p>Attention summary is unavailable. Retry loading the dashboard.</p> : <>
+              <div className="context-actions">
+                <button onClick={() => navigate(lowStockReportPath)}><AlertTriangle /><span>{dashboard?.lowStockCount ?? 0} low-stock items</span></button>
+                <button onClick={() => navigate('/purchase-orders')}><ClipboardList /><span>{dashboard?.kpiContext?.pendingPurchaseOrders ?? 0} purchase orders awaiting receipt</span></button>
+                <button onClick={() => navigate('/sales')}><ArrowRight /><span>{dashboard?.kpiContext?.pendingSalesOrders ?? 0} sales orders to fulfil</span></button>
+              </div>
+              <p>Based on the selected plant and your current access.</p>
+            </>}
+          </section>
+          <section className="context-panel context-note"><h2>One source of truth.</h2><p>Follow every movement from purchase to receipt, stock to sale. Your workspace stays connected.</p><button onClick={() => navigate('/help')}>Explore the workspace guide</button></section>
+        </aside>
+        </div>
+        </>}
       </div>
     </AppLayout>
   );

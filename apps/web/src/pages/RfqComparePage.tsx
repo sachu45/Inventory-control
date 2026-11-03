@@ -7,7 +7,7 @@ import {
   Save,
   Star,
   Trophy,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import { toast } from 'sonner';
 import { AppLayout } from '@/components/AppLayout';
 import { StatusBadge } from '@/components/StatusBadge';

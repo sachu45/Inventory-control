@@ -1,6 +1,11 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, Clock, ExternalLink, ShieldCheck, XCircle } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ApprovalBoard, ApprovalCalendar } from '@/components/approvals/ApprovalViews';
+import { ApprovalActivity } from '@/components/approvals/ApprovalActivity';
+import { DataTablePagination } from '@/components/shared/data-table-pagination';
+import { Input } from '@/components/ui/input';
+import { useAuthStore } from '@/store/authStore';
+import { CheckCircle2, Clock, ExternalLink, ShieldCheck, XCircle } from '@/components/ui/icons';
 import { toast } from 'sonner';
 import { AppLayout } from '@/components/AppLayout';
 import { PageHeader, KpiCard, EmptyState, LoadingSkeleton } from '@/components/shared';
@@ -60,8 +65,17 @@ function formatDate(value?: string | null): string {
 
 export function ApprovalsPage() {
   const navigate = useNavigate();
+  const [viewParams, setViewParams] = useSearchParams();
+  const view = ['board', 'calendar'].includes(viewParams.get('view') ?? '') ? viewParams.get('view')! : 'list';
+  const user = useAuthStore(state => state.user);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [search, setSearch] = useState('');
+  const [mine, setMine] = useState(false);
+  const [dateFrom, setDateFrom] = useState('');
+  const [decisionIntent, setDecisionIntent] = useState<ApprovalStatus | null>(null);
   const [tab, setTab] = useState<ApprovalStatus>('PENDING');
-  const { data: feed, isLoading } = useApprovals({ status: tab });
+  const { data: feed, isLoading, isError, refetch } = useApprovals({ status: view === 'list' ? tab : undefined, page, limit });
   const { data: stats } = useApprovalStats();
   const approve = useApproveApproval();
   const reject = useRejectApproval();
@@ -69,10 +83,17 @@ export function ApprovalsPage() {
   const [active, setActive] = useState<ApprovalRequest | null>(null);
   const [decisionComment, setDecisionComment] = useState('');
 
-  const rows = feed?.data ?? [];
+  const rows = (feed?.data ?? []).filter(row => {
+    const term = search.trim().toLowerCase();
+    if (term && !`${row.documentNumber ?? ''} ${row.approvalType} ${row.description ?? ''}`.toLowerCase().includes(term)) return false;
+    if (mine && row.assignedTo !== user?.id) return false;
+    if (dateFrom && (!row.requiredAt || new Date(row.requiredAt) < new Date(dateFrom))) return false;
+    return true;
+  });
   const deepLink = useMemo(() => (active ? approvalDeepLink(active) : null), [active]);
 
   function openDetail(a: ApprovalRequest) {
+    setDecisionIntent(null);
     setActive(a);
     setDecisionComment('');
   }
@@ -106,20 +127,23 @@ export function ApprovalsPage() {
 
   return (
     <AppLayout active="Approvals">
-      <PageHeader title="Pending Approvals" description="Review and action documents awaiting your decision." />
+      <PageHeader title="Approvals" description="Review documents, follow due dates and keep decisions connected to their records.">
+        <div className="erp-view-switch" aria-label="Approval view">{['list', 'board', 'calendar'].map(mode => <button key={mode} type="button" aria-pressed={view === mode} onClick={() => { setViewParams({ view:mode }); setPage(1); }}>{mode}</button>)}</div>
+      </PageHeader>
 
-      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <KpiCard label="Pending" value={stats?.pending ?? 0} accent="bg-amber-500" icon={<Clock className="h-5 w-5" />} />
-        <KpiCard label="Approved" value={stats?.approved ?? 0} accent="bg-emerald-500" icon={<CheckCircle2 className="h-5 w-5" />} />
-        <KpiCard label="Rejected" value={stats?.rejected ?? 0} accent="bg-red-500" icon={<XCircle className="h-5 w-5" />} />
+      <div className="erp-approval-summary mb-4 grid grid-cols-3 gap-2 sm:gap-3">
+        <KpiCard label="Pending" value={stats?.pending ?? '—'} accent="bg-amber-500" icon={<Clock className="h-5 w-5" />} />
+        <KpiCard label="Approved" value={stats?.approved ?? '—'} accent="bg-emerald-500" icon={<CheckCircle2 className="h-5 w-5" />} />
+        <KpiCard label="Rejected" value={stats?.rejected ?? '—'} accent="bg-red-500" icon={<XCircle className="h-5 w-5" />} />
       </div>
 
-      <div className="mb-3 flex gap-1 rounded-xl border border-border bg-card p-1 dark:border-slate-800 dark:bg-slate-900 sm:w-fit">
+      <div className="erp-record-filterbar"><Input aria-label="Search these approval results" placeholder="Search these results…" value={search} onChange={event => setSearch(event.target.value)} /><label><input type="checkbox" checked={mine} onChange={event => setMine(event.target.checked)} /> Assigned to me</label><label>Due from <input type="date" value={dateFrom} onChange={event => setDateFrom(event.target.value)} /></label>{(search || mine || dateFrom) && <Button variant="ghost" size="sm" onClick={() => { setSearch(''); setMine(false); setDateFrom(''); }}>Clear filters</Button>}</div>
+      {view === 'list' && <div className="mb-3 flex gap-1 rounded-xl border border-border bg-card p-1 dark:border-slate-800 dark:bg-slate-900 sm:w-fit">
         {TABS.map((t) => (
           <button
             key={t.key}
             type="button"
-            onClick={() => setTab(t.key)}
+            onClick={() => { setTab(t.key); setPage(1); }}
             className={
               'rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ' +
               (tab === t.key
@@ -130,9 +154,10 @@ export function ApprovalsPage() {
             {t.label}
           </button>
         ))}
-      </div>
-
-      <Card>
+      </div>}
+      {isError && <div className="auth-notice" role="alert">Approvals could not be loaded. <Button variant="link" onClick={() => refetch()}>Retry</Button></div>}
+      {!isError && view !== 'list' && (isLoading ? <LoadingSkeleton /> : view === 'board' ? <ApprovalBoard rows={rows} onSelect={openDetail} onDecision={(row, target) => { openDetail(row); setDecisionIntent(target); }} /> : <ApprovalCalendar rows={rows} onSelect={openDetail} />)}
+      {!isError && view === 'list' && <Card>
         <CardContent className="p-0">
           {isLoading ? (
             <div className="p-6">
@@ -186,7 +211,8 @@ export function ApprovalsPage() {
             </Table>
           )}
         </CardContent>
-      </Card>
+      </Card>}
+      {!isError && !isLoading && (feed?.total ?? 0) > 0 && <><p className="erp-view-note">Filters, board columns and calendar dates apply to the requests shown on this page.</p><DataTablePagination page={page} totalPages={Math.max(1, Math.ceil((feed?.total ?? 0) / limit))} total={feed?.total ?? 0} limit={limit} onPageChange={setPage} onLimitChange={value => { setLimit(value); setPage(1); }} /></>}
 
       <Sheet open={Boolean(active)} onOpenChange={(open) => !open && setActive(null)}>
         <SheetContent className="flex w-full flex-col gap-0 sm:max-w-md">
@@ -239,6 +265,7 @@ export function ApprovalsPage() {
 
               {active.status === 'PENDING' && (
                 <div className="mt-auto space-y-3 border-t border-border pt-4 dark:border-slate-800">
+                  {decisionIntent && <p className="auth-notice">Review this request, then {decisionIntent === 'APPROVED' ? 'approve it' : 'give a reason and reject it'} to finish the move.</p>}
                   <Textarea
                     placeholder="Add a comment (required to reject)…"
                     value={decisionComment}
@@ -262,6 +289,7 @@ export function ApprovalsPage() {
                   </div>
                 </div>
               )}
+              <ApprovalActivity key={active.id} record={active} />
             </div>
           )}
         </SheetContent>

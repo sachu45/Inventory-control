@@ -1,11 +1,12 @@
+import { AuthLayout } from '@/components/auth/AuthLayout';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, KeyRound, Link2, Mail } from 'lucide-react';
-import { Reveal } from '@/components/motion';
+import { KeyRound, Link2, Mail } from '@/components/ui/icons';
+
 import { TurnstileField } from '@/components/TurnstileField';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { getApiErrorMessage } from '@/lib/api-error';
@@ -27,6 +28,7 @@ export function ForgotPasswordPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [isRequesting, setIsRequesting] = useState(false);
+  const [pendingMethod, setPendingMethod] = useState<RequestMethod | null>(null);
   const [isSubmittingOtp, setIsSubmittingOtp] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState('');
   const [turnstileResetKey, setTurnstileResetKey] = useState(0);
@@ -34,12 +36,14 @@ export function ForgotPasswordPage() {
 
   async function requestReset(method: RequestMethod) {
     if (isRequesting) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setError('Enter a valid email address.'); return; }
     setIsRequesting(true);
+    setPendingMethod(method);
     setError('');
     setMessage('');
     try {
       await portalPost('/auth/password-reset/request', {
-        email,
+        email: email.trim(),
         method,
       });
       setRequestedMethod(method);
@@ -52,6 +56,7 @@ export function ForgotPasswordPage() {
       setError(getApiErrorMessage(err, 'Could not start the password reset flow.'));
     } finally {
       setIsRequesting(false);
+      setPendingMethod(null);
     }
   }
 
@@ -87,41 +92,9 @@ export function ForgotPasswordPage() {
     }
   }
 
-  return (
-    <div className="min-h-screen bg-muted">
-      <header className="bg-slate-900 px-4 py-4 text-white">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5">
-            <span className="text-sm font-bold text-white">SoftdigitIMS</span>
-            <span className="text-[11px] text-slate-300">Account recovery</span>
-          </div>
-          <Link to="/login" className="inline-flex items-center gap-2 text-sm text-slate-300 hover:text-white">
-            <ArrowLeft className="h-4 w-4" />
-            Back to login
-          </Link>
-        </div>
-      </header>
-
-      <main className="mx-auto grid max-w-5xl gap-6 px-4 py-12 lg:grid-cols-[1.1fr_0.9fr]">
-        <section className="hidden rounded-3xl bg-linear-to-br from-slate-800 via-slate-900 to-slate-950 p-8 text-white shadow-xl lg:block">
-          <p className="text-sm uppercase tracking-[0.22em] text-slate-300">SoftdigitIMS</p>
-          <h1 className="mt-4 text-4xl font-semibold leading-tight">Recover access securely.</h1>
-          <p className="mt-4 max-w-md text-sm text-white/80">
-            Choose a one-time code or a magic link. Every reset expires in 10 minutes, older reset
-            requests stop working automatically, and all sessions are revoked after reset.
-          </p>
-          <div className="mt-8 grid gap-3 text-sm">
-            <div className="rounded-2xl border border-white/15 bg-card/10 p-4">Email OTP with 5-attempt protection</div>
-            <div className="rounded-2xl border border-white/15 bg-card/10 p-4">Magic link stored as a hashed token only</div>
-            <div className="rounded-2xl border border-white/15 bg-card/10 p-4">Automatic sign-in after successful password reset</div>
-          </div>
-        </section>
-
-        <Reveal>
-        <Card className="border-border shadow-xl">
-          <CardHeader>
-            <CardTitle>Forgot password</CardTitle>
-          </CardHeader>
+  return <AuthLayout headline="A fresh start.\nA secure workspace." description="Get back to your business with the account recovery options already set up for your workspace.">
+    <div className="auth-form-heading"><span className="auth-eyebrow">ACCOUNT RECOVERY</span><h2>Forgot your password?</h2><p>We’ll help you get back into your workspace.</p></div>
+    <Card className="auth-inner-card">
           <CardContent className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -129,6 +102,7 @@ export function ForgotPasswordPage() {
                 <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="email"
+                  required
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -138,7 +112,7 @@ export function ForgotPasswordPage() {
                 />
               </div>
               <p className="text-xs text-muted-foreground">
-                We always show the same response, even if the email is not registered.
+                Enter the email address you use for your workspace.
               </p>
             </div>
 
@@ -151,7 +125,7 @@ export function ForgotPasswordPage() {
                 onClick={() => requestReset('otp')}
               >
                 <KeyRound className="h-4 w-4" />
-                {isRequesting && requestedMethod === 'otp' ? 'Sending code...' : 'Send OTP'}
+                {isRequesting && pendingMethod === 'otp' ? 'Sending code...' : 'Send code'}
               </Button>
               <Button
                 type="button"
@@ -161,7 +135,7 @@ export function ForgotPasswordPage() {
                 onClick={() => requestReset('magic_link')}
               >
                 <Link2 className="h-4 w-4" />
-                {isRequesting && requestedMethod === 'magic_link' ? 'Sending link...' : 'Send magic link'}
+                {isRequesting && pendingMethod === 'magic_link' ? 'Sending link...' : 'Send reset link'}
               </Button>
             </div>
 
@@ -172,7 +146,7 @@ export function ForgotPasswordPage() {
             ) : null}
 
             {error ? (
-              <div className="rounded-md border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300">
+              <div role="alert" className="rounded-md border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300">
                 {error}
               </div>
             ) : null}
@@ -183,6 +157,9 @@ export function ForgotPasswordPage() {
                   <Label htmlFor="otp">Reset code</Label>
                   <Input
                     id="otp"
+                    required
+                    pattern="[0-9]{6}"
+                    maxLength={6}
                     inputMode="numeric"
                     value={otp}
                     onChange={(e) => setOtp(e.target.value)}
@@ -194,6 +171,8 @@ export function ForgotPasswordPage() {
                   <Label htmlFor="new-password">New password</Label>
                   <Input
                     id="new-password"
+                  required
+                  minLength={10}
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
@@ -205,6 +184,8 @@ export function ForgotPasswordPage() {
                   <Label htmlFor="confirm-password">Confirm password</Label>
                   <Input
                     id="confirm-password"
+                  required
+                  minLength={10}
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
@@ -228,10 +209,6 @@ export function ForgotPasswordPage() {
             </p>
           </CardContent>
         </Card>
-        </Reveal>
-      </main>
-    </div>
-  );
+  </AuthLayout>;
 }
-
 export default ForgotPasswordPage;

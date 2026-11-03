@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
   Building2,
@@ -13,7 +13,7 @@ import {
   Truck,
   Star,
   Trash2,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import { toast } from 'sonner';
 import { AppLayout } from '@/components/AppLayout';
 import { PageHeader, SearchInput, ConfirmDialog, CreatePageLayout, LoadingSkeleton, EmptyState } from '@/components/shared';
@@ -49,6 +49,7 @@ import {
 } from '@/components/ui/table';
 import {
   useSuppliers,
+  useSupplier,
   useCreateSupplier,
   useUpdateSupplier,
   useRequestSupplierDeletion,
@@ -552,12 +553,14 @@ function SuppliersCreateView() {
 
 function SuppliersListView() {
   const navigate = useNavigate();
+  const [recordParams, setRecordParams] = useSearchParams();
   const { data: allSuppliers = [], isLoading } = useSuppliers();
   const { data: companies = [] } = useCompanies();
   const updateSupplier = useUpdateSupplier();
   const requestDeletion = useRequestSupplierDeletion();
 
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => recordParams.get('search') ?? '');
+  useEffect(() => { setSearch(recordParams.get('search') ?? ''); }, [recordParams]);
   const debouncedSearch = useDebouncedValue(search, 300);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
@@ -565,6 +568,9 @@ function SuppliersListView() {
   const [editForm, setEditForm] = useState(emptyForm);
   const [editSheetOpen, setEditSheetOpen] = useState(false);
   const [viewSheetOpen, setViewSheetOpen] = useState(false);
+  const linkedSupplier = useSupplier(recordParams.get('record') ?? '');
+  useEffect(() => { if (linkedSupplier.data) { setViewSupplier(linkedSupplier.data); setViewSheetOpen(true); } }, [linkedSupplier.data]);
+  useEffect(() => { if (linkedSupplier.isError) toast.error('This supplier is unavailable or you do not have access.'); }, [linkedSupplier.isError]);
   const [deleteTarget, setDeleteTarget] = useState<Supplier | null>(null);
 
   const deletionImpact = useSupplierDeletionImpact(deleteTarget?.id ?? null);
@@ -925,7 +931,7 @@ function SuppliersListView() {
         </SheetContent>
       </Sheet>
 
-      <Sheet open={viewSheetOpen} onOpenChange={setViewSheetOpen}>
+      <Sheet open={viewSheetOpen} onOpenChange={(open) => { setViewSheetOpen(open); if (!open) setRecordParams(params => { params.delete('record'); return params; }, { replace: true }); }}>
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
           <SheetHeader>
             <SheetTitle>{viewSupplier?.supplierName}</SheetTitle>

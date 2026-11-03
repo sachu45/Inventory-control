@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Bell, ChevronDown, Menu, RefreshCw } from 'lucide-react';
+import { Bell, ChevronDown, Menu, Loader2 } from '@/components/ui/icons';
 import { ProfileMenuLinks } from '@/components/ProfileMenuLinks';
 import { AppShellControls } from '@/components/AppShellControls';
+import { ApplicationLauncher } from '@/components/ApplicationLauncher';
+import { ModuleNavigation } from '@/components/ModuleNavigation';
+import { Breadcrumbs } from '@/components/navigation/Breadcrumbs';
+import { useBreadcrumbs } from '@/hooks/use-breadcrumbs';
 import { CommandSpotlight } from '@/components/CommandSpotlight';
 import { useQueryClient } from '@tanstack/react-query';
 import { resetClientSessionState } from '@/lib/reset-session-state';
@@ -18,14 +22,12 @@ import {
   useMarkAllNotificationsRead,
 } from '@/hooks/use-notification-feed';
 import { notificationVisual, timeAgo } from '@/lib/notification-presentation';
-import { animalAvatarForUser } from '@/lib/profile-avatar';
 import { AppFooter } from '@/components/AppFooter';
 import { OrganisationIdBadge } from '@/components/OrganisationIdBadge';
 import { TrialUpgradeBanner } from '@/components/TrialUpgradeBanner';
 import { useSubscription } from '@/hooks/use-subscription';
 import { resolvePageTitle } from '@/lib/page-titles';
 import { PageTransition, RouteProgressBar } from '@/components/motion';
-import { useSidebarStore } from '@/store/sidebarStore';
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(() =>
@@ -55,7 +57,6 @@ export function AppLayout({ children, active }: AppLayoutProps) {
   const user = useAuthStore((s) => s.user);
   const clear = useAuthStore((s) => s.clear);
   const isMobile = useIsMobile();
-  const sidebarPinMode = useSidebarStore((s) => s.pinMode);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
     typeof window !== 'undefined' ? false : true,
   );
@@ -64,8 +65,6 @@ export function AppLayout({ children, active }: AppLayoutProps) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [showLogoutSplash, setShowLogoutSplash] = useState(false);
-  const [logoutFadeOut, setLogoutFadeOut] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [routeProgress, setRouteProgress] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
@@ -78,6 +77,7 @@ export function AppLayout({ children, active }: AppLayoutProps) {
   const { data: subscription } = useSubscription(Boolean(user));
 
   const pageTitle = active ?? resolvePageTitle(location.pathname);
+  const breadcrumbs = useBreadcrumbs();
 
   useEffect(() => {
     function close(e: MouseEvent) {
@@ -137,74 +137,20 @@ export function AppLayout({ children, active }: AppLayoutProps) {
 
   async function handleLogout() {
     if (showLogoutSplash) return;
-    setLogoutFadeOut(false);
     setShowLogoutSplash(true);
-    try {
-      await api.post('/auth/logout');
-    } catch {
-      /* best-effort */
-    }
-    window.setTimeout(() => {
-      setLogoutFadeOut(true);
-    }, 800);
-    window.setTimeout(() => {
-      delete api.defaults.headers.common.Authorization;
-      resetClientSessionState(queryClient);
-      clear();
-      nav('/login', { replace: true });
-    }, 1120);
+    try { await api.post('/auth/logout'); } catch { /* best-effort server logout */ }
+    delete api.defaults.headers.common.Authorization;
+    resetClientSessionState(queryClient);
+    clear();
+    nav('/login', { replace: true });
   }
 
-  async function handleRefresh() {
-    if (isRefreshing) return;
-    setIsRefreshing(true);
-    try {
-      await queryClient.invalidateQueries();
-      await queryClient.refetchQueries({ type: 'active' });
-    } finally {
-      window.setTimeout(() => setIsRefreshing(false), 300);
-    }
-  }
-
-  const avatar = animalAvatarForUser(user);
   const avatarUrl = user?.avatarUrl ?? null;
 
   return (
-    <div className="flex min-h-screen bg-transparent text-foreground dark:text-slate-100">
+    <div className="workspace-shell flex min-h-screen bg-transparent text-foreground dark:text-slate-100">
       <CommandSpotlight open={spotlightOpen} onOpenChange={setSpotlightOpen} />
-      {showLogoutSplash && (
-        <div className={cn(
-          "fixed inset-0 z-100 flex items-center justify-center bg-[radial-gradient(circle_at_35%_20%,rgba(99,102,241,0.32),transparent_35%),radial-gradient(circle_at_70%_90%,rgba(56,189,248,0.22),transparent_40%),rgba(2,6,23,0.94)] transition-opacity duration-300",
-          logoutFadeOut ? 'opacity-0' : 'opacity-100',
-        )}>
-          <div className="relative flex min-w-[280px] max-w-sm flex-col items-center gap-5 rounded-3xl border border-white/20 bg-card/10 px-8 py-8 text-center shadow-[0_28px_70px_rgba(2,6,23,0.45)] backdrop-blur-xl">
-            <div className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-primary/10 blur-2xl" />
-            <div className="pointer-events-none absolute -left-6 bottom-4 h-16 w-16 rounded-full bg-cyan-300/35 blur-2xl" />
-            <div className={cn('relative flex h-24 w-24 items-center justify-center rounded-full bg-linear-to-br', avatar.bgClass)}>
-              <div className="absolute inset-0 animate-ping rounded-full bg-card/20" />
-              {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt={`${user?.name ?? 'User'} avatar`}
-                  className="h-24 w-24 rounded-full object-cover"
-                />
-              ) : (
-                <span aria-label={`${avatar.kind} avatar`} role="img" className="text-5xl">
-                  {avatar.emoji}
-                </span>
-              )}
-            </div>
-            <div className="space-y-1">
-              <p className="text-base font-semibold text-white">Signing you out securely</p>
-              <p className="text-xs text-slate-200/90">Clearing session tokens and workspace context...</p>
-            </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-card/20">
-              <div className="h-full w-1/2 animate-[pulse_1.2s_ease-in-out_infinite] rounded-full bg-card" />
-            </div>
-            <p className="text-[11px] uppercase tracking-[0.2em] text-slate-300">Please wait</p>
-          </div>
-        </div>
-      )}
+      {showLogoutSplash && <div className="fixed inset-0 z-100 flex items-center justify-center bg-background" role="status"><div className="flex items-center gap-3 text-sm"><Loader2 className="h-4 w-4 animate-spin" />Signing you out…</div></div>}
       <Sidebar
         collapsed={sidebarCollapsed}
         onCollapsedChange={setSidebarCollapsed}
@@ -216,10 +162,10 @@ export function AppLayout({ children, active }: AppLayoutProps) {
       <div
         className={cn(
           'flex min-h-screen min-w-0 flex-1 flex-col transition-[margin] duration-300 ease-in-out',
-          !isMobile && (sidebarCollapsed || sidebarPinMode === 'auto-hide' ? 'md:ml-[72px]' : 'md:ml-[240px]'),
+          !isMobile && (sidebarCollapsed ? 'md:ml-[72px]' : 'md:ml-[240px]'),
         )}
       >
-        <header className="sticky top-0 z-30 border-b border-border/90 bg-card/95 shadow-xs backdrop-blur-sm supports-backdrop-filter:bg-card/90 dark:border-slate-800 dark:bg-slate-950/90 dark:shadow-slate-950/50">
+        <header className="workspace-topbar sticky top-0 z-30 border-b border-border bg-card">
           <div className="flex h-16 items-center gap-2 px-4 sm:gap-3 sm:px-6">
             <div className="flex min-w-0 flex-1 items-center gap-3">
               <button
@@ -238,23 +184,14 @@ export function AppLayout({ children, active }: AppLayoutProps) {
               >
                 <Menu className="h-5 w-5" />
               </button>
-              <h2 className="premium-title truncate text-base font-semibold sm:text-lg">{pageTitle}</h2>
+              <ApplicationLauncher />
+              <div className="erp-header-breadcrumb hidden min-w-0 md:block">{breadcrumbs.items.length ? <Breadcrumbs items={breadcrumbs.items} /> : <span className="text-sm font-medium">{pageTitle}</span>}</div>
             </div>
 
-            <OrganisationIdBadge className="hidden shrink-0 sm:flex" />
+            <OrganisationIdBadge className="hidden shrink-0 xl:flex" />
 
             <div className="flex flex-1 items-center justify-end gap-2 sm:gap-3">
               <AppShellControls onOpenSpotlight={() => setSpotlightOpen(true)} />
-
-              <button
-                type="button"
-                onClick={handleRefresh}
-                className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground dark:text-muted-foreground dark:hover:bg-slate-800 dark:hover:text-slate-100"
-                aria-label="Refresh data"
-                disabled={isRefreshing}
-              >
-                <RefreshCw className={cn('h-5 w-5', isRefreshing && 'animate-spin')} />
-              </button>
 
               <button
                 type="button"
@@ -362,7 +299,7 @@ export function AppLayout({ children, active }: AppLayoutProps) {
                   onClick={() => setProfileOpen((open) => !open)}
                   className="flex items-center gap-2 rounded-xl p-1.5 hover:bg-muted dark:hover:bg-slate-800"
                 >
-                  <div className={cn('flex h-8 w-8 items-center justify-center rounded-full bg-linear-to-br text-sm shadow-md', avatar.bgClass)}>
+                  <div className="erp-avatar flex h-8 w-8 items-center justify-center rounded-full bg-accent text-sm text-primary">
                     {avatarUrl ? (
                       <img
                         src={avatarUrl}
@@ -370,7 +307,7 @@ export function AppLayout({ children, active }: AppLayoutProps) {
                         className="h-8 w-8 rounded-full object-cover"
                       />
                     ) : (
-                      <span aria-label={`${avatar.kind} avatar`} role="img">{avatar.emoji}</span>
+                      <span aria-label={'Account avatar'} role="img">{(user?.name ?? 'User').split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase()}</span>
                     )}
                   </div>
                   <div className="hidden text-left md:block">
@@ -403,6 +340,7 @@ export function AppLayout({ children, active }: AppLayoutProps) {
             </div>
           </div>
 
+          <ModuleNavigation />
         </header>
 
         <main className="flex min-w-0 flex-1 flex-col p-4 sm:p-6">

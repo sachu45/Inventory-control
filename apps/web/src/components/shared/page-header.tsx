@@ -24,7 +24,7 @@ export function PageHeader({
   const resolvedDescription = description ?? subtitle;
 
   return (
-    <div className={cn('mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between', className)}>
+    <div className={cn('workspace-page-header mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between', className)}>
       <div className="min-w-0">
         {showBreadcrumbs && resolvedItems.length > 0 && (
           <Breadcrumbs items={resolvedItems} className="mb-1.5" />

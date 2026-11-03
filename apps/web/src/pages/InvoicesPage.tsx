@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Download, Plus } from 'lucide-react';
+import { Download, Plus } from '@/components/ui/icons';
 import { toast } from 'sonner';
 import { AppLayout } from '@/components/AppLayout';
 import { StatusBadge } from '@/components/StatusBadge';

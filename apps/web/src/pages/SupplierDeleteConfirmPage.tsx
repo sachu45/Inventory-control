@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { CheckCircle2, ShieldAlert, XCircle } from 'lucide-react';
+import { CheckCircle2, ShieldAlert, XCircle } from '@/components/ui/icons';
 import { portalGet } from '@/lib/portal-api';
 
 type ConfirmResult = {

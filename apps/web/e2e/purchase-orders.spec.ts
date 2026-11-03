@@ -24,7 +24,7 @@ test.describe('purchase orders page (Phase 8)', () => {
     ).toBeVisible({ timeout: 25_000 });
 
     if (await page.getByRole('table').isVisible()) {
-      const scrollWrap = page.locator('.overflow-auto').first();
+      const scrollWrap = page.getByRole('table').locator('..');
       await expect(scrollWrap).toBeVisible();
       const metrics = await scrollWrap.evaluate((el) => ({
         scrollWidth: el.scrollWidth,

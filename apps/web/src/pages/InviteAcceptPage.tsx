@@ -1,9 +1,10 @@
+import { AuthLayout } from '@/components/auth/AuthLayout';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { portalGet, portalPost } from '@/lib/portal-api';
@@ -93,20 +94,7 @@ export function InviteAcceptPage() {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-muted">
-      <header className="bg-slate-900 px-4 py-4 text-white">
-        <div className="flex items-center gap-2.5">
-          <span className="text-sm font-bold text-white">SoftdigitIMS</span>
-          <span className="text-[11px] text-slate-300">User invitation</span>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-md px-4 py-12">
-        <Card>
-          <CardHeader>
-            <CardTitle>Accept your invitation</CardTitle>
-          </CardHeader>
+  return <AuthLayout headline="Good work starts\nwith good people." description="Join your team’s connected business workspace."><div className="auth-form-heading"><span className="auth-eyebrow">YOU'RE INVITED</span><h2>Join your workspace</h2><p>Complete your invitation to get started.</p></div>        <Card className="auth-inner-card">
           <CardContent className="space-y-4">
             {state === 'loading' && <p className="text-sm text-muted-foreground">Loading invitation…</p>}
             {state === 'error' && (
@@ -129,21 +117,29 @@ export function InviteAcceptPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Name</Label>
-                  <Input value={name} onChange={(e) => setName(e.target.value)} />
+                  <Label htmlFor="invite-name">Name</Label>
+                  <Input id="invite-name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Password</Label>
+                  <Label htmlFor="invite-password">Password</Label>
                   <Input
+                    id="invite-password"
                     type="password"
+                    autoComplete="new-password"
+                    minLength={10}
+                    required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Confirm password</Label>
+                  <Label htmlFor="invite-confirm">Confirm password</Label>
                   <Input
+                    id="invite-confirm"
                     type="password"
+                    autoComplete="new-password"
+                    minLength={10}
+                    required
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                   />
@@ -160,10 +156,6 @@ export function InviteAcceptPage() {
               </form>
             )}
           </CardContent>
-        </Card>
-      </main>
-    </div>
-  );
+        </Card></AuthLayout>;
 }
-
 export default InviteAcceptPage;

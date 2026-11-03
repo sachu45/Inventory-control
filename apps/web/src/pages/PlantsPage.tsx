@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   CheckCircle2,
@@ -9,7 +9,7 @@ import {
   Plus,
   Trash2,
   Warehouse,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import { cn } from '@/lib/cn';
 import { AppLayout } from '@/components/AppLayout';
 import { PageHeader } from '@/components/shared/page-header';
@@ -377,7 +377,7 @@ function PlantCard({ plant, locations, onEdit, onDelete }: PlantCardProps) {
             variant="ghost"
             size="icon"
             className="h-8 w-8 text-muted-foreground"
-            aria-label="Edit plant"
+            aria-label="Edit location"
             onClick={onEdit}
           >
             <Pencil className="h-4 w-4" />
@@ -387,7 +387,7 @@ function PlantCard({ plant, locations, onEdit, onDelete }: PlantCardProps) {
             variant="ghost"
             size="icon"
             className="h-8 w-8 text-red-600 dark:text-red-400 hover:bg-red-50 hover:text-red-700"
-            aria-label="Delete plant"
+            aria-label="Delete location"
             onClick={onDelete}
           >
             <Trash2 className="h-4 w-4" />
@@ -398,7 +398,7 @@ function PlantCard({ plant, locations, onEdit, onDelete }: PlantCardProps) {
   );
 }
 
-function PlantsListView() {
+export function PlantsListView() {
   const navigate = useNavigate();
   const { data: plants = [], isLoading: plantsLoading } = useShops();
   const { data: allLocations = [], isLoading: locationsLoading } = useStorageLocations();
@@ -521,18 +521,19 @@ function PlantsListView() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Plants & Warehouses"
+        title="Locations"
+        showBreadcrumbs={false}
         description="Manage storage locations and facilities"
       >
         <Button onClick={() => navigate('/plants/new')}>
           <Plus className="mr-2 h-4 w-4" />
-          Add Plant
+          Add Location
         </Button>
       </PageHeader>
 
       <div className="grid gap-3 sm:grid-cols-3">
         <KpiCard
-          label="Total Plants"
+          label="Total Locations"
           value={stats.total}
           accent="bg-primary"
           icon={<Factory className="h-5 w-5 text-primary" />}
@@ -565,7 +566,7 @@ function PlantsListView() {
             <p className="mt-1 text-sm text-muted-foreground">Add your first plant and storage locations.</p>
             <Button className="mt-4" onClick={() => navigate('/plants/new')}>
               <Plus className="mr-2 h-4 w-4" />
-              Add Plant
+              Add Location
             </Button>
           </CardContent>
         </Card>
@@ -643,7 +644,7 @@ function PlantsListView() {
                 Cancel
               </Button>
               <Button className="flex-1" onClick={onSave} disabled={isSubmitting}>
-                {isSubmitting ? 'Saving…' : 'Update Plant'}
+                {isSubmitting ? 'Saving…' : 'Update Location'}
               </Button>
             </div>
           </div>
@@ -653,7 +654,7 @@ function PlantsListView() {
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete plant</AlertDialogTitle>
+            <AlertDialogTitle>Delete location</AlertDialogTitle>
             <AlertDialogDescription>
               Permanently delete{' '}
               <span className="font-medium text-foreground">{deleteTarget?.shopName}</span>? Plants with
@@ -792,7 +793,7 @@ function PlantsCreateView() {
 
   return (
     <div className="create-page-shell space-y-6 p-4 sm:p-6">
-      <PageHeader title="Add Plant" description="Create a plant and optional storage locations">
+      <PageHeader title="Add Location" description="Add a shop, warehouse or facility and its storage areas">
         <Button variant="outline" onClick={() => navigate('/plants')}>
           Back
         </Button>
@@ -815,7 +816,7 @@ function PlantsCreateView() {
             onClick={onCreate}
             disabled={isSubmitting}
           >
-            {isSubmitting ? 'Creating…' : 'Create Plant'}
+            {isSubmitting ? 'Creating…' : 'Create Location'}
           </Button>
         </CardContent>
       </Card>
@@ -824,8 +825,9 @@ function PlantsCreateView() {
 }
 
 export function PlantsPage({ createOnly = false }: { createOnly?: boolean }) {
+  if (!createOnly) return <Navigate to="/settings?tab=locations" replace />;
   return (
-    <AppLayout active="Plants">
+    <AppLayout active="Locations">
       {createOnly ? <PlantsCreateView /> : <PlantsListView />}
     </AppLayout>
   );

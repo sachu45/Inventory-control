@@ -42,22 +42,22 @@ import {
   BarChart3,       // Reports        — analytics / register charts
   Bell,            // Notifications  — alerts inbox
   BadgeCheck,      // Approvals      — stamped approval badge
-  Sparkles,        // Upgrade        — premium / upgrade prompt
+  CreditCard,        // Upgrade        — premium / upgrade prompt
 
   // Admin
   Monitor,         // Platform Admin — SaaS platform monitoring dashboard
   Printer,         // Print Labels   — label / barcode printer
   Settings,        // Settings       — configuration / preferences
-} from 'lucide-react';
+} from '@/components/ui/icons';
 
 /**
  * Menu icon registry
  *
  * Validation checklist:
- * - ✓ No duplicates (enforced at runtime in dev)
- * - ✓ Each icon is semantically meaningful for its module
- * - ✓ Icons are visually distinct at 20px
- * - ✓ Consistent Lucide React design language
+ * - No duplicates (enforced at runtime in dev)
+ * - Each icon is semantically meaningful for its module
+ * - Icons are visually distinct at 20px
+ * - Consistent custom SVG strokes and sizing
  */
 export const menuIcons = {
   // Overview
@@ -95,7 +95,7 @@ export const menuIcons = {
   reports: BarChart3,
   notifications: Bell,
   approvals: BadgeCheck,
-  upgrade: Sparkles,
+  upgrade: CreditCard,
 
   // Admin
   platformAdmin: Monitor,
@@ -116,7 +116,7 @@ if (import.meta.env.DEV) {
   const duplicates = iconNames.filter((name, idx) => iconNames.indexOf(name) !== idx);
   if (duplicates.length > 0) {
     console.error(
-      '❌ ICON MAP ERROR: Duplicate icons detected.',
+      'ICON MAP ERROR: Duplicate icons detected.',
       'Duplicates:',
       [...new Set(duplicates)],
     );

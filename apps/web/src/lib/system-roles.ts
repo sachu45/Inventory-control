@@ -1,4 +1,4 @@
-import type { LucideIcon } from 'lucide-react';
+import type { LucideIcon } from '@/components/ui/icons';
 import {
   Crown,
   Settings,
@@ -9,7 +9,7 @@ import {
   ClipboardList,
   ShoppingCart,
   Users,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 
 export type AccessLevel = 'full' | 'partial' | 'none';
 

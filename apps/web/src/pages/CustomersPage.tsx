@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   CheckCircle2,
   Download,
@@ -8,7 +8,7 @@ import {
   Plus,
   Trash2,
   Users,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import { toast } from 'sonner';
 import { AppLayout } from '@/components/AppLayout';
 import { PageHeader, SearchInput, ConfirmDialog, CreatePageLayout, LoadingSkeleton, FormErrorBanner, EmptyState } from '@/components/shared';
@@ -43,6 +43,7 @@ import {
 } from '@/components/ui/table';
 import {
   useCustomers,
+  useCustomer,
   useCreateCustomer,
   useUpdateCustomer,
   type Customer,
@@ -430,15 +431,20 @@ function CustomersCreateView() {
 
 function CustomersListView() {
   const navigate = useNavigate();
+  const [recordParams, setRecordParams] = useSearchParams();
   const user = useAuthStore((s) => s.user);
   const functionalCookiesEnabled = useCookieConsentStore((state) => state.preferences.functional);
   const shopLocked = isShopOnlyUser(user);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => recordParams.get('search') ?? '');
+  useEffect(() => { setSearch(recordParams.get('search') ?? ''); }, [recordParams]);
   const debouncedSearch = useDebouncedValue(search, 300);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
   const [viewing, setViewing] = useState<Customer | null>(null);
+  const linkedCustomer = useCustomer(recordParams.get('record') ?? '', !!recordParams.get('record'));
+  useEffect(() => { if (linkedCustomer.data) setViewing(linkedCustomer.data); }, [linkedCustomer.data]);
+  useEffect(() => { if (linkedCustomer.isError) toast.error('This customer is unavailable or you do not have access.'); }, [linkedCustomer.isError]);
   const [deactivateTarget, setDeactivateTarget] = useState<Customer | null>(null);
   const [form, setForm] = useState(emptyForm());
 
@@ -776,7 +782,7 @@ function CustomersListView() {
         </SheetContent>
       </Sheet>
 
-      <Sheet open={Boolean(viewing)} onOpenChange={(open) => !open && setViewing(null)}>
+      <Sheet open={Boolean(viewing)} onOpenChange={(open) => { if (!open) { setViewing(null); setRecordParams(params => { params.delete('record'); return params; }, { replace: true }); } }}>
         <SheetContent className="sm:max-w-md">
           <SheetHeader>
             <SheetTitle>{viewing?.customerName}</SheetTitle>

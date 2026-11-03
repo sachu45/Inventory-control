@@ -104,6 +104,17 @@ export function useSuppliers(search?: string) {
   });
 }
 
+export function useSupplier(id: string) {
+  return useQuery({
+    queryKey: [...keys.all, 'detail', currentTenantKey(), id],
+    enabled: !!id,
+    queryFn: async () => {
+      const res = await api.get(`/suppliers/${id}`);
+      return normalizeSupplier(res.data?.data ?? res.data);
+    },
+  });
+}
+
 function appendSupplierToListCache(
   qc: ReturnType<typeof useQueryClient>,
   created: Supplier,

@@ -23,7 +23,7 @@ type ReportsGlobalKpiStripProps = {
 
 export function ReportsGlobalKpiStrip({ isLoading, items }: ReportsGlobalKpiStripProps) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+    <div className="metric-strip report-metrics">
       {isLoading
         ? Array.from({ length: 6 }).map((_, i) => <DashboardKpiCardSkeleton key={i} />)
         : items.map((item) => (

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, Play } from 'lucide-react';
+import { ChevronDown, Play } from '@/components/ui/icons';
 import type { HelpGuide } from '@/lib/help-content';
 import { cn } from '@/lib/cn';
 

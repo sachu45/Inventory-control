@@ -95,10 +95,10 @@ export class DashboardService {
     const sixtyDaysAgo = new Date();
     sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
-    const sixMonthsAgoStart = new Date();
-    sixMonthsAgoStart.setMonth(sixMonthsAgoStart.getMonth() - 5);
-    sixMonthsAgoStart.setDate(1);
-    sixMonthsAgoStart.setHours(0, 0, 0, 0);
+    // SQL buckets use month-start dates. Local midnight can become the prior
+    // date in UTC, and mutating a 31st can overflow the target month.
+    const now = new Date();
+    const sixMonthsAgoStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 5, 1));
 
     const monthStart = new Date();
     monthStart.setDate(1);
@@ -655,7 +655,7 @@ export class DashboardService {
   private formatMonthlyMovement(rows: MonthlyRow[], expectedStart: Date) {
     if (rows.length > 0) {
       return rows.map((row) => ({
-        month: row.month.toLocaleString('en-US', { month: 'short', year: 'numeric' }),
+        month: row.month.toLocaleString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' }),
         receipts: Number(row.receipts),
         issues: Number(row.issues),
       }));
@@ -665,11 +665,11 @@ export class DashboardService {
     const cursor = new Date(expectedStart);
     for (let i = 0; i < 6; i += 1) {
       out.push({
-        month: cursor.toLocaleString('en-US', { month: 'short', year: 'numeric' }),
+        month: cursor.toLocaleString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' }),
         receipts: 0,
         issues: 0,
       });
-      cursor.setMonth(cursor.getMonth() + 1);
+      cursor.setUTCMonth(cursor.getUTCMonth() + 1);
     }
     return out;
   }

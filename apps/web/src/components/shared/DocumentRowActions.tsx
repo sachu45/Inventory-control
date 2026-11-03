@@ -1,4 +1,4 @@
-import { Download, Mail } from 'lucide-react';
+import { Download, Mail } from '@/components/ui/icons';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { downloadDocumentPdf, type DocumentPdfKind } from '@/lib/document-pdf';

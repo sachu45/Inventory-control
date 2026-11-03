@@ -93,6 +93,8 @@ const PlatformSubscriptionsPage = lazyPage(
   'PlatformSubscriptionsPage',
 );
 const SettingsPage = lazyPage(() => import('@/pages/SettingsPage'), 'SettingsPage');
+const ToolsPage = lazyPage(() => import('@/pages/ToolsPage'), 'ToolsPage');
+const AuthStatusPage = lazyPage(() => import('@/pages/AuthStatusPage'), 'AuthStatusPage');
 
 function Protected({ children }: { children: React.ReactNode }) {
   const initialized = useAuthStore((s) => s.initialized);
@@ -101,14 +103,14 @@ function Protected({ children }: { children: React.ReactNode }) {
   if (!initialized) {
     return <PageFallback />;
   }
-  if (!token || !user) return <Navigate to="/login" replace />;
+  if (!token || !user) return <Navigate to="/login" replace state={{ from: window.location.pathname + window.location.search }} />;
   return <>{children}</>;
 }
 
 function AdminOnly({ children }: { children: React.ReactNode }) {
   const user = useAuthStore((s) => s.user);
   if (!isOrgAdminUser(user)) {
-    return <Navigate to="/products" replace />;
+    return <Navigate to="/access-denied" replace />;
   }
   return <>{children}</>;
 }
@@ -116,7 +118,7 @@ function AdminOnly({ children }: { children: React.ReactNode }) {
 function PlatformAdminOnly({ children }: { children: React.ReactNode }) {
   const user = useAuthStore((s) => s.user);
   if (!isPlatformAdminUser(user)) {
-    return <Navigate to="/products" replace />;
+    return <Navigate to="/access-denied" replace />;
   }
   return <>{children}</>;
 }
@@ -177,6 +179,8 @@ export function AppRoutes() {
           {/* Root redirects to login */}
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login"          element={<AuthRoute><LoginPage /></AuthRoute>} />
+          <Route path="/session-expired" element={<AuthRoute><AuthStatusPage expired /></AuthRoute>} />
+          <Route path="/access-denied" element={<AuthRoute><AuthStatusPage /></AuthRoute>} />
           <Route path="/signup"         element={<AuthRoute><SignupPage /></AuthRoute>} />
           <Route path="/forgot-password" element={<AuthRoute><ForgotPasswordPage /></AuthRoute>} />
           <Route path="/reset-password"  element={<AuthRoute><ResetPasswordPage /></AuthRoute>} />
@@ -436,6 +440,7 @@ export function AppRoutes() {
           />
           <Route path="/workflow-engine" element={<Protected><AdminOnly><WorkflowEnginePage /></AdminOnly></Protected>} />
           <Route path="/settings" element={<Protected><SettingsPage /></Protected>} />
+          <Route path="/tools" element={<Protected><ToolsPage /></Protected>} />
           <Route path="/upgrade" element={<Protected><UpgradePage /></Protected>} />
           <Route
             path="/platform/subscriptions"

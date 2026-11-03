@@ -1,4 +1,4 @@
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight } from '@/components/ui/icons';
 import { Link } from 'react-router-dom';
 import { useMemo } from 'react';
 import { cn } from '@/lib/cn';

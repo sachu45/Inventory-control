@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Download } from 'lucide-react';
+import { Download } from '@/components/ui/icons';
 import { toast } from 'sonner';
 import { AppLayout } from '@/components/AppLayout';
 import { DocumentReferenceSelect, PageHeader, P2PFlowTimeline } from '@/components/shared';

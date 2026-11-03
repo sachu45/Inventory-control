@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
+import { Menu, X } from '@/components/ui/icons';
 import { BRAND } from '@/lib/brand';
 import { MARKETING_NAV } from '@/lib/marketing-content';
 import { MarketingCtaLink } from './MarketingCtaLink';

@@ -1,4 +1,4 @@
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle } from '@/components/ui/icons';
 import { cn } from '@/lib/cn';
 
 type ErrorProps = {

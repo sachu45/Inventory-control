@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ExternalLink, Copy, Send, Link2 } from 'lucide-react';
+import { ExternalLink, Copy, Send, Link2 } from '@/components/ui/icons';
 import { toast } from 'sonner';
 import { AppLayout } from '@/components/AppLayout';
 import { PageHeader } from '@/components/shared/page-header';

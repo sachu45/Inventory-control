@@ -153,7 +153,8 @@ api.interceptors.response.use(
         if (isSessionRejected(refreshError)) {
           applyAccessToken(null);
           useAuthStore.getState().clear();
-          window.location.href = '/login';
+          const returnTo = window.location.pathname + window.location.search;
+          window.location.href = '/login?reason=session-expired&returnTo=' + encodeURIComponent(returnTo);
         }
       }
     }

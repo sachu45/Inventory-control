@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
-import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { AlertTriangle, RefreshCw } from '@/components/ui/icons';
 import { isChunkLoadError, reloadAppForStaleChunks } from '@/lib/chunk-reload';
 
 type Props = {

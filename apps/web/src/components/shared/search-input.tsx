@@ -1,4 +1,4 @@
-import { Loader2, Search, X } from 'lucide-react';
+import { Loader2, Search, X } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/cn';
 

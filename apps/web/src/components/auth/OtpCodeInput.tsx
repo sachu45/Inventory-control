@@ -67,6 +67,9 @@ export function OtpCodeInput({
           autoFocus={autoFocus && index === 0}
           maxLength={1}
           inputMode="numeric"
+          aria-label={`Verification code digit ${index + 1} of ${length}`}
+          aria-invalid={hasError || undefined}
+          autoComplete={index === 0 ? 'one-time-code' : 'off'}
           className={`h-14 w-11 rounded-xl border-2 bg-card text-center text-xl font-bold text-foreground outline-hidden transition sm:w-12 ${
             hasError
               ? 'border-red-500'

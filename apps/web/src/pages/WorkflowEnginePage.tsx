@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Activity, Bot, Brain, GitBranch, PlayCircle, ScrollText, ToggleLeft } from 'lucide-react';
+import { Activity, Bot, Brain, GitBranch, PlayCircle, ScrollText, ToggleLeft } from '@/components/ui/icons';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { WorkflowCanvas } from '@/components/workflow/WorkflowCanvas';
+import { AppLayout } from '@/components/AppLayout';
 import * as wf from '@/api/workflow-engine';
 
 const money = (n: number) => `₹${(n ?? 0).toLocaleString('en-IN')}`;
@@ -382,6 +383,7 @@ function FeaturesTab() {
 
 export function WorkflowEnginePage() {
   return (
+    <AppLayout active="Automation">
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
       <div>
         <h1 className="text-2xl font-semibold">Workflow &amp; Automation Engine</h1>
@@ -404,5 +406,6 @@ export function WorkflowEnginePage() {
         <TabsContent value="features"><FeaturesTab /></TabsContent>
       </Tabs>
     </div>
+    </AppLayout>
   );
 }

@@ -10,7 +10,7 @@ import {
   ChevronDown,
   Package,
   Trash2,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import { AppLayout } from '@/components/AppLayout';
 import { PageHeader } from '@/components/shared';
 import { Button } from '@/components/ui/button';

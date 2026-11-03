@@ -1,4 +1,4 @@
-import { Keyboard, Mail } from 'lucide-react';
+import { Keyboard, Mail } from '@/components/ui/icons';
 import { AppLayout } from '@/components/AppLayout';
 import { HelpGuideAccordion } from '@/components/help/HelpGuideAccordion';
 import { WorkflowCards } from '@/components/help/WorkflowCards';

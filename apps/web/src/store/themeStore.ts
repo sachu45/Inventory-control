@@ -18,9 +18,9 @@ export function resolveTheme(mode: ThemeMode): 'light' | 'dark' {
 }
 
 function readStoredMode(): ThemeMode {
-  if (typeof localStorage === 'undefined') return 'system';
+  if (typeof localStorage === 'undefined') return 'light';
   const raw = localStorage.getItem(STORAGE_KEY);
-  return raw === 'light' || raw === 'dark' || raw === 'system' ? raw : 'system';
+  return raw === 'light' || raw === 'dark' || raw === 'system' ? raw : 'light';
 }
 
 /** Apply the resolved theme to the document root. */

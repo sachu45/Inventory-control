@@ -3,6 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="/fonts/manrope.css" />
+    <link rel="preload" href="/fonts/manrope-latin.woff2" as="font" type="font/woff2" crossorigin />
     <meta name="color-scheme" content="light dark" />
     <script>
       // Apply the saved theme before first paint so dark mode doesn't flash white
@@ -10,7 +12,7 @@
       (function () {
         try {
           var mode = localStorage.getItem('retail-ims-theme');
-          var dark = mode === 'dark' || (mode !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          var dark = mode === 'dark' || (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
           var root = document.documentElement;
           root.classList.add(dark ? 'dark' : 'light');
           root.style.colorScheme = dark ? 'dark' : 'light';

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
-import { FileSpreadsheet, Plus, Send, Truck, XCircle, Download } from 'lucide-react';
+import { FileSpreadsheet, Plus, Send, Truck, XCircle, Download } from '@/components/ui/icons';
 import { toast } from 'sonner';
 import { AppLayout } from '@/components/AppLayout';
 import { PageHeader, KpiCard, EmptyState, LoadingSkeleton, CreatePageLayout } from '@/components/shared';

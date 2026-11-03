@@ -9,7 +9,9 @@ type RouteTitleMeta = {
 
 const SETTINGS_TAB_LABELS: Record<string, string> = {
   profile: 'Profile',
-  shop: 'Shop Details',
+  organisation: 'Organisation',
+  locations: 'Locations',
+  shop: 'My Location',
   cookies: 'Cookie Preferences',
   backups: 'Backups',
   users: 'Users',
@@ -25,6 +27,7 @@ const SETTINGS_SECTION_LABELS: Record<string, string> = {
 
 const ROUTE_TITLES: Record<string, RouteTitleMeta> = {
   '/': { page: 'Home' },
+  '/tools': { page: 'Tools', module: 'Workspace' },
   '/login': { page: 'Login' },
   '/signup': { page: 'Sign Up' },
   '/forgot-password': { page: 'Forgot Password' },

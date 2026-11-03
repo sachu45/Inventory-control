@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowRight } from 'lucide-react';
+import { ArrowDown, ArrowRight } from '@/components/ui/icons';
 import type { WorkflowDefinition } from '@/lib/help-content';
 import { cn } from '@/lib/cn';
 

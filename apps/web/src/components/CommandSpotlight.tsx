@@ -1,242 +1,86 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Command, CornerDownLeft, Search } from 'lucide-react';
-import { cn } from '@/lib/cn';
-import { buildNavCommands, filterNavCommands, type NavCommand } from '@/lib/app-navigation';
+import { useQuery } from '@tanstack/react-query';
+import { Search, Package, Users, Truck, ArrowRight, AlertCircle } from '@/components/ui/icons';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { buildNavCommands, filterNavCommands } from '@/lib/app-navigation';
 import { useAuthStore } from '@/store/authStore';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { api } from '@/api/client';
+import { isOrgAdminUser } from '@/lib/roles';
 
-const SECTION_ORDER = [
-  'Overview',
-  'Master Data',
-  'Procurement',
-  'Warehouse',
-  'Sales & Finance',
-  'Operations',
-  'Actions',
-  'System',
-];
+type SearchRecord = { id: string; label: string; code: string; kind: string; path: string; icon: typeof Package };
+function rows(payload: unknown): Record<string, unknown>[] {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== 'object') return [];
+  const body = payload as { data?: unknown; items?: unknown };
+  if (Array.isArray(body.items)) return body.items;
+  return body.data ? rows(body.data) : [];
+}
 
-type CommandSpotlightProps = {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-};
+export function CommandSpotlight({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="erp-search-dialog sm:max-w-2xl">
+    <SearchContent open={open} close={() => onOpenChange(false)} />
+  </DialogContent></Dialog>;
+}
 
-export function CommandSpotlight({ open, onOpenChange }: CommandSpotlightProps) {
-  const navigate = useNavigate();
-  const user = useAuthStore((s) => s.user);
-  const inputRef = useRef<HTMLInputElement>(null);
+function SearchContent({ open, close }: { open: boolean; close: () => void }) {
   const [query, setQuery] = useState('');
-  const [activeSection, setActiveSection] = useState<string | null>(null);
-  const [highlightIndex, setHighlightIndex] = useState(0);
-
-  const allCommands = useMemo(() => buildNavCommands(user), [user]);
-  const filtered = useMemo(() => filterNavCommands(allCommands, query), [allCommands, query]);
-
-  const sections = useMemo(() => {
-    const set = new Set(filtered.map((c) => c.section));
-    return SECTION_ORDER.filter((s) => set.has(s));
-  }, [filtered]);
-
-  const activeSectionResolved = activeSection && sections.includes(activeSection)
-    ? activeSection
-    : sections[0] ?? null;
-
-  const visible = useMemo(() => {
-    if (!activeSectionResolved) return filtered;
-    return filtered.filter((c) => c.section === activeSectionResolved);
-  }, [filtered, activeSectionResolved]);
-
-  useEffect(() => {
-    if (!open) {
-      setQuery('');
-      setActiveSection(null);
-      setHighlightIndex(0);
-      return;
-    }
-    const t = window.setTimeout(() => inputRef.current?.focus(), 30);
-    return () => window.clearTimeout(t);
-  }, [open]);
-
-  useEffect(() => {
-    setHighlightIndex(0);
-  }, [query, activeSectionResolved]);
-
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
-
-  function go(cmd: NavCommand) {
-    onOpenChange(false);
-    navigate(cmd.path);
+  const debounced = useDebouncedValue(query.trim(), 300);
+  const user = useAuthStore(state => state.user);
+  const navigate = useNavigate();
+  const container = useRef<HTMLDivElement>(null);
+  const can = (permission: string) => isOrgAdminUser(user) || user?.permissions.includes(permission);
+  const sources = [
+    { path: '/products', permission: 'product:read', name: 'Product', label: 'description', code: 'productCode', icon: Package },
+    { path: '/customers', permission: 'shop:read', name: 'Customer', label: 'customerName', code: 'customerCode', icon: Users },
+    { path: '/suppliers', permission: 'supplier:read', name: 'Supplier', label: 'supplierName', code: 'supplierCode', icon: Truck },
+  ].filter(source => can(source.permission));
+  const recordQuery = useQuery({
+    queryKey: ['global-search', user?.companyId, user?.id, user?.permissions.join(','), debounced],
+    enabled: open && !!user && debounced.length >= 2,
+    retry: false,
+    staleTime: 15000,
+    queryFn: async ({ signal }) => {
+      const results = await Promise.allSettled(sources.map(async source => {
+        const response = await api.get(source.path, { signal, params: { search: debounced, ...(source.path === '/products' ? { page: 1, limit: 6 } : { take: 6 }) } });
+        return rows(response.data).slice(0, 6).map(row => {
+          const id = String(row.id ?? '');
+          const label = String(row[source.label] ?? row.name ?? row[source.code] ?? 'Untitled record');
+          const code = String(row[source.code] ?? '');
+          return { id, label, code, kind: source.name, path: source.path + '?' + new URLSearchParams({ search: code || label, record: id }), icon: source.icon } satisfies SearchRecord;
+        }).filter(row => row.id);
+      }));
+      return { records: results.flatMap(result => result.status === 'fulfilled' ? result.value : []), failed: results.filter(result => result.status === 'rejected').length };
+    },
+  });
+  const commands = filterNavCommands(buildNavCommands(user), query).slice(0, query.trim() ? 7 : 5);
+  const records = debounced.length >= 2 ? recordQuery.data?.records ?? [] : [];
+  function go(path: string) { close(); navigate(path); }
+  function keyboard(event: React.KeyboardEvent) {
+    if (!['ArrowDown', 'ArrowUp'].includes(event.key)) return;
+    const buttons = Array.from(container.current?.querySelectorAll<HTMLButtonElement>('[data-search-result]') ?? []);
+    if (!buttons.length) return;
+    event.preventDefault();
+    const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    const next = event.key === 'ArrowDown' ? Math.min(index + 1, buttons.length - 1) : Math.max(index - 1, 0);
+    buttons[next]?.focus();
   }
-
-  function onKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      onOpenChange(false);
-      return;
-    }
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setHighlightIndex((i) => Math.min(i + 1, Math.max(0, visible.length - 1)));
-      return;
-    }
-    if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setHighlightIndex((i) => Math.max(i - 1, 0));
-      return;
-    }
-    if (e.key === 'Enter' && visible[highlightIndex]) {
-      e.preventDefault();
-      go(visible[highlightIndex]);
-    }
-  }
-
-  if (!open) return null;
-
-  return (
-    <div
-      className="fixed inset-0 z-80 flex items-start justify-center px-3 pt-[10vh] sm:px-6"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Jump to"
-    >
-      <button
-        type="button"
-        className="motion-spotlight-backdrop absolute inset-0 bg-slate-950/50 backdrop-blur-[3px] dark:bg-black/65"
-        aria-label="Close jump menu"
-        onClick={() => onOpenChange(false)}
-      />
-
-      <div
-        className="motion-spotlight-panel relative flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[0_24px_80px_rgba(15,23,42,0.28)] dark:border-slate-700 dark:bg-slate-900 dark:shadow-[0_24px_80px_rgba(0,0,0,0.55)]"
-        onKeyDown={onKeyDown}
-      >
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-linear-to-r from-slate-400 via-slate-500 to-slate-400" />
-
-        <div className="flex items-center gap-3 border-b border-border/90 px-4 py-3 dark:border-slate-700">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-md">
-            <Command className="h-4 w-4" />
-          </div>
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Jump to a page or action…"
-            className="min-w-0 flex-1 bg-transparent text-base text-foreground placeholder:text-muted-foreground focus:outline-hidden dark:text-slate-100 dark:placeholder:text-muted-foreground"
-          />
-          <kbd className="hidden rounded-md border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline dark:border-slate-600 dark:bg-slate-800 dark:text-muted-foreground">
-            esc
-          </kbd>
-        </div>
-
-        <div className="flex min-h-[280px] max-h-[min(52vh,420px)]">
-          <aside className="hidden w-36 shrink-0 border-r border-border bg-muted/80 p-2 sm:block dark:border-slate-800 dark:bg-slate-950/50">
-            {sections.map((section) => {
-              const count = filtered.filter((c) => c.section === section).length;
-              const active = section === activeSectionResolved;
-              return (
-                <button
-                  key={section}
-                  type="button"
-                  onClick={() => setActiveSection(section)}
-                  className={cn(
-                    'mb-1 flex w-full items-center justify-between rounded-xl border border-transparent px-2.5 py-2 text-left text-xs font-medium transition',
-                    active
-                      ? 'selection-active'
-                      : 'text-muted-foreground hover:bg-accent hover:text-foreground dark:text-muted-foreground dark:hover:bg-slate-800/50 dark:hover:text-slate-100',
-                  )}
-                >
-                  <span className="truncate">{section}</span>
-                  <span className={cn('tabular-nums text-muted-foreground', active && 'text-primary dark:text-slate-300')}>
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-          </aside>
-
-          <div className="min-w-0 flex-1 overflow-y-auto p-2">
-            {visible.length === 0 ? (
-              <div className="motion-fade-up flex flex-col items-center px-4 py-10 text-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted dark:bg-slate-800">
-                  <Search className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
-                </div>
-                {query.trim() ? (
-                  <>
-                    <p className="mt-4 text-sm font-medium text-foreground dark:text-slate-200">
-                      No matches for &ldquo;{query}&rdquo;
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
-                      Try &ldquo;products&rdquo;, &ldquo;invoice&rdquo;, or &ldquo;dashboard&rdquo;
-                    </p>
-                  </>
-                ) : (
-                  <p className="mt-4 text-sm text-muted-foreground dark:text-muted-foreground">
-                    Type to search pages and quick actions
-                  </p>
-                )}
-              </div>
-            ) : (
-              <div key={query || 'all'} className="motion-fade-up space-y-0.5">
-                {visible.map((cmd, index) => {
-                  const Icon = cmd.icon;
-                  const selected = index === highlightIndex;
-                  return (
-                    <button
-                      key={cmd.id}
-                      type="button"
-                      onMouseEnter={() => setHighlightIndex(index)}
-                      onClick={() => go(cmd)}
-                      className={cn(
-                        'flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-left transition duration-200',
-                        selected
-                          ? 'selection-active'
-                          : 'hover:bg-accent dark:hover:bg-slate-800/40',
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border',
-                          selected
-                            ? 'border-border bg-card selection-active-icon dark:border-slate-500/50 dark:bg-slate-900'
-                            : 'border-border bg-muted text-muted-foreground dark:border-slate-700 dark:bg-slate-800 dark:text-muted-foreground',
-                        )}
-                      >
-                        <Icon className="h-4 w-4" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-foreground dark:text-slate-100">
-                          {cmd.label}
-                        </span>
-                        <span className="block truncate text-xs text-muted-foreground dark:text-muted-foreground">
-                          {cmd.hint}
-                        </span>
-                      </span>
-                      {selected ? (
-                        <span className="hidden items-center gap-1 text-[10px] text-primary sm:flex dark:text-slate-300">
-                          open <CornerDownLeft className="h-3 w-3" />
-                        </span>
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between border-t border-border bg-muted/90 px-4 py-2 text-[11px] text-muted-foreground dark:border-slate-800 dark:bg-slate-950/80 dark:text-muted-foreground">
-          <span className="sm:hidden">{sections.length} modules</span>
-          <span className="hidden sm:inline">↑↓ navigate · enter open · esc close</span>
-          <span>{filtered.length} destinations</span>
-        </div>
-      </div>
+  return <div ref={container} onKeyDown={keyboard}>
+    <DialogTitle className="sr-only">Search your workspace</DialogTitle>
+    <DialogDescription className="sr-only">Search products, customers, suppliers, pages and actions. Use arrow keys to move between results.</DialogDescription>
+    <div className="erp-search-input"><Search size={21} /><input autoFocus aria-label="Search records and pages" placeholder="Search products, contacts, pages…" value={query} onChange={event => setQuery(event.target.value)} /><kbd>esc</kbd></div>
+    <div className="erp-search-results">
+      {debounced.length >= 2 && <section aria-label="Record results"><h3>Records {recordQuery.isFetching && <span role="status">· Searching…</span>}</h3>
+        {recordQuery.data?.failed ? <p className="erp-search-message"><AlertCircle size={15} />Some records could not be searched. Try again in a moment.</p> : null}
+        {records.map(record => <button type="button" data-search-result key={record.kind + record.id} onClick={() => go(record.path)}><record.icon size={18} /><span><strong>{record.label}</strong><small>{record.kind}{record.code ? ' · ' + record.code : ''}</small></span><ArrowRight size={15} /></button>)}
+        {!recordQuery.isFetching && !recordQuery.isError && !recordQuery.data?.failed && records.length === 0 && <p className="erp-search-message">No matching records in the modules you can access.</p>}
+      </section>}
+      <section aria-label="Page results"><h3>{query.trim() ? 'Pages & actions' : 'Quick access'}</h3>
+        {commands.map(command => <button type="button" data-search-result key={command.id} onClick={() => go(command.path)}><command.icon size={18} /><span><strong>{command.label}</strong><small>{command.hint}</small></span><ArrowRight size={15} /></button>)}
+        {!commands.length && <p className="erp-search-message">No matching pages. Try “products”, “sales” or “settings”.</p>}
+      </section>
     </div>
-  );
+    <footer className="erp-search-footer"><span>↑ ↓ to navigate · Enter to open</span><span>{debounced.length < 2 ? 'Type 2 characters to search records' : 'Results respect your access permissions'}</span></footer>
+  </div>;
 }

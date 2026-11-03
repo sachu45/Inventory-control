@@ -9,7 +9,7 @@ import {
   PackageCheck,
   TrendingDown,
   Upload,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import {
   Bar,
   BarChart,

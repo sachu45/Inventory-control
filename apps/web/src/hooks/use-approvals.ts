@@ -51,7 +51,7 @@ export type ApprovalStats = { pending: number; approved: number; rejected: numbe
 
 const keys = {
   all: ['approvals'] as const,
-  list: (status?: ApprovalStatus, page?: number) => [...keys.all, 'list', status ?? 'ALL', page ?? 1] as const,
+  list: (status?: ApprovalStatus, page?: number, limit?: number) => [...keys.all, 'list', status ?? 'ALL', page ?? 1, limit ?? 20] as const,
   stats: () => [...keys.all, 'stats'] as const,
   pendingCount: () => [...keys.all, 'pending-count'] as const,
   comments: (id: string) => [...keys.all, 'comments', id] as const,
@@ -67,7 +67,7 @@ export function useApprovals(params?: { status?: ApprovalStatus; page?: number; 
   const page = params?.page ?? 1;
   const limit = params?.limit ?? 20;
   return useQuery({
-    queryKey: keys.list(status, page),
+    queryKey: keys.list(status, page, limit),
     queryFn: async (): Promise<ApprovalFeed> => {
       const res = await api.get('/approvals', { params: { status, page, limit } });
       const body = (res.data?.data ?? res.data) as ApprovalFeed;
@@ -153,9 +153,9 @@ export function useAddApprovalComment() {
 /** Map an approval type to the document detail route, for "View document" deep links. */
 export function approvalDeepLink(a: ApprovalRequest): string | null {
   const t = (a.approvalType || '').toUpperCase();
-  if (t.includes('GOODS_RECEIPT')) return `/goods-receipts/${a.referenceId}`;
-  if (t.includes('GOODS_ISSUE')) return `/goods-issues/${a.referenceId}`;
-  if (t.includes('PURCHASE_ORDER')) return `/purchase-orders/${a.referenceId}`;
+  if (t.includes('GOODS_RECEIPT')) return `/goods-receipts?record=${encodeURIComponent(a.referenceId)}`;
+  if (t.includes('GOODS_ISSUE')) return `/goods-issues?record=${encodeURIComponent(a.referenceId)}`;
+  if (t.includes('PURCHASE_ORDER')) return `/purchase-orders?record=${encodeURIComponent(a.referenceId)}`;
   if (t.includes('SALES_ORDER')) return `/sales/${a.referenceId}`;
   if (t.includes('RFQ')) return `/rfqs/${a.referenceId}`;
   if (t.includes('CONTRACT')) return `/contracts`;

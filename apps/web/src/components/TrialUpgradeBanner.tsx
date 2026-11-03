@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowRight } from 'lucide-react';
+import { AlertTriangle, ArrowRight } from '@/components/ui/icons';
 import { Link } from 'react-router-dom';
 import type { SubscriptionSnapshot } from '@/lib/plans';
 
@@ -14,18 +14,18 @@ export function TrialUpgradeBanner({ subscription }: Props) {
       : 'Trial active';
 
   return (
-    <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-300">
-      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
+    <div className="trial-notice">
+      <AlertTriangle className="h-4 w-4 shrink-0" />
       <div className="flex flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="font-semibold text-amber-900 dark:text-amber-300">Trial mode</div>
-          <div className="text-amber-800/90">Subscribe to unlock all features. {daysLeft}.</div>
+          <span className="font-semibold">Trial workspace</span>
+          <span className="ml-2">{daysLeft}. Explore inventory, procurement and reporting.</span>
         </div>
         <Link
           to="/upgrade"
-          className="mt-2 inline-flex items-center gap-2 rounded-lg bg-amber-700 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-amber-600 sm:mt-0"
+          className="inline-flex items-center gap-2 text-xs font-semibold hover:underline"
         >
-          Upgrade now <ArrowRight className="h-4 w-4" />
+          View plans <ArrowRight className="h-3 w-3" />
         </Link>
       </div>
     </div>

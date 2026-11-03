@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarClock, CheckCircle2, CreditCard, Download, Sparkles } from 'lucide-react';
+import { CalendarClock, CheckCircle2, CreditCard, Download, BadgeCheck } from '@/components/ui/icons';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { api } from '@/api/client';
@@ -125,7 +125,7 @@ export function UpgradePage() {
         <PageHeader title="Upgrade" description="Manage your organisation plan, trial, and billing.">
           {data ? (
             <Badge variant="secondary" className="gap-1">
-              <Sparkles className="h-3.5 w-3.5" />
+              <BadgeCheck className="h-3.5 w-3.5" />
               {planDisplayName(data.plan)} plan
             </Badge>
           ) : null}
@@ -142,7 +142,7 @@ export function UpgradePage() {
                 <div className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full bg-primary/20 blur-2xl" />
                 <div className="pointer-events-none absolute -bottom-6 left-10 h-20 w-20 rounded-full bg-cyan-400/20 blur-2xl" />
                 <div className="relative flex items-center gap-2 text-xs font-medium uppercase tracking-[0.18em] text-slate-300">
-                  <Sparkles className="h-4 w-4" /> Current plan
+                  <BadgeCheck className="h-4 w-4" /> Current plan
                 </div>
                 <div className="relative">
                   <p className="text-3xl font-semibold tracking-tight">{planDisplayName(data.plan)}</p>
@@ -210,7 +210,7 @@ export function UpgradePage() {
                   }
                 />
                 <PlanStat
-                  icon={<Sparkles className="h-4 w-4" />}
+                  icon={<BadgeCheck className="h-4 w-4" />}
                   label="Plan"
                   value={planDisplayName(data.plan)}
                 />

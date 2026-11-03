@@ -13,7 +13,7 @@ import {
   Plus,
   ShoppingCart,
   Trash2,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import { toast } from 'sonner';
 import { AppLayout } from '@/components/AppLayout';
 import { ConfirmDialog, PageHeader } from '@/components/shared';

@@ -9,7 +9,7 @@ import {
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Loader2 } from '@/components/ui/icons';
 
 type ConfirmDialogProps = {
   open: boolean;

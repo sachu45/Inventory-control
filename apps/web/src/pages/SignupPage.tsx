@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  ArrowLeft,
   Building2,
   Eye,
   EyeOff,
@@ -12,14 +11,13 @@ import {
   MapPin,
   Phone,
   ShieldCheck,
-  Sparkles,
   User,
   Zap,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import { toast } from 'sonner';
 import { api } from '@/api/client';
 import { AuthStepIndicator } from '@/components/auth/AuthStepIndicator';
-import { Reveal } from '@/components/motion';
+import { AuthLayout } from '@/components/auth/AuthLayout';
 import { BackupCodesCard } from '@/components/auth/BackupCodesCard';
 import { OtpCodeInput } from '@/components/auth/OtpCodeInput';
 import { PasswordStrengthBar } from '@/components/auth/PasswordStrengthBar';
@@ -32,7 +30,6 @@ import { initializeSessionFromAuthResponse } from '@/lib/session';
 import { useAuthStore } from '@/store/authStore';
 import { dashboardHomePath } from '@/lib/roles';
 import { PLAN_CATALOG, type BillingInterval, type PlanId } from '@/lib/plans';
-import { DOMAINS } from '@/config/domains';
 import { useRazorpayCheckout } from '@/hooks/use-razorpay-checkout';
 
 type Step = 'details' | 'verify' | 'method' | 'mfa' | 'backup' | 'complete';
@@ -430,55 +427,9 @@ export function SignupPage() {
               : 'Email verification, authenticator setup, and backup protection are all complete.'
             : 'Set up your company, admin account, and secure sign-in flow in one guided experience.';
 
-  return (
-    <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_18%_18%,rgba(99,102,241,0.2),transparent_36%),radial-gradient(circle_at_84%_4%,rgba(56,189,248,0.16),transparent_35%),linear-gradient(180deg,#eef2ff_0%,#f8fafc_50%,#f1f5f9_100%)]">
-      <a
-        href={`https://${DOMAINS.MARKETING}`}
-        className="group absolute left-4 top-4 z-50 inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground shadow-md ring-1 ring-slate-900/5 transition hover:-translate-x-0.5 hover:bg-muted hover:shadow-lg focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:left-6 sm:top-6"
-        aria-label="Back to home page"
-      >
-        <ArrowLeft className="h-4 w-4 text-muted-foreground transition group-hover:text-foreground" />
-        Back to home
-      </a>
-
-      {showAvatarSplash ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90">
-          <div className="flex flex-col items-center gap-4 text-center text-white">
-            <ShieldCheck className="h-10 w-10 text-slate-300" />
-            <p className="text-lg font-semibold">Opening your secure workspace</p>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="mx-auto flex min-h-screen w-full max-w-7xl items-center px-4 py-10 sm:px-6 lg:px-8">
-        <div className="grid w-full gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-          <section className="relative hidden overflow-hidden rounded-4xl border border-border/70 bg-linear-to-br from-slate-800 via-slate-900 to-slate-950 p-10 text-white shadow-[0_30px_70px_rgba(15,23,42,0.38)] lg:block">
-            <div className="pointer-events-none absolute -right-12 -top-12 h-44 w-44 rounded-full bg-slate-400/30 blur-2xl" />
-            <div className="pointer-events-none absolute -left-8 bottom-8 h-36 w-36 rounded-full bg-cyan-300/25 blur-2xl" />
-            <p className="inline-flex items-center gap-2 rounded-full border border-white/35 bg-card/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em]">
-              <Sparkles className="h-3.5 w-3.5" />
-              SoftdigitIMS
-            </p>
-            <h1 className="mt-7 text-4xl font-semibold leading-tight">{heroTitle}</h1>
-            <p className="mt-4 max-w-md text-sm text-white/80">{heroDescription}</p>
-            <div className="mt-10 grid max-w-md gap-3 text-sm">
-              <div className="rounded-xl border border-white/20 bg-card/10 px-4 py-3 backdrop-blur-xs">
-                Verified admin email before access
-              </div>
-              <div className="rounded-xl border border-white/20 bg-card/10 px-4 py-3 backdrop-blur-xs">
-                {mfaSkipped ? 'MFA can be enabled later in settings' : 'Authenticator app required for sign-in'}
-              </div>
-              <div className="rounded-xl border border-white/20 bg-card/10 px-4 py-3 backdrop-blur-xs">
-                {mfaSkipped ? 'Workspace can be entered without MFA for now' : 'Backup codes generated and stored securely'}
-              </div>
-            </div>
-          </section>
-
-          <Reveal as="section" className="relative overflow-hidden rounded-4xl border border-border/90 bg-card/95 p-6 shadow-[0_24px_56px_rgba(15,23,42,0.16)] backdrop-blur-sm sm:p-8">
-            <div className="pointer-events-none absolute -right-12 -top-14 h-36 w-36 rounded-full bg-muted blur-2xl" aria-hidden="true" />
-            <div className="pointer-events-none absolute -left-8 bottom-10 h-24 w-24 rounded-full bg-cyan-100 dark:bg-cyan-500/15 blur-2xl" aria-hidden="true" />
-
-            <AuthStepIndicator steps={steps} current={step} />
+  return <AuthLayout headline={heroTitle} description={heroDescription} wide>
+    {showAvatarSplash && <div className="auth-notice" role="status"><ShieldCheck size={18} /> Opening your secure workspace…</div>}
+    <AuthStepIndicator steps={steps} current={step} />
 
             <div className="mb-6">
               {paidPlanLabel ? (
@@ -985,12 +936,7 @@ export function SignupPage() {
                 </Button>
               </div>
             ) : null}
-          </Reveal>
-        </div>
-      </div>
-    </div>
-  );
+  </AuthLayout>;
 }
-
 export default SignupPage;
 

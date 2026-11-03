@@ -50,6 +50,7 @@ const importers: Record<string, () => Promise<unknown>> = {
   '/platform/subscriptions': () => import('@/pages/PlatformSubscriptionsPage'),
   '/barcode-print': () => import('@/pages/BarcodePrintPage'),
   '/settings': () => import('@/pages/SettingsPage'),
+  '/tools': () => import('@/pages/ToolsPage'),
 };
 
 const warmed = new Set<string>();

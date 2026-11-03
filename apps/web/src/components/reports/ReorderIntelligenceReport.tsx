@@ -60,17 +60,17 @@ export default function ReorderIntelligenceReport({ shopId }: Props) {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-card rounded-lg shadow-sm p-4 border-l-4 border-red-500">
-          <p className="text-sm font-medium text-muted-foreground">🔴 Urgent</p>
+          <p className="text-sm font-medium text-muted-foreground">Urgent</p>
           <p className="text-2xl font-bold text-foreground">{data.summary.urgent.count}</p>
           <p className="text-xs text-muted-foreground mt-1">Order {data.summary.urgent.totalOrderQty.toLocaleString()} units</p>
         </div>
         <div className="bg-card rounded-lg shadow-sm p-4 border-l-4 border-yellow-500">
-          <p className="text-sm font-medium text-muted-foreground">🟡 Warning</p>
+          <p className="text-sm font-medium text-muted-foreground">Warning</p>
           <p className="text-2xl font-bold text-foreground">{data.summary.warning.count}</p>
           <p className="text-xs text-muted-foreground mt-1">Order {data.summary.warning.totalOrderQty.toLocaleString()} units</p>
         </div>
         <div className="bg-card rounded-lg shadow-sm p-4 border-l-4 border-green-500">
-          <p className="text-sm font-medium text-muted-foreground">🟢 Normal</p>
+          <p className="text-sm font-medium text-muted-foreground">Normal</p>
           <p className="text-2xl font-bold text-foreground">{data.summary.normal.count}</p>
           <p className="text-xs text-muted-foreground mt-1">Stock is healthy</p>
         </div>

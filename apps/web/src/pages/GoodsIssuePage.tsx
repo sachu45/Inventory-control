@@ -9,7 +9,7 @@ import {
   PackageOpen,
   Plus,
   Search,
-} from 'lucide-react';
+} from '@/components/ui/icons';
 import { toast } from 'sonner';
 import { AppLayout } from '@/components/AppLayout';
 import { PageHeader } from '@/components/shared/page-header';
@@ -126,7 +126,7 @@ export function GoodsIssuePage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [page, setPage] = useState(1);
-  const [detailId, setDetailId] = useState<string | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(() => searchParams.get('record'));
   const [confirmState, setConfirmState] = useState<{ type: 'post' | 'delete'; id: string } | null>(
     null,
   );
