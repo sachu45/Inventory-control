@@ -20,10 +20,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  gate:
     runs-on: ubuntu-latest
-    name: Deploy API to VPS
-    timeout-minutes: 30
+    name: Check deployment conditions
     # Only proceed when the upstream Quality Gate actually succeeded on a push
     # to main in this repository. CI Quality Gate also runs on pull requests,
     # and `branches: [main]` matches the head branch *name*: without the event
@@ -34,6 +33,14 @@ jobs:
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_repository.full_name == github.repository
+    steps:
+      - run: echo "Deployment conditions met"
+
+  deploy:
+    needs: gate
+    runs-on: ubuntu-latest
+    name: Deploy API to VPS
+    timeout-minutes: 30
 
     # GitHub Environment: enables required reviewers, wait timers, deployment
     # history, and environment-scoped secrets on GitHub.
