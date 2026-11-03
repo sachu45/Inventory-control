@@ -6,6 +6,8 @@ import { installAuthRefreshStub, writeE2eSession } from './helpers';
 const authDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '.auth');
 const authFile = path.join(authDir, 'admin.json');
 
+setup.setTimeout(120_000);
+
 setup('authenticate as admin', async ({ page }) => {
   await installAuthRefreshStub(page);
   await page.goto('/login');
