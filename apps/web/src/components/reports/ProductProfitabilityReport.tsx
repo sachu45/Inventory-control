@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import {
   getProductProfitability,
   getProfitRankStars,
-  getRecommendationColor,
   getRecommendationText,
   ProfitabilityResponse,
   ProfitabilityFilters,
@@ -176,7 +175,7 @@ export default function ProductProfitabilityReport({ shopId }: Props) {
                     <td className="px-6 py-4 text-center text-lg">{getProfitRankStars(item.profitRank)}</td>
                     <td className="px-6 py-4 text-sm">
                       <span
-                        className={`px-3 py-1 rounded-full text-xs font-medium inline-block bg-${getRecommendationColor(item.recommendation)}-100 text-${getRecommendationColor(item.recommendation)}-800`}
+                        className="px-3 py-1 rounded-full text-xs font-medium inline-block"
                         style={{
                           backgroundColor:
                             item.recommendation === 'STOP_SELLING'

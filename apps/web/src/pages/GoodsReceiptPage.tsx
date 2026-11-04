@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { formResolver } from '@/lib/form-resolver';
@@ -261,17 +261,18 @@ export function GoodsReceiptPage({ createOnly = false }: { createOnly?: boolean 
   const items: GoodsReceipt[] = data?.items ?? [];
   const meta = data?.meta ?? { total: 0, page: 1, limit: PAGE_SIZE, totalPages: 1 };
 
-  const debounceTimer = useState<ReturnType<typeof setTimeout> | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current); }, []);
   const handleSearchChange = useCallback(
     (value: string) => {
       setSearch(value);
-      if (debounceTimer[0]) clearTimeout(debounceTimer[0]);
-      debounceTimer[0] = setTimeout(() => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = setTimeout(() => {
         setDebouncedSearch(value);
         setPage(1);
       }, 400);
     },
-    [debounceTimer],
+    [],
   );
 
   const form = useForm<GRFormValues>({
