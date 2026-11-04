@@ -144,7 +144,11 @@ export function useCompanySettings() {
     queryKey: companySettingsKeys.list(),
     queryFn: async () => {
       const { data } = await api.get('/company-settings');
-      return data as Array<{ key: string; value: string }>;
+      const payload = data as Record<string, unknown>;
+      const rows = Array.isArray(payload) ? payload
+        : Array.isArray((payload as Record<string, unknown>)?.data) ? (payload as Record<string, unknown>).data
+        : [];
+      return rows as Array<{ key: string; value: string }>;
     },
   });
 }
