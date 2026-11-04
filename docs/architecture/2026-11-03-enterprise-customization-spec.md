@@ -1,8 +1,8 @@
 # SoftDigit IMS — Enterprise Customization Technical Architecture Specification
 
-**Date:** 2026-11-03
+**Date:** 2026-11-03 (Revision 2: 2026-11-04)
 **Author:** Architecture Team
-**Status:** Draft — Pending Review
+**Status:** Revision 2 — Reconciled with architecture review findings
 
 ---
 
@@ -177,7 +177,12 @@ export interface ModuleDefinition {
   customizableFields: string[];   // Field keys that can be shown/hidden/required
   supportsCustomFields: boolean;  // Whether JSON custom fields are allowed
   supportsWorkflows: boolean;     // Whether workflow rules apply
+  dependsOn: string[];           // Module keys this module requires (validated on enable/disable)
 }
+
+// Module dependency validation: disabling a module that others depend on
+// returns a 409 listing the dependent modules. Enabling a module auto-checks
+// that all its dependencies are enabled for the tenant.
 
 export const MODULE_REGISTRY: Record<string, ModuleDefinition> = {
   'dashboard': {
@@ -193,6 +198,7 @@ export const MODULE_REGISTRY: Record<string, ModuleDefinition> = {
     customizableFields: [],
     supportsCustomFields: false,
     supportsWorkflows: false,
+    dependsOn: [],
   },
   'products': {
     key: 'products',
@@ -210,6 +216,7 @@ export const MODULE_REGISTRY: Record<string, ModuleDefinition> = {
     ],
     supportsCustomFields: true,
     supportsWorkflows: false,
+    dependsOn: [],
   },
   'purchase-orders': {
     key: 'purchase-orders',
@@ -227,6 +234,7 @@ export const MODULE_REGISTRY: Record<string, ModuleDefinition> = {
     ],
     supportsCustomFields: true,
     supportsWorkflows: true,
+    dependsOn: ['products'],    // POs depend on the products module
   },
   // ... one entry per module (all 30+)
 };
@@ -265,7 +273,7 @@ model TenantModuleConfig {
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   shop    Shop?   @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
-  @@unique([companyId, shopId, moduleKey])
+  @@unique([companyId, shopId, moduleKey])  // PostgreSQL 15: NULLS NOT DISTINCT — nullable shopId participates in uniqueness
   @@index([companyId])
   @@map("tenant_module_configs")
 }
@@ -341,27 +349,48 @@ while keeping queries simple.
 - `goods_receipt_headers`
 - `goods_issue_headers`
 
-### 4.4 Config Versioning (Phase 7)
+### 4.4 Config Versioning — Immutable Published Snapshots
 
-Added later to avoid over-engineering Phase 1:
+Config versioning is implemented from Phase 2 onward (not deferred to Phase 7).
+Every publish creates an **immutable snapshot** — published versions are never
+mutated. Rollback creates a new version whose snapshot copies a previous one.
+
+**Revision 2 decisions:**
+- No `draft` status on `ConfigVersion`. Drafts live as uncommitted
+  `TenantModuleConfig` rows. The `ConfigVersion` table only holds published
+  (immutable) snapshots.
+- Publication captures a consistent snapshot under an advisory lock with an
+  expected base version to prevent concurrent publish conflicts (HTTP 409).
+- Every draft mutation is tied to a draft revision; publication captures the
+  draft atomically so a concurrent draft edit cannot slip through.
 
 ```prisma
 model ConfigVersion {
-  id          String   @id @default(uuid()) @db.Uuid
-  companyId   String   @map("company_id") @db.Uuid
-  status      String   @default("draft")              // draft | preview | published | rolled_back
-  snapshot    Json                                     // Full config snapshot at publish time
-  publishedAt DateTime? @map("published_at") @db.Timestamptz(6)
-  publishedBy String?  @map("published_by") @db.Uuid
-  rollbackOf  String?  @map("rollback_of") @db.Uuid   // Points to the version this rolled back
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id            String   @id @default(uuid()) @db.Uuid
+  companyId     String   @map("company_id") @db.Uuid
+  version       Int                                       // Monotonically increasing per company
+  snapshot      Json                                      // Full immutable config snapshot
+  publishedAt   DateTime @default(now()) @map("published_at") @db.Timestamptz(6)
+  publishedBy   String   @map("published_by") @db.Uuid
+  baseVersionId String?  @map("base_version_id") @db.Uuid // The version this was published from
+  rollbackOfId  String?  @map("rollback_of_id") @db.Uuid  // Non-null if this is a rollback
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  @@index([companyId, status])
+  @@unique([companyId, version])
+  @@index([companyId])
   @@map("config_versions")
 }
 ```
+
+**Publication algorithm:**
+1. Acquire advisory lock on `companyId`
+2. Verify `expectedBaseVersion` matches the current latest published version (409 if not)
+3. Snapshot all `TenantModuleConfig` + `CustomFieldDefinition` rows for the company
+4. Insert immutable `ConfigVersion` row with incremented version number
+5. Invalidate the config cache for the company
+6. Release advisory lock
 
 ---
 
@@ -393,15 +422,43 @@ export class ModuleRegistryService {
 
 **File:** `apps/api/src/common/config/config-resolver.service.ts`
 
-The core resolution engine. Redis-cached with 30s TTL (same pattern as
-`FeatureFlagsService`).
+The core resolution engine. Uses **version-based caching** — not TTL-based.
 
-**Cache key pattern:** `cfg:{companyId}:{shopId|_}:{moduleKey}` for company/shop
-configs, `cfg:user:{companyId}:{userId}:{moduleKey}` for user overrides.
+**Revision 2 caching strategy:**
 
-**Cache invalidation:** On any write to `tenant_module_configs` or
-`user_config_overrides`, delete the relevant cache keys. The service exposes
-an `invalidate(companyId, moduleKey?)` method.
+The resolved business configuration is identical for all users in a company at a
+given published version. The cache key therefore does NOT include `roleId` or
+`userId` — role-specific authorization and personal preferences are resolved
+separately (see below).
+
+**Cache key pattern:**
+- Business config: `cfg:v{publishedVersion}:{companyId}:{shopId|_}:{moduleKey}`
+- User preferences: `cfg:user:{companyId}:{userId}:{moduleKey}`
+
+**How it works:**
+1. On publish, the new version number is written to Redis (`cfg:current:{companyId}`)
+2. Business config reads embed the current version in the cache key
+3. Published config snapshots are immutable, so cached entries never go stale
+4. Old version cache entries are evicted lazily (no TTL needed for correctness,
+   but a long TTL like 24h prevents unbounded growth)
+5. User preference cache entries use a short TTL (60s) since they are mutable
+
+**Three separate resolution paths (Revision 2):**
+- **Business configuration** — company/shop-level module settings from the
+  published snapshot. Cached at company/version level. Identical for all users.
+- **Authorization** — role permissions resolved via existing `PermissionsGuard`
+  and `role-permissions.ts`. Not part of the config cache.
+- **Personal preferences** — user-level UI overrides from `UserConfigOverride`.
+  Cached per user with short TTL.
+
+**Cache invalidation:**
+- Business config: invalidated on publish (new version = new cache keys automatically)
+- User preferences: delete on write to `user_config_overrides`
+
+**Shop-level configuration:** If shop-level business config differs from the
+company default, the cache key includes `shopId`. The published snapshot must
+account for shop-level overrides by including them in the snapshot or by noting
+which shops have inherited vs. overridden configuration.
 
 ### 5.3 Config Admin Service
 
@@ -510,7 +567,7 @@ apps/admin/src/pages/
   BrandingPage.tsx            — Company branding (extends existing branding system)
   RolesPermissionsPage.tsx    — Configure role permission overrides per company
   AuditLogPage.tsx            — View all config changes with rollback
-  ConfigVersionsPage.tsx      — Draft/publish/rollback management (Phase 7)
+  ConfigVersionsPage.tsx      — Publish/rollback management (integrated from Phase 2)
 ```
 
 ### 7.4 Module Config Editor (Key Screen)
@@ -574,9 +631,9 @@ POST   /api/v1/admin/tenants/:companyId/custom-fields
 PUT    /api/v1/admin/tenants/:companyId/custom-fields/:id
 DELETE /api/v1/admin/tenants/:companyId/custom-fields/:id
 
-# Config versioning (Phase 7)
+# Config versioning (Phase 2 — publishing; Phase 7 — UI)
 GET    /api/v1/admin/tenants/:companyId/config-versions
-POST   /api/v1/admin/tenants/:companyId/config-versions/publish
+POST   /api/v1/admin/tenants/:companyId/config-versions/publish    # 409 on concurrent conflict
 POST   /api/v1/admin/tenants/:companyId/config-versions/:id/rollback
 
 # Audit
@@ -637,14 +694,35 @@ PUT    /api/v1/me/modules/:key/preferences
                   └─────────────────┘
 ```
 
-### 9.2 Admin Dashboard Security
+### 9.2 NestJS Guard Execution Order
+
+**Critical implementation detail:** NestJS guards execute **before** interceptors.
+The `TenantRlsInterceptor` populates `AsyncLocalStorage` with `companyId`, but
+guards cannot depend on it being available yet.
+
+Therefore, any module-level guard (e.g. `ModuleEnabledGuard` from issue #179)
+must obtain `companyId` from a source available during guard execution:
+- `request.user.companyId` — from the JWT payload, set by `JwtAuthGuard`
+- NOT from `AsyncLocalStorage` (populated by the interceptor, which runs later)
+- NOT from an arbitrary client-provided header or query parameter (untrusted)
+
+**Execution order:**
+```
+JwtAuthGuard → PermissionsGuard → ModuleEnabledGuard → SubscriptionWriteGuard
+  → TenantRlsInterceptor (AsyncLocalStorage) → Controller
+```
+
+The `companyId` from `request.user` is trusted because it comes from the verified
+JWT token. Never accept a client-supplied `companyId` for authorization decisions.
+
+### 9.3 Admin Dashboard Security
 
 - All admin API routes behind `PlatformAdminGuard` (already exists)
 - Every config write logged to `PlatformAuditLog` (already exists)
 - Admin dashboard deployed on a separate subdomain (e.g. `admin.softdigit.app`)
 - Admin users are flagged `isPlatformAdmin: true` in the `User` table
 
-### 9.3 Cross-Tenant Isolation Tests (Phase 8)
+### 9.4 Cross-Tenant Isolation Tests (Phase 8)
 
 Automated tests that must pass before each release:
 - User from Company A cannot read Company B's module configs
@@ -707,14 +785,18 @@ Automated tests that must pass before each release:
 
 ### Phase 2 — Platform Admin APIs (E03)
 
-**Epic E03: Platform Admin APIs**
+**Epic E03: Platform Admin APIs + Config Publishing**
 - [ ] Create `ConfigAdminModule` with `PlatformAdminGuard`
 - [ ] `GET/PUT/DELETE /admin/tenants/:id/modules/:key` — module config CRUD
 - [ ] `GET/PUT/DELETE /admin/tenants/:id/shops/:shopId/modules/:key` — shop overrides
 - [ ] `GET/PUT/DELETE /admin/tenants/:id/users/:userId/overrides/:key` — user overrides
+- [ ] Create `ConfigVersion` Prisma model + migration (immutable published snapshots, see §4.4)
+- [ ] Implement `ConfigPublishingService` — advisory lock, expected base version, atomic snapshot
+- [ ] `POST /admin/tenants/:id/config-versions/publish` — publish with 409 on conflict
+- [ ] `POST /admin/tenants/:id/config-versions/:id/rollback` — create new version from old snapshot
 - [ ] Config change audit logging via existing `PlatformAuditLog`
 - [ ] Input validation DTOs with class-validator
-- [ ] API integration tests
+- [ ] API integration tests including concurrent publish conflict (409)
 
 ### Phase 3 — Admin Dashboard (E04)
 
@@ -763,16 +845,20 @@ Automated tests that must pass before each release:
 - [ ] Admin dashboard: approval chain configuration per module
 - [ ] Integration test: workflow runs with company-specific config
 
-### Phase 7 — Config Versioning (E08)
+### Phase 7 — Config Versioning UI & Advanced Lifecycle (E08)
 
-**Epic E08: Configuration Versioning**
-- [ ] Create `ConfigVersion` Prisma model + migration
-- [ ] Implement draft/preview/publish lifecycle in `ConfigVersioningService`
-- [ ] Publish = snapshot all `TenantModuleConfig` + `CustomFieldDefinition` rows
-- [ ] Rollback = restore from a previous snapshot
-- [ ] Admin dashboard: version history timeline
-- [ ] Admin dashboard: preview mode ("view as Company X, User Y")
-- [ ] Admin dashboard: publish confirmation + rollback button
+**Epic E08: Configuration Versioning UI**
+
+Note: The `ConfigVersion` model and immutable publish/rollback mechanism are
+implemented in Phase 2 (see §4.4). Phase 7 adds the admin dashboard UI and
+advanced lifecycle features on top.
+
+- [ ] Admin dashboard: version history timeline with diff viewer
+- [ ] Admin dashboard: preview mode ("view as Company X, User Y, Shop Z")
+- [ ] Admin dashboard: publish confirmation with version comparison
+- [ ] Admin dashboard: rollback button with impact preview
+- [ ] Admin dashboard: audit trail per published version
+- [ ] Implement version diff service (compare two published snapshots)
 
 ### Phase 8 — Enterprise Validation (E09)
 
@@ -799,10 +885,13 @@ Automated tests that must pass before each release:
 - All admin CRUD endpoints return correct responses
 - Every config write produces an audit log entry
 - Non-platform-admin users get 403 on all admin endpoints
+- Config publish creates an immutable snapshot with correct version number
+- Concurrent publish returns 409 when base version does not match
+- Rollback creates a new version from a prior snapshot (does not mutate)
 
 ### Phase 3
 - Admin can log in, see all tenants, toggle modules, save config
-- Config changes reflect in tenant's sidebar within 30 seconds
+- Config changes reflect in tenant's sidebar immediately after publish (version-based cache)
 
 ### Phase 4
 - Sidebar renders from API config, not hardcoded array
@@ -821,9 +910,10 @@ Automated tests that must pass before each release:
 - Workflow engine respects company-specific config
 
 ### Phase 7
-- Admin can draft, preview, publish and rollback config
-- Published config is the only one tenants see
-- Rollback restores the previous published version
+- Admin dashboard shows version history with diffs between published snapshots
+- Preview mode renders "view as Company X, User Y, Shop Z"
+- Publish confirmation UI shows what changed since last published version
+- Rollback UI shows impact preview before confirming
 
 ### Phase 8
 - All isolation tests pass
@@ -848,11 +938,14 @@ Automated tests that must pass before each release:
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| Config resolution adds latency to every request | Medium | High | Redis cache with 30s TTL; cache warm on publish |
+| Config resolution adds latency to every request | Medium | High | Version-based Redis cache (immutable snapshots never go stale); cache warm on publish |
 | Custom fields create query performance issues | Medium | Medium | JSON column with GIN index; no EAV pattern |
-| Admin misconfiguration breaks a client's system | High | Critical | Draft/publish lifecycle (Phase 7); rollback capability |
+| Admin misconfiguration breaks a client's system | High | Critical | Immutable published snapshots (Phase 2); rollback creates new version from prior snapshot |
 | Config schema evolves, old configs become invalid | Medium | High | Version field on configs; migration scripts per schema change |
 | Sidebar config API failure locks users out | Low | Critical | Frontend fallback to hardcoded `SIDEBAR_SECTIONS` |
+| Concurrent publish corrupts config | Low | Critical | Advisory lock + expected base version check (409 conflict); draft revision tracking |
+| Prisma migration drops NULLS NOT DISTINCT constraint | Low | High | Verify constraint in CI; manual migration with explicit `CREATE UNIQUE INDEX` |
+| Module guard reads untrusted companyId | Medium | Critical | Guard reads `companyId` from authenticated `request.user` only, never from client-provided headers/params |
 
 ---
 
@@ -863,6 +956,47 @@ Automated tests that must pass before each release:
 - **Plugin/extension system** — Custom code beyond configuration goes through SoftDigit engineering
 - **White-label mobile app** — Out of scope; existing React web is the primary interface
 - **AI-powered configuration suggestions** — Future optimization using the existing agent platform
+
+---
+
+---
+
+## 16. API-Level Field Enforcement
+
+Mandatory and hidden field configuration is enforced at the **API layer**, not
+only in the frontend. This prevents clients from bypassing field rules via
+direct API calls.
+
+- **Mandatory fields:** The API validates that fields marked mandatory in
+  `TenantModuleConfig.config.mandatoryFields` are present and non-empty on
+  create/update requests. Missing mandatory fields return 422.
+- **Hidden fields:** Fields marked hidden in `config.hiddenFields` are stripped
+  from API responses. On write requests, hidden fields are silently ignored
+  (not rejected) to avoid breaking integrations.
+- Enforcement is implemented as a NestJS interceptor (`FieldEnforcementInterceptor`)
+  that reads the resolved module config for the current tenant.
+
+---
+
+## 17. Custom Field Lifecycle Rules
+
+- **Deactivation over deletion:** Custom fields are soft-deactivated (`isActive: false`)
+  rather than deleted. Existing data in `custom_fields` JSON columns is preserved.
+- **Type changes:** Once a custom field has data, its `fieldType` cannot be changed.
+  A new field must be created and the old one deactivated.
+- **Required flag:** Changing `required` from false to true only applies to new records.
+  Existing records are not retroactively validated.
+- **Select options:** Removing a select option does not delete existing data that used
+  it. The value is preserved but flagged as deprecated in the admin UI.
+
+---
+
+## Revision History
+
+| Revision | Date | Changes |
+|---|---|---|
+| 1 | 2026-11-03 | Initial architecture specification |
+| 2 | 2026-11-04 | Reconciled with architecture review: version-based caching replaces 30s TTL; immutable published snapshots replace draft ConfigVersion model; publishing moved to Phase 2; added NULLS NOT DISTINCT constraint note; added guard execution order (§9.2); added module dependency validation; added API-level field enforcement (§16); added custom field lifecycle rules (§17); added concurrent publish, constraint and guard risks to risk register |
 
 ---
 
