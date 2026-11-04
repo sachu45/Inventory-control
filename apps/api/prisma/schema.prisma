@@ -402,6 +402,9 @@ model Company {
   documentRegistry DocumentRegistry[]
   pdfJobs          PdfJob[]
 
+  // Enterprise Configuration
+  tenantModuleConfigs TenantModuleConfig[]
+
   // Agent Platform (WhatsApp assistant)
   channelAccounts    ChannelAccount[]
   userChannelLinks   UserChannelLink[]
@@ -566,6 +569,9 @@ model Shop {
   lowStockAlerts        LowStockAlert[]
   ewayBills             EwayBill[]
   inventoryLots         InventoryLot[]
+
+  // Enterprise Configuration
+  tenantModuleConfigs TenantModuleConfig[]
 
   @@map("shops")
 }
@@ -4317,6 +4323,25 @@ model InventoryException {
   @@index([companyId, severity, status], map: "inventory_exceptions_severity_idx")
   @@index([companyId, lastDetectedAt], map: "inventory_exceptions_time_idx")
   @@map("inventory_exceptions")
+}
+
+model TenantModuleConfig {
+  id        String   @id @default(uuid()) @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  shopId    String?  @map("shop_id") @db.Uuid
+  moduleKey String   @map("module_key")
+  enabled   Boolean?
+  config    Json     @default("{}")
+  revision  Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  shop    Shop?   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("tenant_module_configs")
 }
 
 model CompanyHealthScoreConfig {
