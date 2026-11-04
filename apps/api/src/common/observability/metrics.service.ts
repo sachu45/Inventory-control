@@ -20,6 +20,8 @@ export class MetricsService {
   readonly notificationEngineDuration: Histogram<string>;
   /** Customer dispatch outcomes by channel + result (sent/failed/deferred/batched…). */
   readonly workflowDispatch: Counter<string>;
+  /** Config resolver: Redis failures that fell through to Postgres, by operation. */
+  readonly configCacheRedisErrors: Counter<string>;
 
   constructor() {
     collectDefaultMetrics({ register: this.registry });
@@ -74,6 +76,13 @@ export class MetricsService {
       name: 'workflow_dispatch_total',
       help: 'Customer dunning dispatch outcomes by channel and result',
       labelNames: ['channel', 'result'],
+      registers: [this.registry],
+    });
+
+    this.configCacheRedisErrors = new Counter({
+      name: 'config_cache_redis_errors_total',
+      help: 'Config resolver Redis errors that fell back to Postgres',
+      labelNames: ['op'],
       registers: [this.registry],
     });
   }
