@@ -1,12 +1,14 @@
 import { randomUUID } from 'crypto';
 import { ConflictException, HttpStatus } from '@nestjs/common';
 import { ConfigPublishService } from '../src/common/config/config-publish.service';
+import { ConfigResolverService } from '../src/common/config/config-resolver.service';
 import {
   ConfigValidationException,
   ConfigVersionConflictException,
   PublishedSnapshot,
   latestVersionCacheKey,
 } from '../src/common/config/config-snapshot';
+import { MetricsService } from '../src/common/observability/metrics.service';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 
@@ -18,7 +20,7 @@ describe('ConfigPublishService (e2e)', () => {
   const enabled = Boolean(process.env.DATABASE_URL);
   let prisma: PrismaService;
   let service: ConfigPublishService;
-  const redis = { del: jest.fn(async (_key: string) => 1) };
+  const redis = { get: jest.fn(async () => null), set: jest.fn(async () => 'OK' as const), del: jest.fn(async (_key: string) => 1) };
   let actorId: string;
   const companies: string[] = [];
 
@@ -54,7 +56,7 @@ describe('ConfigPublishService (e2e)', () => {
     prisma = new PrismaService();
     // Seeded by the e2e global setup; audit rows reference a real user.
     actorId = (await prisma.user.findFirstOrThrow({ select: { id: true } })).id;
-    service = new ConfigPublishService(prisma, new AuditService(prisma), redis);
+    service = new ConfigPublishService(prisma, new AuditService(prisma), redis, new ConfigResolverService(prisma, redis, new MetricsService()));
   });
 
   beforeEach(() => redis.del.mockClear());

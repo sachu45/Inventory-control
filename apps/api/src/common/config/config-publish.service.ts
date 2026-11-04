@@ -4,6 +4,7 @@ import type Redis from 'ioredis';
 import { AuditService } from '../../modules/audit/audit.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { REDIS_CLIENT } from '../cache/redis.provider';
+import { ConfigResolverService } from './config-resolver.service';
 import {
   ConfigChange,
   ConfigIssue,
@@ -38,6 +39,7 @@ export class ConfigPublishService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     @Inject(REDIS_CLIENT) private readonly redis: Pick<Redis, 'del'>,
+    private readonly resolver: ConfigResolverService,
   ) {}
 
   /** The live version: the highest `version` for the company, or null before the first publish. */
@@ -199,6 +201,7 @@ export class ConfigPublishService {
         changedPaths: changes.slice(0, AUDITED_PATH_LIMIT).map((c) => c.path),
       },
     });
+    this.resolver.invalidateLatest(companyId);
     try {
       await this.redis.del(latestVersionCacheKey(companyId));
     } catch (err) {

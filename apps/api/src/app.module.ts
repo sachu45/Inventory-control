@@ -58,6 +58,7 @@ import { QueuesModule } from './common/queues/queues.module';
 import { QueueModule } from './common/queue/queue.module';
 import { UploadModule } from './common/upload/upload.module';
 import { ObservabilityModule } from './common/observability/observability.module';
+import { TenantConfigModule } from './common/config/config.module';
 import { FxModule } from './modules/fx/fx.module';
 import { MailModule } from './common/mail/mail.module';
 import { BillingModule } from './modules/billing/billing.module';
@@ -160,6 +161,7 @@ function routeOptsIntoAuthThrottle(context: ExecutionContext): boolean {
     QueueModule,
     UploadModule,
     ObservabilityModule,
+    TenantConfigModule,
     FxModule,
     AuditModule,
     StockModule,

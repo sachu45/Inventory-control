@@ -6,6 +6,7 @@ import {
   diffJson,
   diffSnapshots,
   draftsFromSnapshot,
+  validateDraftRow,
 } from './config-snapshot';
 
 const SHOP = '11111111-1111-1111-1111-111111111111';
@@ -167,5 +168,23 @@ describe('diff', () => {
     ]);
     const next = compileSnapshot([company('contracts', false)], shops, 2).snapshot;
     expect(diffSnapshots(snapshot, next)).toEqual([]);
+  });
+});
+
+describe('validateDraftRow', () => {
+  it('accepts valid company and shop rows', () => {
+    expect(validateDraftRow(company('purchase-orders', true, { mandatoryFields: ['remarks'] }))).toEqual([]);
+    expect(validateDraftRow(shop('contracts', false))).toEqual([]);
+  });
+
+  it('rejects unknown modules, non-object config and invalid settings', () => {
+    expect(validateDraftRow(company('ghost', true))).toEqual([{ path: 'moduleKey', message: 'Unknown module "ghost"' }]);
+    expect(validateDraftRow(company('products', null, []))).toEqual([{ path: 'config', message: 'Config must be an object' }]);
+    expect(validateDraftRow(company('purchase-orders', null, { hiddenFields: ['remarks'], mandatoryFields: ['remarks'] })).map((i) => i.path)).toEqual(['config.hiddenFields']);
+  });
+
+  it('rejects non-overridable shop keys and disabling always-enabled modules', () => {
+    expect(validateDraftRow(shop('purchase-orders', null, { label: 'x' })).map((i) => i.path)).toEqual(['config.label']);
+    expect(validateDraftRow(company('settings', false)).map((i) => i.path)).toEqual(['enabled']);
   });
 });

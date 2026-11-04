@@ -31,6 +31,13 @@ export type ResolvedConfig = {
   provenance?: Record<string, ConfigLayer>;
 };
 
+/** The company of the current request. Config is never resolved for a company taken from request input. */
+export function requireTenantCompanyId(): string {
+  const companyId = TenantContext.get()?.companyId;
+  if (!companyId) throw new ForbiddenException('Config can only be resolved inside a tenant context');
+  return companyId;
+}
+
 export function snapshotCacheKey(companyId: string, version: number): string {
   return `cfg:v1:${companyId}:snap:${version}`;
 }
@@ -87,7 +94,7 @@ export class ConfigResolverService {
   ) {}
 
   async resolve(options: { shopId?: string | null; explain?: boolean } = {}): Promise<ResolvedConfig> {
-    const companyId = this.currentCompanyId();
+    const companyId = requireTenantCompanyId();
     const version = await this.latestVersion(companyId);
     const snapshot = version === 0 ? DEFAULT_SNAPSHOT : await this.snapshot(companyId, version);
     return materialize(companyId, snapshot, options.shopId ?? null, options.explain ?? false);
@@ -98,7 +105,7 @@ export class ConfigResolverService {
    * makes mandatory removed, so a preference can never hide a required field.
    */
   async resolvePreferences(userId: string): Promise<Record<string, UserPreferences>> {
-    const companyId = this.currentCompanyId();
+    const companyId = requireTenantCompanyId();
     const [stored, config] = await Promise.all([this.storedPreferences(companyId, userId), this.resolve()]);
     const result: Record<string, UserPreferences> = {};
     for (const [scope, prefs] of Object.entries(stored)) {
@@ -120,12 +127,6 @@ export class ConfigResolverService {
     const key = preferencesCacheKey(companyId, userId);
     this.preferences.delete(key);
     await this.redisCall('del', () => this.redis.del(key));
-  }
-
-  private currentCompanyId(): string {
-    const companyId = TenantContext.get()?.companyId;
-    if (!companyId) throw new ForbiddenException('Config can only be resolved inside a tenant context');
-    return companyId;
   }
 
   private async latestVersion(companyId: string): Promise<number> {

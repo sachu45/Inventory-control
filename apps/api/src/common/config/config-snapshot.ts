@@ -154,6 +154,32 @@ export function compileSnapshot(
   };
 }
 
+/**
+ * Checks one draft row on its own (module exists, config shape, shop-overridable
+ * keys, always-enabled). Cross-module rules such as dependencies are checked at publish.
+ */
+export function validateDraftRow(row: DraftRow): ConfigIssue[] {
+  if (!isModuleKey(row.moduleKey)) return [{ path: 'moduleKey', message: `Unknown module "${row.moduleKey}"` }];
+  const mod = MODULE_REGISTRY[row.moduleKey];
+  if (!isPlainObject(row.config)) return [{ path: 'config', message: 'Config must be an object' }];
+
+  const issues: ConfigIssue[] = [];
+  if (row.shopId !== null) {
+    const allowed = new Set<string>(mod.shopOverridable);
+    for (const key of Object.keys(row.config).filter((k) => !allowed.has(k))) {
+      issues.push({ path: `config.${key}`, message: `"${key}" cannot be overridden per shop` });
+    }
+  }
+  if (!issues.length) {
+    const parsed = mod.configSchema.safeParse({ ...mod.defaults, ...row.config });
+    if (!parsed.success) issues.push(...issuesFrom('config', parsed.error));
+  }
+  if (mod.alwaysEnabled && row.enabled === false) {
+    issues.push({ path: 'enabled', message: `${mod.label} cannot be disabled` });
+  }
+  return issues;
+}
+
 function dependencyIssues(prefix: string, isEnabled: (key: ModuleKey) => boolean): ConfigIssue[] {
   const issues: ConfigIssue[] = [];
   for (const key of MODULE_KEYS) {

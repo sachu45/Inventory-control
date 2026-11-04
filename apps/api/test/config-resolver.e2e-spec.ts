@@ -29,8 +29,8 @@ describe('ConfigResolverService (e2e)', () => {
     if (!enabled) return;
     prisma = new PrismaService();
     actorId = (await prisma.user.findFirstOrThrow({ select: { id: true } })).id;
-    publisher = new ConfigPublishService(prisma, new AuditService(prisma), redis);
     resolver = new ConfigResolverService(prisma, redis, new MetricsService());
+    publisher = new ConfigPublishService(prisma, new AuditService(prisma), redis, resolver);
     companyId = randomUUID();
     const tag = companyId.slice(0, 8);
     await prisma.company.create({ data: { id: companyId, companyCode: `RES-${tag}`, companyName: `res ${tag}` } });
@@ -55,14 +55,13 @@ describe('ConfigResolverService (e2e)', () => {
     await prisma.$disconnect();
   });
 
-  it('serves defaults, then each published version once its cache pointer is invalidated', async () => {
+  it('serves defaults, then each published version immediately on the publishing node', async () => {
     if (!enabled) return;
     expect((await asTenant(() => resolver.resolve())).version).toBe(0);
 
     await prisma.tenantModuleConfig.create({ data: { companyId, moduleKey: 'contracts', enabled: false } });
     await prisma.tenantModuleConfig.create({ data: { companyId, shopId, moduleKey: 'rfqs', enabled: false } });
     await publisher.publish({ companyId, expectedBaseVersion: 0, actorId });
-    resolver.invalidateLatest(companyId);
 
     const companyWide = await asTenant(() => resolver.resolve());
     expect(companyWide.version).toBe(1);
@@ -74,7 +73,6 @@ describe('ConfigResolverService (e2e)', () => {
     expect((await asTenant(() => resolver.resolve())).modules.contracts.enabled).toBe(false);
 
     await publisher.publish({ companyId, expectedBaseVersion: 1, actorId });
-    resolver.invalidateLatest(companyId);
     const next = await asTenant(() => resolver.resolve());
     expect(next.version).toBe(2);
     expect(next.modules.contracts.enabled).toBe(true);
