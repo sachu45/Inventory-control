@@ -9,7 +9,24 @@ on:
     - cron: '44 10 * * 5'
 
 jobs:
+  # Code scanning on a private personal repo needs paid GitHub Code Security, so
+  # analysis only runs while the repo is public. Scheduled runs carry no repository
+  # payload, hence the API lookup instead of github.event.repository.private.
+  visibility:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      private: ${{ steps.repo.outputs.private }}
+    steps:
+    - id: repo
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: echo "private=$(gh api "repos/$GITHUB_REPOSITORY" --jq .private)" >> "$GITHUB_OUTPUT"
+
   analyze:
+    needs: visibility
+    if: needs.visibility.outputs.private == 'false'
     name: Analyze (${{ matrix.language }})
     runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
     timeout-minutes: 60
