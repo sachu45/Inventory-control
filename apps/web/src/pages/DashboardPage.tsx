@@ -48,6 +48,7 @@ import {
   DashboardKpiCard,
   DashboardKpiCardSkeleton,
 } from '@/components/dashboard/DashboardKpiCard';
+import { useModuleUsable } from '@/hooks/use-module-config';
 import { DashboardInsightsPanel } from '@/components/dashboard/DashboardInsightsPanel';
 import { computePeriodTrend } from '@/lib/kpi-trend';
 import { useShops } from '@/hooks/use-shops';
@@ -110,6 +111,7 @@ type ReorderSuggestion = {
 
 export function DashboardPage() {
   const navigate = useNavigate();
+  const usable = useModuleUsable();
   const user = useAuthStore((s) => s.user);
   const isAdmin = isAdminUser(user);
   const { data: shopList = [] } = useShops();
@@ -167,6 +169,7 @@ export function DashboardPage() {
         icon: Package,
         accent: 'sky' as const,
         ariaLabel: `Total Products: ${(dashboard?.totalProducts ?? 0).toLocaleString('en-IN')}. View products.`,
+        path: '/products',
         onClick: () => navigate('/products'),
       },
       {
@@ -180,6 +183,7 @@ export function DashboardPage() {
         tooltip:
           'Calculated using current quantity × unit cost across all inventory items.',
         ariaLabel: `Total Stock Value: ${formatInr(dashboard?.totalStockValue ?? 0)}. View products.`,
+        path: '/products',
         onClick: () => navigate('/products'),
       },
       {
@@ -190,6 +194,7 @@ export function DashboardPage() {
         icon: AlertTriangle,
         accent: 'amber' as const,
         ariaLabel: `Low Stock Alerts: ${dashboard?.lowStockCount ?? 0} items. View low stock report.`,
+        path: lowStockReportPath,
         onClick: () => navigate(lowStockReportPath),
       },
       {
@@ -201,10 +206,12 @@ export function DashboardPage() {
         icon: ArrowRightLeft,
         accent: 'violet' as const,
         ariaLabel: `Recent Transactions: ${dashboard?.recentTransactions ?? 0}. View stock movement history.`,
+        path: '/reports?tab=stock-ledger',
         onClick: () => navigate('/reports?tab=stock-ledger'),
       },
-    ];
-  }, [dashboard, lowStockReportPath, navigate]);
+      // Only widgets whose module this user can actually use.
+    ].filter((card) => usable(card.path));
+  }, [dashboard, lowStockReportPath, navigate, usable]);
 
   return (
     <AppLayout active="Dashboard">
@@ -213,8 +220,12 @@ export function DashboardPage() {
           title="Dashboard"
           description={`Your inventory, at a glance. Welcome back, ${user?.name ?? 'User'}.`}
         >
-          <Button variant="outline" onClick={() => navigate('/reports')}><BarChart3 className="h-4 w-4" /> View reports</Button>
-          <Button onClick={() => navigate('/products/new')}><Plus className="h-4 w-4" /> Add product</Button>
+          {usable('/reports') && (
+            <Button variant="outline" onClick={() => navigate('/reports')}><BarChart3 className="h-4 w-4" /> View reports</Button>
+          )}
+          {usable('/products') && (
+            <Button onClick={() => navigate('/products/new')}><Plus className="h-4 w-4" /> Add product</Button>
+          )}
           {isAdmin && shopList.length > 0 && (
             <Select value={shopFilter} onValueChange={setShopFilter}>
               <SelectTrigger className="h-9 w-full sm:w-[200px]">
@@ -613,19 +624,19 @@ export function DashboardPage() {
           <section className="context-panel">
             <h2>Keep things moving</h2><p>Your most-used inventory actions, a click away.</p>
             <div className="context-actions">
-              <button onClick={() => navigate('/goods-receipts/new')}><Package />Record goods receipt</button>
-              <button onClick={() => navigate('/purchase-orders/new')}><ClipboardList />Create purchase order</button>
-              <button onClick={() => navigate('/goods-issues/new')}><ArrowRightLeft />Record goods issue</button>
-              <button onClick={() => navigate('/reports?tab=stock-ledger')}><BarChart3 />Open stock ledger</button>
+              {usable('/goods-receipts') && <button onClick={() => navigate('/goods-receipts/new')}><Package />Record goods receipt</button>}
+              {usable('/purchase-orders') && <button onClick={() => navigate('/purchase-orders/new')}><ClipboardList />Create purchase order</button>}
+              {usable('/goods-issues') && <button onClick={() => navigate('/goods-issues/new')}><ArrowRightLeft />Record goods issue</button>}
+              {usable('/reports') && <button onClick={() => navigate('/reports?tab=stock-ledger')}><BarChart3 />Open stock ledger</button>}
             </div>
           </section>
           <section className="context-panel">
             <h2>Needs your attention</h2>
             {isLoading ? <Skeleton className="mt-4 h-16 w-full" /> : isError ? <p>Attention summary is unavailable. Retry loading the dashboard.</p> : <>
               <div className="context-actions">
-                <button onClick={() => navigate(lowStockReportPath)}><AlertTriangle /><span>{dashboard?.lowStockCount ?? 0} low-stock items</span></button>
-                <button onClick={() => navigate('/purchase-orders')}><ClipboardList /><span>{dashboard?.kpiContext?.pendingPurchaseOrders ?? 0} purchase orders awaiting receipt</span></button>
-                <button onClick={() => navigate('/sales')}><ArrowRight /><span>{dashboard?.kpiContext?.pendingSalesOrders ?? 0} sales orders to fulfil</span></button>
+                {usable(lowStockReportPath) && <button onClick={() => navigate(lowStockReportPath)}><AlertTriangle /><span>{dashboard?.lowStockCount ?? 0} low-stock items</span></button>}
+                {usable('/purchase-orders') && <button onClick={() => navigate('/purchase-orders')}><ClipboardList /><span>{dashboard?.kpiContext?.pendingPurchaseOrders ?? 0} purchase orders awaiting receipt</span></button>}
+                {usable('/sales') && <button onClick={() => navigate('/sales')}><ArrowRight /><span>{dashboard?.kpiContext?.pendingSalesOrders ?? 0} sales orders to fulfil</span></button>}
               </div>
               <p>Based on the selected plant and your current access.</p>
             </>}

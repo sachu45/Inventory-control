@@ -5,6 +5,7 @@ import { isOrgAdminUser } from '@/lib/roles';
 import { useRfq } from '@/hooks/use-rfqs';
 import { useSalesOrder } from '@/hooks/use-sales-orders';
 import { breadcrumbRoutes, type BreadcrumbLabelMap } from '@/lib/breadcrumbs';
+import { useCustomModuleLabel } from '@/hooks/use-module-config';
 
 type BreadcrumbResult = {
   items: { label: string; href?: string }[];
@@ -20,6 +21,7 @@ export function useBreadcrumbs(): BreadcrumbResult {
   const location = useLocation();
   const user = useAuthStore((s) => s.user);
   const homeHref = resolveHomeHref(user);
+  const customLabel = useCustomModuleLabel();
 
   const rfqDetailMatch =
     matchPath({ path: '/rfqs/:id/compare', end: true }, location.pathname) ??
@@ -46,11 +48,17 @@ export function useBreadcrumbs(): BreadcrumbResult {
       const match = matchPath({ path: route.path, end: true }, location.pathname);
       if (!match) continue;
       const ctx = { homeHref, params: match.params, searchParams, labels };
+      const built = route.buildItems(ctx);
       return {
-        items: route.buildItems(ctx),
+        // Crumbs for a module's list page use the organisation's own name for it, if set.
+        items: built.map((item, i) => {
+          const target = item.href ?? (i === built.length - 1 ? location.pathname : undefined);
+          const label = target ? customLabel(target) : undefined;
+          return label ? { ...item, label } : item;
+        }),
         subtitle: route.subtitle ? route.subtitle(ctx) : undefined,
       };
     }
     return { items: [], subtitle: undefined };
-  }, [homeHref, labels, location.pathname, location.search]);
+  }, [customLabel, homeHref, labels, location.pathname, location.search]);
 }

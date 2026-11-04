@@ -84,6 +84,8 @@ import {
   type SalesOrder,
 } from '@/hooks/use-sales-orders';
 import { useAuthStore } from '@/store/authStore';
+import { useModuleFields } from '@/hooks/use-module-config';
+import { fieldLabel, missingFieldsMessage, visibleCsvColumns } from '@/lib/module-field-ui';
 import { resolvePreferredOrgId } from '@/lib/cookie-consent';
 import { cn } from '@/lib/cn';
 import { getApiErrorMessage } from '@/lib/api-error';
@@ -276,6 +278,7 @@ export function SalesPage({ createOnly = false }: { createOnly?: boolean }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SalesOrder | null>(null);
   const [form, setForm] = useState(emptyForm());
+  const fields = useModuleFields('sales');
   const [useMasterAddress, setUseMasterAddress] = useState(true);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
@@ -412,10 +415,10 @@ export function SalesPage({ createOnly = false }: { createOnly?: boolean }) {
   };
 
   const handleExportSalesOrders = () => {
-    const ok = exportModuleCsv('sales-orders.csv', filtered, [
+    const ok = exportModuleCsv('sales-orders.csv', filtered, visibleCsvColumns([
       { header: 'SO Number', value: (order) => order.soNumber },
       { header: 'Order Date', value: (order) => csvDate(order.orderDate) },
-      { header: 'Expected Date', value: (order) => csvDate(order.expectedDate) },
+      { header: 'Expected Date', field: 'expectedDate', value: (order) => csvDate(order.expectedDate) },
       { header: 'Customer', value: (order) => order.customer?.customerName ?? '' },
       { header: 'Plant', value: (order) => order.shop?.shopName ?? '' },
       { header: 'Status', value: (order) => statusLabel(order.status) },
@@ -423,7 +426,7 @@ export function SalesPage({ createOnly = false }: { createOnly?: boolean }) {
       { header: 'Items', value: (order) => order.items?.length ?? 0 },
       { header: 'Order Qty', value: (order) => order.items?.reduce((sum, item) => sum + Number(item.quantity ?? 0), 0) ?? 0 },
       { header: 'Total Value', value: (order) => csvMoney(order.totalValue) },
-    ]);
+    ], fields.isHidden));
     if (ok) toast.success('Sales orders exported');
     else toast.error('No sales orders to export');
   };
@@ -512,10 +515,19 @@ export function SalesPage({ createOnly = false }: { createOnly?: boolean }) {
       toast.error('Add at least one line item');
       return null;
     }
+    const remarks = buildRemarks(form);
+    const missing = missingFieldsMessage(fields.missing({ expectedDate: form.expectedDate, remarks }), {
+      expectedDate: 'Delivery Date',
+      remarks: 'Notes / payment terms',
+    });
+    if (missing) {
+      toast.error(missing);
+      return null;
+    }
     const base = {
       customerId: form.customerId,
-      expectedDate: form.expectedDate || undefined,
-      remarks: buildRemarks(form),
+      expectedDate: fields.isHidden('expectedDate') ? undefined : form.expectedDate || undefined,
+      remarks: fields.isHidden('remarks') ? undefined : remarks,
       gstSupplyType,
       items,
     };
@@ -639,45 +651,52 @@ export function SalesPage({ createOnly = false }: { createOnly?: boolean }) {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <Label>Delivery Date</Label>
-            <Input
-              type="date"
-              className="h-9"
-              value={form.expectedDate}
-              onChange={(e) => setForm((p) => ({ ...p, expectedDate: e.target.value }))}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Payment Terms</Label>
-            <Select
-              value={form.paymentTerms}
-              onValueChange={(v) => setForm((p) => ({ ...p, paymentTerms: v }))}
-            >
-              <SelectTrigger className="h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Net 30">Net 30</SelectItem>
-                <SelectItem value="Net 15">Net 15</SelectItem>
-                <SelectItem value="Due on receipt">Due on receipt</SelectItem>
-                <SelectItem value="COD">COD</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {!fields.isHidden('expectedDate') && (
+            <div className="space-y-2">
+              <Label>{fieldLabel('Delivery Date', fields.isRequired('expectedDate'))}</Label>
+              <Input
+                required={fields.isRequired('expectedDate')}
+                type="date"
+                className="h-9"
+                value={form.expectedDate}
+                onChange={(e) => setForm((p) => ({ ...p, expectedDate: e.target.value }))}
+              />
+            </div>
+          )}
+          {!fields.isHidden('remarks') && (
+            <div className="space-y-2">
+              <Label>Payment Terms</Label>
+              <Select
+                value={form.paymentTerms}
+                onValueChange={(v) => setForm((p) => ({ ...p, paymentTerms: v }))}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Net 30">Net 30</SelectItem>
+                  <SelectItem value="Net 15">Net 15</SelectItem>
+                  <SelectItem value="Due on receipt">Due on receipt</SelectItem>
+                  <SelectItem value="COD">COD</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
       </section>
 
-      <SalesOrderFulfillmentSection
-        deliveryAddress={form.deliveryAddress}
-        notes={form.notes}
-        useMasterAddress={useMasterAddress}
-        customer={activeCustomer}
-        inputClassName="h-9"
-        onDeliveryAddressChange={handleDeliveryAddressChange}
-        onNotesChange={(notes) => setForm((p) => ({ ...p, notes }))}
-        onUseMasterAddressChange={setUseMasterAddress}
-      />
+      {!fields.isHidden('remarks') && (
+        <SalesOrderFulfillmentSection
+          deliveryAddress={form.deliveryAddress}
+          notes={form.notes}
+          useMasterAddress={useMasterAddress}
+          customer={activeCustomer}
+          inputClassName="h-9"
+          onDeliveryAddressChange={handleDeliveryAddressChange}
+          onNotesChange={(notes) => setForm((p) => ({ ...p, notes }))}
+          onUseMasterAddressChange={setUseMasterAddress}
+        />
+      )}
 
       <p className="text-xs font-medium text-muted-foreground">{supplyTypeLabel(gstSupplyType)}</p>
 
@@ -996,43 +1015,50 @@ export function SalesPage({ createOnly = false }: { createOnly?: boolean }) {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label>Delivery Date</Label>
-                  <Input
-                    type="date"
-                    value={form.expectedDate}
-                    onChange={(e) => setForm((p) => ({ ...p, expectedDate: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Payment Terms</Label>
-                  <Select
-                    value={form.paymentTerms}
-                    onValueChange={(v) => setForm((p) => ({ ...p, paymentTerms: v }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Net 30">Net 30</SelectItem>
-                      <SelectItem value="Net 15">Net 15</SelectItem>
-                      <SelectItem value="Due on receipt">Due on receipt</SelectItem>
-                      <SelectItem value="COD">COD</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {!fields.isHidden('expectedDate') && (
+                  <div className="space-y-2">
+                    <Label>{fieldLabel('Delivery Date', fields.isRequired('expectedDate'))}</Label>
+                    <Input
+                      required={fields.isRequired('expectedDate')}
+                      type="date"
+                      value={form.expectedDate}
+                      onChange={(e) => setForm((p) => ({ ...p, expectedDate: e.target.value }))}
+                    />
+                  </div>
+                )}
+                {!fields.isHidden('remarks') && (
+                  <div className="space-y-2">
+                    <Label>Payment Terms</Label>
+                    <Select
+                      value={form.paymentTerms}
+                      onValueChange={(v) => setForm((p) => ({ ...p, paymentTerms: v }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Net 30">Net 30</SelectItem>
+                        <SelectItem value="Net 15">Net 15</SelectItem>
+                        <SelectItem value="Due on receipt">Due on receipt</SelectItem>
+                        <SelectItem value="COD">COD</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
             </section>
 
-            <SalesOrderFulfillmentSection
-              deliveryAddress={form.deliveryAddress}
-              notes={form.notes}
-              useMasterAddress={useMasterAddress}
-              customer={activeCustomer}
-              onDeliveryAddressChange={handleDeliveryAddressChange}
-              onNotesChange={(notes) => setForm((p) => ({ ...p, notes }))}
-              onUseMasterAddressChange={setUseMasterAddress}
-            />
+            {!fields.isHidden('remarks') && (
+              <SalesOrderFulfillmentSection
+                deliveryAddress={form.deliveryAddress}
+                notes={form.notes}
+                useMasterAddress={useMasterAddress}
+                customer={activeCustomer}
+                onDeliveryAddressChange={handleDeliveryAddressChange}
+                onNotesChange={(notes) => setForm((p) => ({ ...p, notes }))}
+                onUseMasterAddressChange={setUseMasterAddress}
+              />
+            )}
 
             <p className="text-xs font-medium text-muted-foreground">{supplyTypeLabel(gstSupplyType)}</p>
 

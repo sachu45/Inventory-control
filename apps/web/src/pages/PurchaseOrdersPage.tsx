@@ -109,6 +109,16 @@ import {
 } from '@/lib/po-line-calculations';
 import { csvDate, csvMoney, exportModuleCsv } from '@/lib/module-csv';
 import { getApiErrorMessage } from '@/lib/api-error';
+import { useModuleFields } from '@/hooks/use-module-config';
+import { missingFieldsMessage, visibleCsvColumns, withoutHiddenFields } from '@/lib/module-field-ui';
+
+const PO_FIELD_LABELS: Record<string, string> = {
+  remarks: 'Remarks',
+  contractId: 'Contract',
+  rfqId: 'RFQ',
+  lineDescription: 'Line description',
+  lineCategory: 'Line category',
+};
 import { useSupplierBills } from '@/hooks/use-supplier-bills';
 import { resolvePreferredOrgId, syncPreferredOrgId } from '@/lib/cookie-consent';
 import { useCookieConsentStore } from '@/store/cookieConsentStore';
@@ -363,6 +373,7 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
   );
   const deliveryPlantLocked = isShopScopedRole(user?.role) || shops.length <= 1;
   const [sourceType, setSourceType] = useState<'DIRECT' | 'RFQ' | 'CONTRACT'>('DIRECT');
+  const poFields = useModuleFields('purchase-orders');
   const [sourceRfqId, setSourceRfqId] = useState('');
   const [sourceContractId, setSourceContractId] = useState('');
 
@@ -606,7 +617,7 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
   );
 
   const handleExportPoList = useCallback(() => {
-    const ok = exportModuleCsv('purchase-orders.csv', filteredPoList, [
+    const ok = exportModuleCsv('purchase-orders.csv', filteredPoList, visibleCsvColumns([
       { header: 'PO Number', value: (po) => po.poNumber },
       { header: 'PO Date', value: (po) => csvDate(po.poDate) },
       { header: 'Supplier', value: (po) => po.supplier },
@@ -614,6 +625,7 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
       { header: 'Status', value: (po) => po.lifecycleStatus ?? po.status },
       {
         header: 'RFQ Number',
+        field: 'rfqId',
         value: (po) => (po.rfqId ? rfqMap.get(po.rfqId)?.rfqNumber ?? '' : ''),
       },
       { header: 'Items', value: (po) => po.items.length },
@@ -625,15 +637,15 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
         header: 'Gross Amount',
         value: (po) => csvMoney(purchaseOrderTotals(po, productMap).grossTotal),
       },
-      { header: 'Remarks', value: (po) => po.remarks ?? '' },
-    ]);
+      { header: 'Remarks', field: 'remarks', value: (po) => po.remarks ?? '' },
+    ], poFields.isHidden));
     if (ok) toast.success('Purchase orders exported');
     else toast.error('No purchase orders to export');
-  }, [filteredPoList, productMap, rfqMap]);
+  }, [poFields.isHidden, filteredPoList, productMap, rfqMap]);
 
   const handleExportPoDetail = useCallback(
     (po: PurchaseOrder) => {
-      const ok = exportModuleCsv(`${po.poNumber}.csv`, po.items.map((item, index) => ({ po, item, index })), [
+      const ok = exportModuleCsv(`${po.poNumber}.csv`, po.items.map((item, index) => ({ po, item, index })), visibleCsvColumns([
         { header: 'PO Number', value: ({ po: current }) => current.poNumber },
         { header: 'PO Date', value: ({ po: current }) => csvDate(current.poDate) },
         { header: 'Supplier', value: ({ po: current }) => current.supplier },
@@ -641,6 +653,7 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
         { header: 'Status', value: ({ po: current }) => current.lifecycleStatus ?? current.status },
         {
           header: 'RFQ Number',
+          field: 'rfqId',
           value: ({ po: current }) =>
             current.rfqId ? rfqMap.get(current.rfqId)?.rfqNumber ?? '' : '',
         },
@@ -677,12 +690,12 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
         { header: 'Current Stock', value: ({ item }) => item.currentStock },
         { header: 'Min Stock', value: ({ item }) => item.minStock },
         { header: 'Suggested Qty', value: ({ item }) => item.suggestedQty },
-        { header: 'Remarks', value: ({ po: current }) => current.remarks ?? '' },
-      ]);
+        { header: 'Remarks', field: 'remarks', value: ({ po: current }) => current.remarks ?? '' },
+      ], poFields.isHidden));
       if (ok) toast.success('Purchase order exported');
       else toast.error('No PO lines to export');
     },
-    [productMap, rfqMap],
+    [poFields.isHidden, productMap, rfqMap],
   );
 
   const openCreate = useCallback(() => {
@@ -1013,8 +1026,25 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
           return;
         }
       }
+      const missingFields = new Set(
+        poFields.missing({
+          remarks: normalizedValues.remarks,
+          contractId: sourceType === 'CONTRACT' ? sourceContractId : '',
+          rfqId: sourceType === 'RFQ' ? sourceRfqId : '',
+        }),
+      );
+      for (const item of normalizedValues.items) {
+        for (const field of poFields.missing({ lineDescription: item.lineDescription, lineCategory: item.lineCategory })) {
+          if (field.startsWith('line')) missingFields.add(field);
+        }
+      }
+      const missing = missingFieldsMessage([...missingFields], PO_FIELD_LABELS);
+      if (missing) {
+        toast.error(missing);
+        return;
+      }
       const deliveryShop = shops.find((s) => s.id === resolvedShopId);
-      const payload = mapPoFormToCreatePayload({
+      const mappedPayload = mapPoFormToCreatePayload({
         values: normalizedValues,
         resolvedShopId,
         shop: deliveryShop,
@@ -1022,6 +1052,7 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
         sourceRfqId,
         sourceContractId,
       });
+      const payload = withoutHiddenFields(mappedPayload, poFields.isHidden, 'items');
 
       if (sendNow) {
         const supplier = suppliers.find((s) => s.supplierName === normalizedValues.supplier);
@@ -1293,8 +1324,8 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
                 <SelectTrigger className={PO_SELECT_TRIGGER}><SelectValue /></SelectTrigger>
                 <SelectContent className={PO_SELECT_CONTENT}>
                   <SelectItem value="DIRECT">Direct PO</SelectItem>
-                  <SelectItem value="RFQ">From RFQ</SelectItem>
-                  <SelectItem value="CONTRACT">From Contract</SelectItem>
+                  {!poFields.isHidden('rfqId') && <SelectItem value="RFQ">From RFQ</SelectItem>}
+                  {!poFields.isHidden('contractId') && <SelectItem value="CONTRACT">From Contract</SelectItem>}
                 </SelectContent>
               </Select>
             </div>
@@ -1679,14 +1710,17 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
 
       <PoLogisticsTaxFields form={form} />
 
-      <FormSection title="Remarks">
-        <Textarea
-          id="remarks"
-          rows={2}
-          placeholder="Optional notes…"
-          {...form.register('remarks')}
-        />
-      </FormSection>
+      {!poFields.isHidden('remarks') && (
+        <FormSection title={poFields.isRequired('remarks') ? 'Remarks *' : 'Remarks'}>
+          <Textarea
+            id="remarks"
+            rows={2}
+            required={poFields.isRequired('remarks')}
+            placeholder={poFields.isRequired('remarks') ? 'Required by your organisation' : 'Optional notes…'}
+            {...form.register('remarks')}
+          />
+        </FormSection>
+      )}
 
       <FormSection
         title="Line Items"
@@ -1816,31 +1850,37 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
                     {/* Description (editable) */}
                     <TableCell>
                       <div className="space-y-1">
-                        <Input
-                          className="h-8 w-full text-xs"
-                          placeholder={product?.description ?? 'Description (required if no product)'}
-                          {...form.register(`items.${idx}.lineDescription`)}
-                          onChange={(e) => {
-                            form.setValue(`items.${idx}.lineDescription`, e.target.value, {
-                              shouldDirty: true,
-                            });
-                            const next = e.target.value.trim();
-                            const productId = form.getValues(`items.${idx}.productId`);
-                            if (!productId?.trim() && next) {
-                              form.setValue(`items.${idx}.lineCategory`, 'Service', { shouldDirty: true });
-                            }
-                          }}
-                          onBlur={(e) => {
-                            const next = e.target.value?.trim();
-                            const productId = form.getValues(`items.${idx}.productId`);
-                            if (!productId?.trim() && next) {
-                              form.setValue(`items.${idx}.lineCategory`, 'Service', { shouldDirty: true });
-                            }
-                          }}
-                        />
-                        <p className="text-[10px] text-muted-foreground">
-                          Category: {row.lineCategory || product?.category || '—'}
-                        </p>
+                        {poFields.isHidden('lineDescription') ? (
+                          <p className="text-xs">{product?.description ?? '—'}</p>
+                        ) : (
+                          <Input
+                            className="h-8 w-full text-xs"
+                            placeholder={product?.description ?? 'Description (required if no product)'}
+                            {...form.register(`items.${idx}.lineDescription`)}
+                            onChange={(e) => {
+                              form.setValue(`items.${idx}.lineDescription`, e.target.value, {
+                                shouldDirty: true,
+                              });
+                              const next = e.target.value.trim();
+                              const productId = form.getValues(`items.${idx}.productId`);
+                              if (!productId?.trim() && next) {
+                                form.setValue(`items.${idx}.lineCategory`, 'Service', { shouldDirty: true });
+                              }
+                            }}
+                            onBlur={(e) => {
+                              const next = e.target.value?.trim();
+                              const productId = form.getValues(`items.${idx}.productId`);
+                              if (!productId?.trim() && next) {
+                                form.setValue(`items.${idx}.lineCategory`, 'Service', { shouldDirty: true });
+                              }
+                            }}
+                          />
+                        )}
+                        {!poFields.isHidden('lineCategory') && (
+                          <p className="text-[10px] text-muted-foreground">
+                            Category: {row.lineCategory || product?.category || '—'}
+                          </p>
+                        )}
                       </div>
                     </TableCell>
 
@@ -2391,7 +2431,7 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
                 </div>
               </div>
 
-              {detailRemarks && (
+              {detailRemarks && !poFields.isHidden('remarks') && (
                 <div>
                   <p className="text-xs text-muted-foreground">Remarks</p>
                   <p className="text-sm">{detailRemarks}</p>

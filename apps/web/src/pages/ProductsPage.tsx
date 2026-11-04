@@ -52,6 +52,15 @@ import {
 import { useShops } from '@/hooks/use-shops';
 import { useStorageLocations } from '@/hooks/use-storage-locations';
 import { getApiErrorMessage } from '@/lib/api-error';
+import { useModuleFields } from '@/hooks/use-module-config';
+import { fieldLabel, missingFieldsMessage, visibleCsvColumns } from '@/lib/module-field-ui';
+
+const PRODUCT_FIELD_LABELS: Record<string, string> = {
+  hsnCode: 'HSN Code',
+  materialGroup: 'Material Group',
+  drawingReference: 'Drawing Reference',
+  brand: 'Brand',
+};
 import { mapProductFormToPayload, type ProductFormValues } from '@/lib/payload-mappers';
 import { isAdminUser, isShopOnlyUser, productListShopId } from '@/lib/shop-scope';
 
@@ -841,11 +850,11 @@ export function ProductsPage({ createOnly = false }: { createOnly?: boolean }) {
   );
 
   async function onExportCsv() {
-    const columns: CsvColumn<Product>[] = [
+    const allColumns: (CsvColumn<Product> & { field?: string })[] = [
       { header: 'SKU', value: (r) => r.productCode },
       { header: 'Name', value: (r) => r.description },
       { header: 'Category', value: (r) => r.category },
-      { header: 'Brand', value: (r) => r.brand ?? '' },
+      { header: 'Brand', field: 'brand', value: (r) => r.brand ?? '' },
       { header: 'Tax Preference', value: (r) => formatTaxPreference(r.taxPreference) },
       { header: 'Unit', value: (r) => r.uom },
       { header: 'Selling Price', value: (r) => r.sellingPrice },
@@ -856,6 +865,7 @@ export function ProductsPage({ createOnly = false }: { createOnly?: boolean }) {
       },
       { header: 'Status', value: (r) => (r.isActive ? 'Active' : 'Inactive') },
     ];
+    const columns = visibleCsvColumns(allColumns, productFields.isHidden);
     // Export every product matching the current filters, not just this page.
     try {
       const rows = await fetchAllProducts({ ...filters, page: undefined, limit: undefined });
@@ -866,6 +876,7 @@ export function ProductsPage({ createOnly = false }: { createOnly?: boolean }) {
     }
   }
 
+  const productFields = useModuleFields('products');
   const form = useForm<FormShape>({
     resolver: formResolver(productSchema),
     defaultValues,
@@ -1094,14 +1105,19 @@ export function ProductsPage({ createOnly = false }: { createOnly?: boolean }) {
         toast.error('Select a plant — products only appear for shops they are assigned to');
         return;
       }
+      const missing = missingFieldsMessage(productFields.missing(rawValues), PRODUCT_FIELD_LABELS);
+      if (missing) {
+        toast.error(missing);
+        return;
+      }
       const values: ProductFormValues = {
         productCode: finalProductCode,
         description: rawValues.description,
         category: rawValues.category,
-        hsnCode: rawValues.hsnCode,
-        materialGroup: rawValues.materialGroup,
-        drawingReference: rawValues.drawingReference,
-        brand: rawValues.brand,
+        hsnCode: productFields.isHidden('hsnCode') ? undefined : rawValues.hsnCode,
+        materialGroup: productFields.isHidden('materialGroup') ? undefined : rawValues.materialGroup,
+        drawingReference: productFields.isHidden('drawingReference') ? undefined : rawValues.drawingReference,
+        brand: productFields.isHidden('brand') ? undefined : rawValues.brand,
         taxPreference: rawValues.taxPreference,
         gstRate: rawValues.gstRate,
         purchasePrice: rawValues.purchasePrice,
@@ -1401,6 +1417,11 @@ export function ProductsPage({ createOnly = false }: { createOnly?: boolean }) {
           throw new Error(`Row ${rowNumber}: HSN code must be 4, 6, or 8 digits`);
         }
         if (!uom) throw new Error(`Row ${rowNumber}: Unit of Measure is required`);
+        const importMissing = missingFieldsMessage(
+          productFields.missing({ hsnCode, materialGroup, drawingReference, brand }),
+          PRODUCT_FIELD_LABELS,
+        );
+        if (importMissing) throw new Error(`Row ${rowNumber}: ${importMissing}`);
         if (!Number.isFinite(purchasePrice) || purchasePrice < 0) {
           throw new Error(`Row ${rowNumber}: Invalid Purchase Price`);
         }
@@ -1448,10 +1469,10 @@ export function ProductsPage({ createOnly = false }: { createOnly?: boolean }) {
           storageLocationCode: storageLocationCode || undefined,
           description,
           category,
-          hsnCode: hsnCode || undefined,
-          materialGroup: materialGroup || undefined,
-          drawingReference: drawingReference || undefined,
-          brand: brand || undefined,
+          hsnCode: productFields.isHidden('hsnCode') ? undefined : hsnCode || undefined,
+          materialGroup: productFields.isHidden('materialGroup') ? undefined : materialGroup || undefined,
+          drawingReference: productFields.isHidden('drawingReference') ? undefined : drawingReference || undefined,
+          brand: productFields.isHidden('brand') ? undefined : brand || undefined,
           taxPreference,
           purchasePrice,
           sellingPrice,
@@ -1608,97 +1629,103 @@ export function ProductsPage({ createOnly = false }: { createOnly?: boolean }) {
           }
         />
       ) : null}
-      <div className="space-y-2">
-        <Label htmlFor="hsnCode">HSN Code</Label>
-        <Input
-          id="hsnCode"
-          inputMode="numeric"
-          maxLength={8}
-          {...form.register('hsnCode')}
-          placeholder="e.g. 84314900"
-        />
-        {form.formState.errors.hsnCode && (
-          <p className="text-xs text-destructive">
-            {form.formState.errors.hsnCode.message}
-          </p>
-        )}
-        {gstHsnQuery.isFetching && hsnLookupDebounced.length >= 3 ? (
-          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            Searching GST portal…
-          </p>
-        ) : null}
-        {gstHsnQuery.isError && hsnLookupDebounced.length >= 3 ? (
-          <p className="text-xs text-amber-700 dark:text-amber-300">
-            GST portal search unavailable — using local suggestions or enter HSN manually.
-          </p>
-        ) : null}
-        {(gstHsnQuery.data?.length ?? 0) > 0 ? (
-          <div className="space-y-1">
-            <p className="text-[11px] font-medium text-muted-foreground">
-              GST portal ({gstHsnQuery.data!.length} result
-              {gstHsnQuery.data!.length === 1 ? '' : 's'})
+      {!productFields.isHidden('hsnCode') && (
+        <div className="space-y-2">
+          <Label htmlFor="hsnCode">{fieldLabel('HSN Code', productFields.isRequired('hsnCode'))}</Label>
+          <Input
+            id="hsnCode"
+            inputMode="numeric"
+            maxLength={8}
+            {...form.register('hsnCode')}
+            placeholder="e.g. 84314900"
+          />
+          {form.formState.errors.hsnCode && (
+            <p className="text-xs text-destructive">
+              {form.formState.errors.hsnCode.message}
             </p>
-          <ul className="max-h-64 overflow-y-auto rounded-md border border-border bg-card text-xs shadow-xs">
-            {gstHsnQuery.data!.map((row) => (
-              <li key={row.code} className="border-b border-border last:border-0">
-                <button
-                  type="button"
-                  className="flex w-full flex-col gap-0.5 px-2.5 py-2 text-left hover:bg-accent sm:flex-row sm:items-center sm:gap-2"
-                  onClick={() => applyHsnCode(row.code)}
-                >
-                  <span className="font-mono font-semibold text-foreground">{row.code}</span>
-                  <span className="text-muted-foreground">{row.description}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-          </div>
-        ) : null}
-        {hsnSuggestion && watchedHsnCode?.trim() !== hsnSuggestion.code ? (
-          <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted px-2.5 py-2 text-xs text-foreground">
-            <span>
-              Suggested:{' '}
-              <span className="font-mono font-semibold">{hsnSuggestion.code}</span>
-              <span className="text-primary"> — {hsnSuggestion.description}</span>
-              <span className="ml-1 text-primary">
-                ({hsnSuggestionSourceLabel(hsnSuggestion.source)})
+          )}
+          {gstHsnQuery.isFetching && hsnLookupDebounced.length >= 3 ? (
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Searching GST portal…
+            </p>
+          ) : null}
+          {gstHsnQuery.isError && hsnLookupDebounced.length >= 3 ? (
+            <p className="text-xs text-amber-700 dark:text-amber-300">
+              GST portal search unavailable — using local suggestions or enter HSN manually.
+            </p>
+          ) : null}
+          {(gstHsnQuery.data?.length ?? 0) > 0 ? (
+            <div className="space-y-1">
+              <p className="text-[11px] font-medium text-muted-foreground">
+                GST portal ({gstHsnQuery.data!.length} result
+                {gstHsnQuery.data!.length === 1 ? '' : 's'})
+              </p>
+            <ul className="max-h-64 overflow-y-auto rounded-md border border-border bg-card text-xs shadow-xs">
+              {gstHsnQuery.data!.map((row) => (
+                <li key={row.code} className="border-b border-border last:border-0">
+                  <button
+                    type="button"
+                    className="flex w-full flex-col gap-0.5 px-2.5 py-2 text-left hover:bg-accent sm:flex-row sm:items-center sm:gap-2"
+                    onClick={() => applyHsnCode(row.code)}
+                  >
+                    <span className="font-mono font-semibold text-foreground">{row.code}</span>
+                    <span className="text-muted-foreground">{row.description}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            </div>
+          ) : null}
+          {hsnSuggestion && watchedHsnCode?.trim() !== hsnSuggestion.code ? (
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted px-2.5 py-2 text-xs text-foreground">
+              <span>
+                Suggested:{' '}
+                <span className="font-mono font-semibold">{hsnSuggestion.code}</span>
+                <span className="text-primary"> — {hsnSuggestion.description}</span>
+                <span className="ml-1 text-primary">
+                  ({hsnSuggestionSourceLabel(hsnSuggestion.source)})
+                </span>
               </span>
-            </span>
-            <Button type="button" variant="outline" size="sm" className="h-7" onClick={applyHsnSuggestion}>
-              Use this HSN
-            </Button>
-          </div>
-        ) : null}
-        <p className="text-[11px] text-muted-foreground">
-          GST portal results are indicative — verify on the{' '}
-          <a
-            href="https://services.gst.gov.in/services/searchhsn"
-            target="_blank"
-            rel="noreferrer"
-            className="text-primary underline"
-          >
-            GST HSN search
-          </a>{' '}
-          before invoicing.
-        </p>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="materialGroup">Material Group</Label>
-        <Input
-          id="materialGroup"
-          {...form.register('materialGroup')}
-          placeholder="e.g. Stainless Steel"
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="brand">Brand</Label>
-        <Input
-          id="brand"
-          {...form.register('brand')}
-          placeholder="e.g. Bosch"
-        />
-      </div>
+              <Button type="button" variant="outline" size="sm" className="h-7" onClick={applyHsnSuggestion}>
+                Use this HSN
+              </Button>
+            </div>
+          ) : null}
+          <p className="text-[11px] text-muted-foreground">
+            GST portal results are indicative — verify on the{' '}
+            <a
+              href="https://services.gst.gov.in/services/searchhsn"
+              target="_blank"
+              rel="noreferrer"
+              className="text-primary underline"
+            >
+              GST HSN search
+            </a>{' '}
+            before invoicing.
+          </p>
+        </div>
+      )}
+      {!productFields.isHidden('materialGroup') && (
+        <div className="space-y-2">
+          <Label htmlFor="materialGroup">{fieldLabel('Material Group', productFields.isRequired('materialGroup'))}</Label>
+          <Input
+            id="materialGroup"
+            {...form.register('materialGroup')}
+            placeholder="e.g. Stainless Steel"
+          />
+        </div>
+      )}
+      {!productFields.isHidden('brand') && (
+        <div className="space-y-2">
+          <Label htmlFor="brand">{fieldLabel('Brand', productFields.isRequired('brand'))}</Label>
+          <Input
+            id="brand"
+            {...form.register('brand')}
+            placeholder="e.g. Bosch"
+          />
+        </div>
+      )}
       <div className="space-y-2">
         <Label htmlFor="uom">Unit of Measure *</Label>
         <Controller
@@ -1809,14 +1836,16 @@ export function ProductsPage({ createOnly = false }: { createOnly?: boolean }) {
   <section className="space-y-4 rounded-xl border border-border bg-card p-4">
     <h3 className="text-sm font-semibold text-foreground">Technical Details</h3>
     <div className="grid gap-4 sm:grid-cols-2">
-      <div className="space-y-2">
-        <Label htmlFor="drawingReference">Drawing Reference</Label>
-        <Input
-          id="drawingReference"
-          {...form.register('drawingReference')}
-          placeholder="e.g. DRW-2024-001"
-        />
-      </div>
+      {!productFields.isHidden('drawingReference') && (
+        <div className="space-y-2">
+          <Label htmlFor="drawingReference">{fieldLabel('Drawing Reference', productFields.isRequired('drawingReference'))}</Label>
+          <Input
+            id="drawingReference"
+            {...form.register('drawingReference')}
+            placeholder="e.g. DRW-2024-001"
+          />
+        </div>
+      )}
       <div className="flex items-center justify-between rounded-lg border p-3">
         <div>
           <Label htmlFor="isActive" className="cursor-pointer">
@@ -2511,13 +2540,13 @@ export function ProductsPage({ createOnly = false }: { createOnly?: boolean }) {
                 <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Category</dt>
                 <dd className="mt-1 text-foreground">{viewingProduct.category}</dd>
               </div>
-              {viewingProduct.hsnCode ? (
+              {viewingProduct.hsnCode && !productFields.isHidden('hsnCode') ? (
                 <div>
                   <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">HSN Code</dt>
                   <dd className="mt-1 font-mono text-foreground">{viewingProduct.hsnCode}</dd>
                 </div>
               ) : null}
-              {viewingProduct.brand ? (
+              {viewingProduct.brand && !productFields.isHidden('brand') ? (
                 <div>
                   <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Brand</dt>
                   <dd className="mt-1 text-foreground">{viewingProduct.brand}</dd>

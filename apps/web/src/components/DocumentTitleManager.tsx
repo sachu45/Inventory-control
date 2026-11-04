@@ -1,5 +1,6 @@
 import { useEffect, useReducer } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
+import { useCustomModuleLabel } from '@/hooks/use-module-config';
 import {
   DEFAULT_DOCUMENT_TITLE,
   resolveDocumentTitle,
@@ -13,6 +14,7 @@ export function DocumentTitleManager() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const [overrideVersion, bumpOverride] = useReducer((count: number) => count + 1, 0);
+  const customLabel = useCustomModuleLabel();
 
   useEffect(() => subscribeDocumentTitlePageOverride(() => bumpOverride()), []);
 
@@ -20,9 +22,9 @@ export function DocumentTitleManager() {
     document.title = resolveDocumentTitle(
       location.pathname,
       searchParams,
-      getDocumentTitlePageOverride(),
+      getDocumentTitlePageOverride() ?? customLabel(location.pathname),
     );
-  }, [location.pathname, location.search, searchParams, overrideVersion]);
+  }, [customLabel, location.pathname, location.search, searchParams, overrideVersion]);
 
   useEffect(
     () => () => {

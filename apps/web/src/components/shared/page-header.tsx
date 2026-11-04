@@ -1,6 +1,8 @@
 import { cn } from '@/lib/cn';
 import { Breadcrumbs } from '@/components/navigation/Breadcrumbs';
+import { useLocation } from 'react-router-dom';
 import { useBreadcrumbs } from '@/hooks/use-breadcrumbs';
+import { useCustomModuleLabel } from '@/hooks/use-module-config';
 
 type PageHeaderProps = {
   title: string;
@@ -20,6 +22,10 @@ export function PageHeader({
   showBreadcrumbs = true,
 }: PageHeaderProps) {
   const { items, subtitle } = useBreadcrumbs();
+  const { pathname } = useLocation();
+  const customLabel = useCustomModuleLabel()(pathname);
+  // A module list page shows the organisation's own name for the module, if it set one.
+  const resolvedTitle = (showBreadcrumbs && customLabel) || title;
   const resolvedItems = breadcrumbs ?? items;
   const resolvedDescription = description ?? subtitle;
 
@@ -29,7 +35,7 @@ export function PageHeader({
         {showBreadcrumbs && resolvedItems.length > 0 && (
           <Breadcrumbs items={resolvedItems} className="mb-1.5" />
         )}
-        <h1 className="premium-title text-lg font-semibold sm:text-xl">{title}</h1>
+        <h1 className="premium-title text-lg font-semibold sm:text-xl">{resolvedTitle}</h1>
         {resolvedDescription && (
           <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">{resolvedDescription}</p>
         )}

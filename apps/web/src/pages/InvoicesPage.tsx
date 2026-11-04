@@ -13,10 +13,14 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCustomers } from '@/hooks/use-customers';
 import { useCreateInvoice, useInvoices } from '@/hooks/use-invoices';
+import { useModuleFields } from '@/hooks/use-module-config';
 import { useSalesOrders } from '@/hooks/use-sales-orders';
 import { csvDate, csvMoney, exportModuleCsv } from '@/lib/module-csv';
 import { formatCustomerOption, formatSalesOrderOption } from '@/lib/document-display';
 import { getApiErrorMessage } from '@/lib/api-error';
+import { fieldLabel, missingFieldsMessage, visibleCsvColumns } from '@/lib/module-field-ui';
+
+const FIELD_LABELS: Record<string, string> = { dueDate: 'Due Date', remarks: 'Remarks' };
 
 const emptyForm = () => ({
   customerId: '',
@@ -33,10 +37,16 @@ export function InvoicesPage({ createOnly = false }: { createOnly?: boolean }) {
   const { data: salesOrders = [] } = useSalesOrders();
   const createInvoice = useCreateInvoice();
   const [form, setForm] = useState(emptyForm);
+  const fields = useModuleFields('invoices');
 
   const onCreate = async () => {
     if (!form.customerId) {
       toast.error('Select a customer');
+      return;
+    }
+    const missing = missingFieldsMessage(fields.missing(form), FIELD_LABELS);
+    if (missing) {
+      toast.error(missing);
       return;
     }
     // The invoice belongs to the order's (or customer's) plant, not the user's home plant.
@@ -48,8 +58,8 @@ export function InvoicesPage({ createOnly = false }: { createOnly?: boolean }) {
         customerId: form.customerId,
         salesOrderId: form.salesOrderId || undefined,
         totalValue: Number(form.totalValue),
-        dueDate: form.dueDate || undefined,
-        remarks: form.remarks || undefined,
+        dueDate: fields.isHidden('dueDate') ? undefined : form.dueDate || undefined,
+        remarks: fields.isHidden('remarks') ? undefined : form.remarks || undefined,
       });
       toast.success('Invoice created');
       if (createOnly) {
@@ -63,17 +73,17 @@ export function InvoicesPage({ createOnly = false }: { createOnly?: boolean }) {
   };
 
   const handleExportInvoices = () => {
-    const ok = exportModuleCsv('invoices.csv', invoices, [
+    const ok = exportModuleCsv('invoices.csv', invoices, visibleCsvColumns([
       { header: 'Invoice Number', value: (invoice) => invoice.invoiceNumber },
       { header: 'Invoice Date', value: (invoice) => csvDate(invoice.invoiceDate) },
-      { header: 'Due Date', value: (invoice) => csvDate(invoice.dueDate) },
+      { header: 'Due Date', field: 'dueDate', value: (invoice) => csvDate(invoice.dueDate) },
       { header: 'Customer', value: (invoice) => invoice.customer?.customerName ?? '' },
       { header: 'Sales Order', value: (invoice) => invoice.salesOrder?.soNumber ?? '' },
       { header: 'Status', value: (invoice) => invoice.status },
       { header: 'Total Value', value: (invoice) => csvMoney(invoice.totalValue) },
       { header: 'Paid Value', value: (invoice) => csvMoney(invoice.paidValue) },
-      { header: 'Remarks', value: (invoice) => invoice.remarks ?? '' },
-    ]);
+      { header: 'Remarks', field: 'remarks', value: (invoice) => invoice.remarks ?? '' },
+    ], fields.isHidden));
     if (ok) toast.success('Invoices exported');
     else toast.error('No invoices to export');
   };
@@ -125,18 +135,29 @@ export function InvoicesPage({ createOnly = false }: { createOnly?: boolean }) {
             onChange={(e) => setForm((p) => ({ ...p, totalValue: e.target.value }))}
           />
         </div>
-        <div className="space-y-2">
-          <Label>Due Date</Label>
-          <Input
-            type="date"
-            value={form.dueDate}
-            onChange={(e) => setForm((p) => ({ ...p, dueDate: e.target.value }))}
-          />
-        </div>
-        <div className="space-y-2 md:col-span-2">
-          <Label>Remarks</Label>
-          <Input value={form.remarks} onChange={(e) => setForm((p) => ({ ...p, remarks: e.target.value }))} />
-        </div>
+        {!fields.isHidden('dueDate') && (
+          <div className="space-y-2">
+            <Label htmlFor="invoice-due-date">{fieldLabel('Due Date', fields.isRequired('dueDate'))}</Label>
+            <Input
+              id="invoice-due-date"
+              type="date"
+              required={fields.isRequired('dueDate')}
+              value={form.dueDate}
+              onChange={(e) => setForm((p) => ({ ...p, dueDate: e.target.value }))}
+            />
+          </div>
+        )}
+        {!fields.isHidden('remarks') && (
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="invoice-remarks">{fieldLabel('Remarks', fields.isRequired('remarks'))}</Label>
+            <Input
+              id="invoice-remarks"
+              required={fields.isRequired('remarks')}
+              value={form.remarks}
+              onChange={(e) => setForm((p) => ({ ...p, remarks: e.target.value }))}
+            />
+          </div>
+        )}
         <div className="md:col-span-2">
           <Button onClick={onCreate} disabled={createInvoice.isPending}>
             {createInvoice.isPending ? 'Creating…' : 'Create Invoice'}
