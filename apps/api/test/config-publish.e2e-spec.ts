@@ -112,7 +112,7 @@ describe('ConfigPublishService (e2e)', () => {
     const { companyId } = await createCompany();
     await service.publish({ companyId, expectedBaseVersion: 0, actorId });
     await expect(service.publish({ companyId, expectedBaseVersion: 0, actorId })).rejects.toMatchObject({
-      response: { code: 'CONFIG_VERSION_CONFLICT', expectedBaseVersion: 0, activeVersion: 1 },
+      response: { code: 'CONFIG_VERSION_CONFLICT', details: { expectedBaseVersion: 0, activeVersion: 1 } },
     });
   });
 

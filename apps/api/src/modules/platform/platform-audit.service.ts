@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { AuditAction } from '@prisma/client';
+import { AuditAction, Prisma } from '@prisma/client';
 import { auditRequestMetadata } from '../../common/utils/audit-context';
 import { AuditService } from '../audit/audit.service';
 
@@ -8,7 +8,11 @@ export type PlatformAuditAction =
   | 'platform_subscription_backfill'
   | 'platform_notification_read'
   | 'platform_notification_read_all'
-  | 'platform_health_view';
+  | 'platform_health_view'
+  | 'platform_config_draft_set'
+  | 'platform_config_draft_reset'
+  | 'platform_config_publish'
+  | 'platform_config_rollback';
 
 @Injectable()
 export class PlatformAuditService {
@@ -17,6 +21,9 @@ export class PlatformAuditService {
   async logPlatformAction(args: {
     userId: string;
     adminEmail: string;
+    /** Tenant the action was taken on, so it shows in that company's audit trail. */
+    companyId?: string | null;
+    oldValues?: Record<string, unknown>;
     action: PlatformAuditAction;
     entityType?: string;
     entityId?: string;
@@ -27,10 +34,11 @@ export class PlatformAuditService {
     const meta = auditRequestMetadata();
     await this.audit.log({
       userId: args.userId,
-      companyId: null,
+      companyId: args.companyId ?? null,
       action: args.auditAction ?? AuditAction.EXPORT_AUDIT,
       entityType: args.entityType ?? 'PlatformAdmin',
       entityId: args.entityId ?? args.userId,
+      ...(args.oldValues ? { oldValues: args.oldValues as Prisma.InputJsonValue } : {}),
       newValues: {
         platformAction: args.action,
         adminEmail: args.adminEmail,

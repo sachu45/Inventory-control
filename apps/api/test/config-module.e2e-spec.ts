@@ -98,7 +98,7 @@ describe('TenantConfigModule in AppModule (e2e)', () => {
     expect(updated).toMatchObject({ revision: 2, enabled: false, config: { label: 'Agreements' } });
     await expect(drafts.update({ companyId, id: row.id, expectedRevision: 1, enabled: true, actorId })).rejects.toMatchObject({
       status: HttpStatus.CONFLICT,
-      response: { code: 'CONFIG_DRAFT_REVISION_CONFLICT', expectedRevision: 1, currentRevision: 2 },
+      response: { code: 'CONFIG_DRAFT_REVISION_CONFLICT', details: { expectedRevision: 1, currentRevision: 2 } },
     });
     await expect(
       drafts.update({ companyId: other.companyId, id: row.id, expectedRevision: 2, enabled: true, actorId }),

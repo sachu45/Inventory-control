@@ -37,8 +37,7 @@ export class ConfigVersionConflictException extends HttpException {
       {
         message: 'Configuration was published by someone else since this draft was previewed',
         code: 'CONFIG_VERSION_CONFLICT',
-        expectedBaseVersion,
-        activeVersion,
+        details: { expectedBaseVersion, activeVersion },
       },
       HttpStatus.CONFLICT,
     );

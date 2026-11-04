@@ -8,8 +8,7 @@ export class DraftRevisionConflictException extends ConflictException {
     super({
       message: 'This draft was changed by someone else; reload it and try again',
       code: 'CONFIG_DRAFT_REVISION_CONFLICT',
-      expectedRevision,
-      currentRevision,
+      details: { expectedRevision, currentRevision },
     });
   }
 }
