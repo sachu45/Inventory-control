@@ -197,9 +197,28 @@ export class SubscriptionService {
     return reason;
   }
 
-  /** Drop the cached read-only state after a plan change. */
+  /** Drop the cached read-only state and plan after a plan change. */
   clearWriteBlockCache(companyId: string): void {
     this.writeBlockCache.delete(companyId);
+    this.planCache.delete(companyId);
+  }
+
+  private readonly planCache = new Map<string, { at: number; plan: SubscriptionPlan | null }>();
+
+  /**
+   * The company's plan, cached for 60s like writeBlockReason. Called from
+   * PlanFeatureGuard before the tenant context exists, so the lookup runs in the
+   * company's own context. Null when the company does not exist.
+   */
+  async currentPlan(companyId: string): Promise<SubscriptionPlan | null> {
+    const cached = this.planCache.get(companyId);
+    if (cached && Date.now() - cached.at < 60_000) return cached.plan;
+    const company = await TenantContext.run({ companyId, inRLSTx: false, systemAccess: false }, async () =>
+      await this.prisma.company.findUnique({ where: { id: companyId }, select: { subscriptionPlan: true } }),
+    );
+    const plan = company?.subscriptionPlan ?? null;
+    this.planCache.set(companyId, { at: Date.now(), plan });
+    return plan;
   }
 
   async assertActiveSubscription(companyId: string): Promise<void> {

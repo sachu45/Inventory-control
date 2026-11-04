@@ -67,6 +67,7 @@ import { FxModule } from './modules/fx/fx.module';
 import { MailModule } from './common/mail/mail.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { SubscriptionWriteGuard } from './modules/billing/guards/subscription-write.guard';
+import { PlanFeatureGuard } from './modules/billing/guards/plan-feature.guard';
 import { PostalCodesModule } from './modules/postal-codes/postal-codes.module';
 import { BackupModule } from './modules/backup/backup.module';
 import { WarehouseModule } from './modules/warehouse/warehouse.module';
@@ -219,6 +220,8 @@ function routeOptsIntoAuthThrottle(context: ExecutionContext): boolean {
     { provide: APP_GUARD, useClass: PermissionsGuard },
     // Runs after auth so req.user is known; expired plans become read-only.
     { provide: APP_GUARD, useClass: SubscriptionWriteGuard },
+    // Then the plan tier: writes to plan-gated modules (registry planGate) need a plan that includes them.
+    { provide: APP_GUARD, useClass: PlanFeatureGuard },
     // Runs after the plan check; refuses modules the company's config has disabled.
     { provide: APP_GUARD, useClass: ModuleEnabledGuard },
     { provide: APP_INTERCEPTOR, useClass: TenantRlsInterceptor },
