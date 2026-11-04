@@ -21,26 +21,15 @@ const PENDING_RLS: Record<string, string> = {
   ai_settings: '#238',
   ai_usage_logs: '#238',
   alert_events: '#238',
-  backup_artifacts: '#238',
-  barcode_audit_logs: '#238',
-  barcode_history: '#238',
   company_engagement_snapshots: '#238',
   company_health_score_configs: '#238',
-  contract_header: '#238',
   conversations: '#238',
   customer_contact_channels: '#238',
-  customer_returns: '#238',
-  damaged_stock: '#238',
   device_registrations: '#238',
-  document_branding: '#238',
   document_email_outbox: '#238',
-  document_sequences: '#238',
   document_series_config: '#238',
-  eway_bills: '#238',
   followup_threads: '#238',
-  inventory_exceptions: '#238',
   lifecycle_campaign_enrollments: '#238',
-  low_stock_alerts: '#238',
   media_assets: '#238',
   notification_audit_logs: '#238',
   notification_deliveries: '#238',
@@ -52,13 +41,7 @@ const PENDING_RLS: Record<string, string> = {
   outbox_events: '#238',
   platform_notifications: '#238',
   product_barcodes: '#238',
-  restore_jobs: '#238',
-  rfq_header: '#238',
-  sales_quote_header: '#238',
   scan_logs: '#238',
-  stock_count_sessions: '#238',
-  supplier_quote_header: '#238',
-  supplier_returns: '#238',
   user_channel_links: '#238',
   user_devices: '#238',
   user_invitations: '#238',
@@ -133,5 +116,31 @@ describe('Row-level security coverage (e2e)', () => {
         prisma.productPlant.create({ data: { productId: a.productId, shopId: b.shopId } }),
       ),
     ).rejects.toThrow(/row-level security/);
+  });
+
+  it("hides another company's documents (sales quotations) and refuses updates to them", async () => {
+    if (!E2E_DB_ENABLED) return;
+    const a = await seedWorkflowMasterData(app);
+    const b = await seedWorkflowMasterData(app);
+    const quote = await asTenant(b.companyId, () =>
+      prisma.salesQuotationHeader.create({
+        data: {
+          quoteNumber: `SQ-RLS-${Date.now()}`,
+          quoteDate: new Date(),
+          customerId: b.customerId,
+          shopId: b.shopId,
+          totalValue: 10,
+        },
+        select: { id: true },
+      }),
+    );
+
+    expect(await asTenant(b.companyId, () => prisma.salesQuotationHeader.count({ where: { id: quote.id } }))).toBe(1);
+    expect(await asTenant(a.companyId, () => prisma.salesQuotationHeader.count({ where: { id: quote.id } }))).toBe(0);
+    // An update from A matches no rows: RLS hides B's row from A's UPDATE.
+    const updated = await asTenant(a.companyId, () =>
+      prisma.salesQuotationHeader.updateMany({ where: { id: quote.id }, data: { remarks: 'from A' } }),
+    );
+    expect(updated.count).toBe(0);
   });
 });
