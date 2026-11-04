@@ -30,6 +30,17 @@ export function unwrap<T>(body: Envelope<T> | T): T {
   return body as T;
 }
 
+export type ApiErrorInfo = { status: number | null; code: string | null; message: string; details: unknown };
+
+/** Status, code and details from the API's error envelope, for callers that branch on them. */
+export function apiErrorInfo(error: unknown): ApiErrorInfo {
+  const status = axios.isAxiosError(error) ? (error.response?.status ?? null) : null;
+  const body = axios.isAxiosError(error)
+    ? (error.response?.data as { error?: { code?: string; details?: unknown } } | undefined)
+    : undefined;
+  return { status, code: body?.error?.code ?? null, message: errorMessage(error), details: body?.error?.details };
+}
+
 /** The API's error envelope is `{ success: false, error: { code, message, details } }`. */
 export function errorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {

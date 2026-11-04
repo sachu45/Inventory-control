@@ -1,41 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { StatusBadge } from '@/components/StatusBadge';
-import { errorMessage } from '@/lib/api';
 import { platformApi } from '@/lib/platform-api';
 
+/** Overview tab; TenantLayout renders the header and handles loading and errors. */
 export function TenantDetailPage() {
   const { companyId = '' } = useParams();
-  const query = useQuery({ queryKey: ['tenant', companyId], queryFn: () => platformApi.getTenant(companyId) });
+  const { data: tenant } = useQuery({ queryKey: ['tenant', companyId], queryFn: () => platformApi.getTenant(companyId) });
+  if (!tenant) return null;
 
-  if (query.isPending) return <p className="text-slate-500">Loading tenant…</p>;
-  if (query.isError) {
-    return (
-      <div className="space-y-3">
-        <Link to="/tenants" className="text-sm text-slate-600 hover:underline">
-          ← All tenants
-        </Link>
-        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-          {errorMessage(query.error)}
-        </p>
-      </div>
-    );
-  }
-
-  const tenant = query.data;
   return (
-    <section className="space-y-6">
-      <div>
-        <Link to="/tenants" className="text-sm text-slate-600 hover:underline">
-          ← All tenants
-        </Link>
-        <h1 className="mt-2 text-2xl font-semibold">{tenant.companyName}</h1>
-        <p className="text-sm text-slate-500">
-          {tenant.companyCode}
-          {!tenant.isActive && ' · inactive'}
-        </p>
-      </div>
-
+    <div className="space-y-6">
       <dl className="grid gap-4 sm:grid-cols-4">
         <Stat label="Plan">{tenant.subscriptionPlan}</Stat>
         <Stat label="Subscription">
@@ -63,7 +38,7 @@ export function TenantDetailPage() {
           ))}
         </ul>
       </div>
-    </section>
+    </div>
   );
 }
 

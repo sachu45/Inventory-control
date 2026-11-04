@@ -65,7 +65,127 @@ export const platformApi = {
     return unwrap<TenantPage>(res.data);
   },
   async getTenant(companyId: string): Promise<TenantDetail> {
-    const res = await api.get(`/platform/tenants/${encodeURIComponent(companyId)}`);
+    const res = await api.get(tenantPath(companyId));
     return unwrap<TenantDetail>(res.data);
+  },
+};
+
+export type JsonSchema = {
+  type?: string | string[];
+  properties?: Record<string, JsonSchema>;
+  required?: string[];
+  items?: JsonSchema;
+  enum?: unknown[];
+  not?: unknown;
+  minLength?: number;
+  maxLength?: number;
+  minimum?: number;
+  maximum?: number;
+  description?: string;
+};
+
+export type ModuleSettings = Record<string, unknown>;
+
+export type DraftRow = {
+  id: string;
+  enabled: boolean | null;
+  config: ModuleSettings;
+  revision: number;
+  updatedAt: string;
+  updatedBy: string | null;
+};
+
+export type DraftModule = {
+  key: string;
+  label: string;
+  sidebarSection: string;
+  defaultEnabled: boolean;
+  alwaysEnabled: boolean;
+  planGate: string | null;
+  requiredPermission: string | null;
+  dependsOn: string[];
+  defaults: ModuleSettings;
+  customizableFields: string[];
+  lockedMandatoryFields: string[];
+  shopOverridable: string[];
+  configSchema: JsonSchema;
+  draft: DraftRow | null;
+  shops: (DraftRow & { shopId: string })[];
+};
+
+export type ConfigIssue = { path: string; message: string };
+export type ConfigChange = { path: string; before: unknown; after: unknown };
+export type Preview = { baseVersion: number; issues: ConfigIssue[]; changes: ConfigChange[] };
+export type PublishResult = { version: { id: string; version: number }; changes: ConfigChange[] };
+export type VersionSummary = {
+  id: string;
+  version: number;
+  sourceVersion: number | null;
+  changeNote: string | null;
+  publishedBy: string;
+  publishedAt: string;
+};
+
+export type ConfigLayer = 'registry' | 'company' | 'shop';
+export type EffectiveConfig = {
+  config: {
+    version: number;
+    shopId: string | null;
+    modules: Record<string, { enabled: boolean; config: ModuleSettings }>;
+    provenance: Record<string, ConfigLayer>;
+  };
+  user?: { id: string; email: string; role: string; usableModules: string[] };
+};
+
+const tenantPath = (companyId: string) => `/platform/tenants/${encodeURIComponent(companyId)}`;
+const draftPath = (companyId: string, key: string, shopId?: string | null) =>
+  `${tenantPath(companyId)}/draft/${shopId ? `shops/${encodeURIComponent(shopId)}/` : ''}modules/${encodeURIComponent(key)}`;
+
+export const configApi = {
+  async listDrafts(companyId: string): Promise<DraftModule[]> {
+    const res = await api.get(`${tenantPath(companyId)}/draft/modules`);
+    return unwrap<{ modules: DraftModule[] }>(res.data).modules;
+  },
+  /** Creates the scope's draft row, or updates it when `revision` matches; 409 when stale. */
+  async setDraft(
+    companyId: string,
+    key: string,
+    body: { enabled: boolean | null; config: ModuleSettings; revision?: number },
+    shopId?: string | null,
+  ): Promise<DraftRow> {
+    const res = await api.put(draftPath(companyId, key, shopId), body);
+    return unwrap<DraftRow>(res.data);
+  },
+  async resetDraft(companyId: string, key: string, revision: number, shopId?: string | null): Promise<void> {
+    await api.delete(draftPath(companyId, key, shopId), { params: { revision } });
+  },
+  async preview(companyId: string): Promise<Preview> {
+    const res = await api.post(`${tenantPath(companyId)}/draft/preview`);
+    return unwrap<Preview>(res.data);
+  },
+  async publish(companyId: string, expectedBaseVersion: number, note?: string): Promise<PublishResult> {
+    const res = await api.post(`${tenantPath(companyId)}/publish`, { expectedBaseVersion, note: note || undefined });
+    return unwrap<PublishResult>(res.data);
+  },
+  async listVersions(companyId: string): Promise<VersionSummary[]> {
+    const res = await api.get(`${tenantPath(companyId)}/versions`);
+    return unwrap<VersionSummary[]>(res.data);
+  },
+  async diff(companyId: string, from: number, to: number): Promise<ConfigChange[]> {
+    const res = await api.get(`${tenantPath(companyId)}/versions/${from}/diff/${to}`);
+    return unwrap<{ changes: ConfigChange[] }>(res.data).changes;
+  },
+  async rollback(companyId: string, version: number, expectedBaseVersion: number, note?: string): Promise<PublishResult> {
+    const res = await api.post(`${tenantPath(companyId)}/versions/${version}/rollback`, {
+      expectedBaseVersion,
+      note: note || undefined,
+    });
+    return unwrap<PublishResult>(res.data);
+  },
+  async effective(companyId: string, params: { shopId?: string; userId?: string }): Promise<EffectiveConfig> {
+    const res = await api.get(`${tenantPath(companyId)}/effective`, {
+      params: { shopId: params.shopId || undefined, userId: params.userId || undefined },
+    });
+    return unwrap<EffectiveConfig>(res.data);
   },
 };

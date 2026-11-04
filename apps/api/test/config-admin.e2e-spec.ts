@@ -175,6 +175,9 @@ describe('Platform config admin API (e2e)', () => {
       (await admin().get(`${base}/draft/modules`).expect(200)).body,
     );
     expect(drafts.modules).toHaveLength(29);
+    const poSchema = (drafts.modules.find((m) => m.key === 'purchase-orders') as unknown as { configSchema: { properties: Record<string, { items?: { enum?: string[] } }> } }).configSchema;
+    expect(poSchema.properties.mandatoryFields.items?.enum).toContain('remarks');
+    expect(poSchema.properties).toHaveProperty('label');
     expect(drafts.modules.find((m) => m.key === 'contracts')?.draft?.revision).toBe(2);
     expect(drafts.modules.find((m) => m.key === 'rfqs')?.shops).toHaveLength(1);
 

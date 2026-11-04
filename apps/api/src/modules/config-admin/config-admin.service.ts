@@ -4,7 +4,8 @@ import { resolveRolePermissions } from '../../common/auth/role-permissions';
 import { ConfigDraftService, DraftRevisionConflictException } from '../../common/config/config-draft.service';
 import { ConfigPublishService } from '../../common/config/config-publish.service';
 import { ConfigResolverService } from '../../common/config/config-resolver.service';
-import { ModuleKey, isModuleKey } from '../../common/config/module-registry';
+import { z } from 'zod';
+import { MODULE_KEYS, MODULE_REGISTRY, ModuleKey, isModuleKey } from '../../common/config/module-registry';
 import { ModuleRegistryService } from '../../common/config/module-registry.service';
 import { UserPreferenceService } from '../../common/config/user-preference.service';
 import { TenantContext } from '../../common/tenant/tenant-context';
@@ -22,6 +23,18 @@ type TenantSummary = {
   subscriptionPlan: SubscriptionPlan;
   subscriptionStatus: SubscriptionStatus;
 };
+
+/**
+ * Each module's settings schema as JSON Schema, so the admin console can render a form
+ * for any setting defined in code. Cross-field refinements are not representable and
+ * stay server-side validation.
+ */
+const CONFIG_JSON_SCHEMAS = Object.fromEntries(
+  MODULE_KEYS.map((key) => [
+    key,
+    z.toJSONSchema(MODULE_REGISTRY[key].configSchema, { unrepresentable: 'any', io: 'input' }),
+  ]),
+) as unknown as Record<ModuleKey, Record<string, unknown>>;
 
 const CONFIG_AUDIT_ENTITY_TYPES = ['ConfigVersion', 'TenantModuleConfig'];
 
@@ -124,6 +137,7 @@ export class ConfigAdminService {
           customizableFields: mod.customizableFields,
           lockedMandatoryFields: mod.lockedMandatoryFields,
           shopOverridable: mod.shopOverridable,
+          configSchema: CONFIG_JSON_SCHEMAS[mod.key],
           draft: draftView(rows.find((r) => r.moduleKey === mod.key && r.shopId === null)),
           shops: rows
             .filter((r) => r.moduleKey === mod.key && r.shopId !== null)
