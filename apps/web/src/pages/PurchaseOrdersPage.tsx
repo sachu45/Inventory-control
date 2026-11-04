@@ -111,6 +111,9 @@ import { csvDate, csvMoney, exportModuleCsv } from '@/lib/module-csv';
 import { getApiErrorMessage } from '@/lib/api-error';
 import { useModuleFields } from '@/hooks/use-module-config';
 import { missingFieldsMessage, visibleCsvColumns, withoutHiddenFields } from '@/lib/module-field-ui';
+import { useTableColumns } from '@/hooks/use-table-columns';
+import { ColumnPicker } from '@/components/shared/column-picker';
+import type { TableColumn } from '@/lib/table-columns';
 
 const PO_FIELD_LABELS: Record<string, string> = {
   remarks: 'Remarks',
@@ -2024,6 +2027,174 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
     </form>
   );
 
+  const poColumns: TableColumn<PurchaseOrder>[] = [
+    {
+      key: 'poNumber',
+      label: 'PO Number',
+      locked: true,
+      cellClassName: 'max-w-[200px] truncate font-medium font-mono text-[11px]',
+      cell: (po) => (
+        <>
+          <button
+            type="button"
+            onClick={() => setDetailId(po.id)}
+            className="truncate text-left text-primary hover:underline"
+          >
+            {po.poNumber}
+          </button>
+        </>
+      ),
+    },
+    {
+      key: 'poDate',
+      label: 'PO Date',
+      headClassName: 'w-[112px]',
+      cellClassName: 'whitespace-nowrap text-muted-foreground',
+      cell: (po) => (
+        <>
+          <div className="flex flex-col leading-tight">
+            <span>{new Date(po.poDate).toLocaleDateString()}</span>
+            {(() => {
+              const status = po.lifecycleStatus ?? po.status;
+              const poDate = new Date(po.poDate);
+              const today = new Date();
+              const isOverdue = status === 'CONFIRMED' && poDate < today;
+              if (!isOverdue) return null;
+              const diffDays = Math.max(
+                1,
+                Math.ceil((today.getTime() - poDate.getTime()) / (1000 * 60 * 60 * 24)),
+              );
+              return <span className="text-[10px] text-amber-700 dark:text-amber-300">Overdue by {diffDays} day(s)</span>;
+            })()}
+          </div>
+        </>
+      ),
+    },
+    {
+      key: 'supplier',
+      label: 'Supplier',
+      cellClassName: 'max-w-[160px] truncate',
+      cell: (po) => (
+        <>
+          {po.supplier}
+        </>
+      ),
+    },
+    {
+      key: 'items',
+      label: 'Items',
+      headClassName: 'w-12 text-center',
+      cellClassName: 'text-center tabular-nums',
+      cell: (po) => (
+        <>
+          {po.items?.length ?? '—'}
+        </>
+      ),
+    },
+    {
+      key: 'grossAmount',
+      label: 'Gross Amount',
+      headClassName: 'w-28 text-right',
+      cellClassName: 'whitespace-nowrap text-right font-medium tabular-nums',
+      cell: (po) => (
+        <>
+          {formatCurrency(purchaseOrderTotals(po, productMap).grossTotal)}
+        </>
+      ),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      headClassName: 'w-36',
+      cell: (po) => (
+        <>
+          <StatusBadge status={po.lifecycleStatus ?? po.status} compact />
+        </>
+      ),
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      locked: true,
+      headClassName: 'w-10 text-right',
+      cellClassName: 'text-right',
+      cell: (po) => (
+        <>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setDetailId(po.id)}>
+                <Eye className="mr-2 h-4 w-4" /> View Details
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDownloadPoPdf(po)}>
+                <Download className="mr-2 h-4 w-4" /> Download PDF
+              </DropdownMenuItem>
+          
+              {(po.lifecycleStatus ?? po.status) !== 'CANCELLED' && (
+                <DropdownMenuItem
+                  disabled={!canSendPoEmail || sendMut.isPending}
+                  onClick={() => handleResendToSupplier(po)}
+                >
+                  <Send className="mr-2 h-4 w-4" /> Resend email
+                </DropdownMenuItem>
+              )}
+          
+              {po.status === 'DRAFT' && (
+                <>
+                  <DropdownMenuItem onClick={() => openEdit(po)} disabled={!canMutatePo}>
+                    <Pencil className="mr-2 h-4 w-4" /> Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setConfirmState({ type: 'confirm', id: po.id, poNumber: po.poNumber })} disabled={!canMutatePo || !canApprovePo}>
+                    <CheckCircle2 className="mr-2 h-4 w-4" /> Confirm
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    disabled={!canMutatePo}
+                    onClick={() =>
+                      setCancelDialog({
+                        id: po.id,
+                        poNumber: po.poNumber,
+                      })
+                    }
+                  >
+                    <XCircle className="mr-2 h-4 w-4" /> Cancel
+                  </DropdownMenuItem>
+                </>
+              )}
+          
+              {po.status === 'CONFIRMED' && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleConvertToGR(po.id)}>
+                    <ArrowRightFromLine className="mr-2 h-4 w-4" /> Convert to GR
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    disabled={!canMutatePo}
+                    onClick={() =>
+                      setCancelDialog({
+                        id: po.id,
+                        poNumber: po.poNumber,
+                      })
+                    }
+                  >
+                    <XCircle className="mr-2 h-4 w-4" /> Cancel
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </>
+      ),
+    },
+  ];
+  const columns = useTableColumns('purchase-orders', poColumns);
+
   if (createOnly) {
     return (
       <AppLayout>
@@ -2168,6 +2339,7 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
               </SelectContent>
             </Select>
           )}
+          <ColumnPicker columns={columns} tableLabel="purchase order" />
         </div>
           </Card>
 
@@ -2198,123 +2370,21 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
             <Table className="text-xs [&_th]:h-8 [&_th]:px-2 [&_th]:py-1 [&_th]:text-[11px] [&_td]:px-2 [&_td]:py-1.5">
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead>PO Number</TableHead>
-                  <TableHead className="w-[112px]">PO Date</TableHead>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead className="w-12 text-center">Items</TableHead>
-                  <TableHead className="w-28 text-right">Gross Amount</TableHead>
-                  <TableHead className="w-36">Status</TableHead>
-                  <TableHead className="w-10 text-right">Actions</TableHead>
+                  {columns.visible.map((c) => (
+                    <TableHead key={c.key} className={c.headClassName}>
+                      {c.label}
+                    </TableHead>
+                  ))}
                 </TableRow>
               </TableHeader>
               <AnimatedTableBody pageKey={page}>
                 {filteredPoList.map((po) => (
                   <TableRow key={po.id} className="hover:bg-muted/80">
-                    <TableCell className="max-w-[200px] truncate font-medium font-mono text-[11px]">
-                      <button
-                        type="button"
-                        onClick={() => setDetailId(po.id)}
-                        className="truncate text-left text-primary hover:underline"
-                      >
-                        {po.poNumber}
-                      </button>
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      <div className="flex flex-col leading-tight">
-                        <span>{new Date(po.poDate).toLocaleDateString()}</span>
-                        {(() => {
-                          const status = po.lifecycleStatus ?? po.status;
-                          const poDate = new Date(po.poDate);
-                          const today = new Date();
-                          const isOverdue = status === 'CONFIRMED' && poDate < today;
-                          if (!isOverdue) return null;
-                          const diffDays = Math.max(
-                            1,
-                            Math.ceil((today.getTime() - poDate.getTime()) / (1000 * 60 * 60 * 24)),
-                          );
-                          return <span className="text-[10px] text-amber-700 dark:text-amber-300">Overdue by {diffDays} day(s)</span>;
-                        })()}
-                      </div>
-                    </TableCell>
-                    <TableCell className="max-w-[160px] truncate">{po.supplier}</TableCell>
-                    <TableCell className="text-center tabular-nums">{po.items?.length ?? '—'}</TableCell>
-                    <TableCell className="whitespace-nowrap text-right font-medium tabular-nums">
-                      {formatCurrency(purchaseOrderTotals(po, productMap).grossTotal)}
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={po.lifecycleStatus ?? po.status} compact />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-7 w-7">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setDetailId(po.id)}>
-                            <Eye className="mr-2 h-4 w-4" /> View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDownloadPoPdf(po)}>
-                            <Download className="mr-2 h-4 w-4" /> Download PDF
-                          </DropdownMenuItem>
-
-                          {(po.lifecycleStatus ?? po.status) !== 'CANCELLED' && (
-                            <DropdownMenuItem
-                              disabled={!canSendPoEmail || sendMut.isPending}
-                              onClick={() => handleResendToSupplier(po)}
-                            >
-                              <Send className="mr-2 h-4 w-4" /> Resend email
-                            </DropdownMenuItem>
-                          )}
-
-                          {po.status === 'DRAFT' && (
-                            <>
-                              <DropdownMenuItem onClick={() => openEdit(po)} disabled={!canMutatePo}>
-                                <Pencil className="mr-2 h-4 w-4" /> Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => setConfirmState({ type: 'confirm', id: po.id, poNumber: po.poNumber })} disabled={!canMutatePo || !canApprovePo}>
-                                <CheckCircle2 className="mr-2 h-4 w-4" /> Confirm
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-destructive focus:text-destructive"
-                                disabled={!canMutatePo}
-                                onClick={() =>
-                                  setCancelDialog({
-                                    id: po.id,
-                                    poNumber: po.poNumber,
-                                  })
-                                }
-                              >
-                                <XCircle className="mr-2 h-4 w-4" /> Cancel
-                              </DropdownMenuItem>
-                            </>
-                          )}
-
-                          {po.status === 'CONFIRMED' && (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => handleConvertToGR(po.id)}>
-                                <ArrowRightFromLine className="mr-2 h-4 w-4" /> Convert to GR
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="text-destructive focus:text-destructive"
-                                disabled={!canMutatePo}
-                                onClick={() =>
-                                  setCancelDialog({
-                                    id: po.id,
-                                    poNumber: po.poNumber,
-                                  })
-                                }
-                              >
-                                <XCircle className="mr-2 h-4 w-4" /> Cancel
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
+                    {columns.visible.map((c) => (
+                      <TableCell key={c.key} className={c.cellClassName}>
+                        {c.cell(po)}
+                      </TableCell>
+                    ))}
                   </TableRow>
                 ))}
               </AnimatedTableBody>

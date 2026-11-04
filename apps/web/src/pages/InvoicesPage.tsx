@@ -12,7 +12,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCustomers } from '@/hooks/use-customers';
-import { useCreateInvoice, useInvoices } from '@/hooks/use-invoices';
+import { useCreateInvoice, useInvoices, type Invoice } from '@/hooks/use-invoices';
+import { useTableColumns } from '@/hooks/use-table-columns';
+import { ColumnPicker } from '@/components/shared/column-picker';
+import type { TableColumn } from '@/lib/table-columns';
 import { useModuleFields } from '@/hooks/use-module-config';
 import { useSalesOrders } from '@/hooks/use-sales-orders';
 import { csvDate, csvMoney, exportModuleCsv } from '@/lib/module-csv';
@@ -21,6 +24,16 @@ import { getApiErrorMessage } from '@/lib/api-error';
 import { fieldLabel, missingFieldsMessage, visibleCsvColumns } from '@/lib/module-field-ui';
 
 const FIELD_LABELS: Record<string, string> = { dueDate: 'Due Date', remarks: 'Remarks' };
+
+const INVOICE_COLUMNS: TableColumn<Invoice>[] = [
+  { key: 'invoiceNumber', label: 'Invoice', locked: true, cell: (inv) => inv.invoiceNumber },
+  { key: 'invoiceDate', label: 'Date', cell: (inv) => new Date(inv.invoiceDate).toLocaleDateString() },
+  { key: 'customer', label: 'Customer', cell: (inv) => inv.customer?.customerName ?? '-' },
+  { key: 'status', label: 'Status', cell: (inv) => <StatusBadge status={inv.status} /> },
+  { key: 'total', label: 'Total', cell: (inv) => Number(inv.totalValue ?? 0).toFixed(2) },
+  { key: 'paid', label: 'Paid', cell: (inv) => Number(inv.paidValue ?? 0).toFixed(2) },
+  { key: 'actions', label: 'Actions', locked: true, headClassName: 'text-right', cell: (inv) => <DocumentRowActions kind="invoice" id={inv.id} /> },
+];
 
 const emptyForm = () => ({
   customerId: '',
@@ -38,6 +51,7 @@ export function InvoicesPage({ createOnly = false }: { createOnly?: boolean }) {
   const createInvoice = useCreateInvoice();
   const [form, setForm] = useState(emptyForm);
   const fields = useModuleFields('invoices');
+  const columns = useTableColumns('invoices', INVOICE_COLUMNS);
 
   const onCreate = async () => {
     if (!form.customerId) {
@@ -196,20 +210,21 @@ export function InvoicesPage({ createOnly = false }: { createOnly?: boolean }) {
         </PageHeader>
 
         <Card>
-          <CardHeader><CardTitle>Invoices</CardTitle></CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle>Invoices</CardTitle>
+            <ColumnPicker columns={columns} tableLabel="invoice" />
+          </CardHeader>
           <CardContent>
             <Table>
-              <TableHeader><TableRow><TableHead>Invoice</TableHead><TableHead>Date</TableHead><TableHead>Customer</TableHead><TableHead>Status</TableHead><TableHead>Total</TableHead><TableHead>Paid</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+              <TableHeader>
+                <TableRow>
+                  {columns.visible.map((c) => <TableHead key={c.key} className={c.headClassName}>{c.label}</TableHead>)}
+                </TableRow>
+              </TableHeader>
               <TableBody>
-                {invoices.length === 0 ? <TableRow><TableCell colSpan={7}>No invoices found.</TableCell></TableRow> : invoices.map((inv) => (
+                {invoices.length === 0 ? <TableRow><TableCell colSpan={columns.visible.length}>No invoices found.</TableCell></TableRow> : invoices.map((inv) => (
                   <TableRow key={inv.id}>
-                    <TableCell>{inv.invoiceNumber}</TableCell>
-                    <TableCell>{new Date(inv.invoiceDate).toLocaleDateString()}</TableCell>
-                    <TableCell>{inv.customer?.customerName ?? '-'}</TableCell>
-                    <TableCell><StatusBadge status={inv.status} /></TableCell>
-                    <TableCell>{Number(inv.totalValue ?? 0).toFixed(2)}</TableCell>
-                    <TableCell>{Number(inv.paidValue ?? 0).toFixed(2)}</TableCell>
-                    <TableCell><DocumentRowActions kind="invoice" id={inv.id} /></TableCell>
+                    {columns.visible.map((c) => <TableCell key={c.key} className={c.cellClassName}>{c.cell(inv)}</TableCell>)}
                   </TableRow>
                 ))}
               </TableBody>

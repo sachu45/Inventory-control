@@ -86,6 +86,9 @@ import {
 import { useAuthStore } from '@/store/authStore';
 import { useModuleFields } from '@/hooks/use-module-config';
 import { fieldLabel, missingFieldsMessage, visibleCsvColumns } from '@/lib/module-field-ui';
+import { useTableColumns } from '@/hooks/use-table-columns';
+import { ColumnPicker } from '@/components/shared/column-picker';
+import type { TableColumn } from '@/lib/table-columns';
 import { resolvePreferredOrgId } from '@/lib/cookie-consent';
 import { cn } from '@/lib/cn';
 import { getApiErrorMessage } from '@/lib/api-error';
@@ -728,6 +731,61 @@ export function SalesPage({ createOnly = false }: { createOnly?: boolean }) {
     </div>
   );
 
+  const salesColumns: TableColumn<SalesOrder>[] = [
+    {
+      key: 'soNumber',
+      label: 'SO Number',
+      locked: true,
+      cell: (so) => (
+        <button type="button" onClick={() => openView(so)} className="font-semibold text-primary hover:underline">
+          {so.soNumber}
+        </button>
+      ),
+    },
+    { key: 'customer', label: 'Customer', cell: (so) => so.customer?.customerName ?? '—' },
+    { key: 'plant', label: 'Plant', cellClassName: 'text-sm text-muted-foreground', cell: (so) => so.shop?.shopName ?? '—' },
+    {
+      key: 'amount',
+      label: 'Amount',
+      headClassName: 'text-right',
+      cellClassName: 'text-right tabular-nums text-foreground',
+      cell: (so) => formatAmount(so.totalValue),
+    },
+    { key: 'status', label: 'Status', cell: (so) => <StatusPill status={so.status} /> },
+    { key: 'orderDate', label: 'Date', cellClassName: 'text-sm text-muted-foreground', cell: (so) => formatOrderDate(so.orderDate) },
+    {
+      key: 'actions',
+      label: 'Actions',
+      locked: true,
+      headClassName: 'text-right',
+      cellClassName: 'text-right',
+      cell: (so) => (
+        <div className="flex justify-end gap-1">
+          <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" aria-label="View" onClick={() => openView(so)}>
+            <Eye className="h-4 w-4" />
+          </Button>
+          {so.status === 'DRAFT' && (
+            <>
+              <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" aria-label="Edit" onClick={() => openEdit(so)}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8 text-red-600 dark:text-red-400 hover:bg-red-50"
+                aria-label="Delete"
+                onClick={() => setDeleteTarget(so)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+        </div>
+      ),
+    },
+  ];
+  const columns = useTableColumns('sales', salesColumns);
+
   if (createOnly) {
     return (
       <AppLayout active="Sales">
@@ -825,6 +883,7 @@ export function SalesPage({ createOnly = false }: { createOnly?: boolean }) {
                     noResultsMessage="No sales orders match your search."
                     className="w-full min-w-[200px] sm:max-w-xs"
                   />
+                  <ColumnPicker columns={columns} tableLabel="sales order" />
                   <Select value={customerFilter} onValueChange={setCustomerFilter}>
                     <SelectTrigger className="h-9 w-full sm:w-[180px]">
                       <SelectValue placeholder="Customer" />
@@ -869,91 +928,23 @@ export function SalesPage({ createOnly = false }: { createOnly?: boolean }) {
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/80">
-                        <TableHead className="text-xs font-semibold uppercase tracking-wide">
-                          SO Number
-                        </TableHead>
-                        <TableHead className="text-xs font-semibold uppercase tracking-wide">
-                          Customer
-                        </TableHead>
-                        <TableHead className="text-xs font-semibold uppercase tracking-wide">
-                          Plant
-                        </TableHead>
-                        <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">
-                          Amount
-                        </TableHead>
-                        <TableHead className="text-xs font-semibold uppercase tracking-wide">
-                          Status
-                        </TableHead>
-                        <TableHead className="text-xs font-semibold uppercase tracking-wide">
-                          Date
-                        </TableHead>
-                        <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">
-                          Actions
-                        </TableHead>
+                        {columns.visible.map((c) => (
+                          <TableHead key={c.key} className={`text-xs font-semibold uppercase tracking-wide ${c.headClassName ?? ''}`}>
+                            {c.label}
+                          </TableHead>
+                        ))}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filtered.map((so) => (
-                          <TableRow key={so.id} className="hover:bg-muted/50">
-                            <TableCell>
-                              <button
-                                type="button"
-                                onClick={() => openView(so)}
-                                className="font-semibold text-primary hover:underline"
-                              >
-                                {so.soNumber}
-                              </button>
+                        <TableRow key={so.id} className="hover:bg-muted/50">
+                          {columns.visible.map((c) => (
+                            <TableCell key={c.key} className={c.cellClassName}>
+                              {c.cell(so)}
                             </TableCell>
-                            <TableCell>{so.customer?.customerName ?? '—'}</TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {so.shop?.shopName ?? '—'}
-                            </TableCell>
-                            <TableCell className="text-right tabular-nums text-foreground">
-                              {formatAmount(so.totalValue)}
-                            </TableCell>
-                            <TableCell>
-                              <StatusPill status={so.status} />
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {formatOrderDate(so.orderDate)}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-1">
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-8 w-8 text-muted-foreground"
-                                  aria-label="View"
-                                  onClick={() => openView(so)}
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                                {so.status === 'DRAFT' && (
-                                  <>
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      className="h-8 w-8 text-muted-foreground"
-                                      aria-label="Edit"
-                                      onClick={() => openEdit(so)}
-                                    >
-                                      <Pencil className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      className="h-8 w-8 text-red-600 dark:text-red-400 hover:bg-red-50"
-                                      aria-label="Delete"
-                                      onClick={() => setDeleteTarget(so)}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                          ))}
+                        </TableRow>
+                      ))}
                     </TableBody>
                   </Table>
                   )}

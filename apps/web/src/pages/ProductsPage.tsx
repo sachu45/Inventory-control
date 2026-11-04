@@ -54,6 +54,9 @@ import { useStorageLocations } from '@/hooks/use-storage-locations';
 import { getApiErrorMessage } from '@/lib/api-error';
 import { useModuleFields } from '@/hooks/use-module-config';
 import { fieldLabel, missingFieldsMessage, visibleCsvColumns } from '@/lib/module-field-ui';
+import { useTableColumns } from '@/hooks/use-table-columns';
+import { ColumnPicker } from '@/components/shared/column-picker';
+import type { TableColumn } from '@/lib/table-columns';
 
 const PRODUCT_FIELD_LABELS: Record<string, string> = {
   hsnCode: 'HSN Code',
@@ -2104,6 +2107,82 @@ export function ProductsPage({ createOnly = false }: { createOnly?: boolean }) {
     );
   }
 
+  const productColumns: TableColumn<Product>[] = [
+    {
+      key: 'productCode',
+      label: 'SKU',
+      locked: true,
+      cell: (product) => (
+        <button
+          type="button"
+          onClick={() => setViewingProduct(product)}
+          className="font-mono text-sm font-medium text-primary hover:text-primary hover:underline"
+        >
+          {product.productCode}
+        </button>
+      ),
+    },
+    { key: 'description', label: 'Name', cellClassName: 'max-w-[220px] truncate font-medium text-foreground', cell: (p) => p.description },
+    {
+      key: 'category',
+      label: 'Category',
+      cell: (p) => (
+        <Badge variant="secondary" className="font-normal">
+          {p.category}
+        </Badge>
+      ),
+    },
+    { key: 'uom', label: 'Unit', cellClassName: 'text-sm text-muted-foreground', cell: (p) => p.uom },
+    {
+      key: 'sellingPrice',
+      label: 'Selling Price',
+      headClassName: 'text-right',
+      cellClassName: 'text-right text-sm tabular-nums text-foreground',
+      cell: (p) => formatAmount(p.sellingPrice),
+    },
+    {
+      key: 'purchasePrice',
+      label: 'Cost Price',
+      headClassName: 'text-right',
+      cellClassName: 'text-right text-sm tabular-nums text-foreground',
+      cell: (p) => formatAmount(p.purchasePrice),
+    },
+    {
+      key: 'stock',
+      label: 'Stock',
+      headClassName: 'text-right',
+      cellClassName: 'text-right',
+      cell: (p) => <StockCell stock={resolveProductStock(p, listShopId)} min={resolveMinStock(p, listShopId)} />,
+    },
+    { key: 'status', label: 'Status', cell: (p) => <ProductStatusPill active={p.isActive} /> },
+    {
+      key: 'actions',
+      label: 'Actions',
+      locked: true,
+      headClassName: 'text-right',
+      cell: (product) => (
+        <div className="flex items-center justify-end gap-1">
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" aria-label="View product" onClick={() => setViewingProduct(product)}>
+            <Eye className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" aria-label="Edit product" onClick={() => openEdit(product)}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-red-600 dark:text-red-400 hover:bg-red-50 hover:text-red-700"
+            aria-label="Delete product"
+            onClick={() => setDeleteTarget(product)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+  const columns = useTableColumns('products', productColumns);
+
   if (createOnly) {
     return (
       <AppLayout active="Products">
@@ -2276,6 +2355,7 @@ export function ProductsPage({ createOnly = false }: { createOnly?: boolean }) {
                 className="max-w-md"
               />
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <ColumnPicker columns={columns} tableLabel="product" />
                 <Select
                   value={categoryFilter}
                   onValueChange={(v) => {
@@ -2398,92 +2478,23 @@ export function ProductsPage({ createOnly = false }: { createOnly?: boolean }) {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/80 hover:bg-muted/80">
-                      <TableHead className="text-xs font-semibold uppercase tracking-wide">SKU</TableHead>
-                      <TableHead className="text-xs font-semibold uppercase tracking-wide">Name</TableHead>
-                      <TableHead className="text-xs font-semibold uppercase tracking-wide">Category</TableHead>
-                      <TableHead className="text-xs font-semibold uppercase tracking-wide">Unit</TableHead>
-                      <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">
-                        Selling Price
-                      </TableHead>
-                      <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">
-                        Cost Price
-                      </TableHead>
-                      <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Stock</TableHead>
-                      <TableHead className="text-xs font-semibold uppercase tracking-wide">Status</TableHead>
-                      <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Actions</TableHead>
+                      {columns.visible.map((c) => (
+                        <TableHead key={c.key} className={`text-xs font-semibold uppercase tracking-wide ${c.headClassName ?? ''}`}>
+                          {c.label}
+                        </TableHead>
+                      ))}
                     </TableRow>
                   </TableHeader>
                   <AnimatedTableBody pageKey={page}>
-                    {tableItems.map((product) => {
-                      const stockValue = resolveProductStock(product, listShopId);
-                      const minStockValue = resolveMinStock(product, listShopId);
-
-                      return (
-                        <TableRow key={product.id}>
-                          <TableCell>
-                            <button
-                              type="button"
-                              onClick={() => setViewingProduct(product)}
-                              className="font-mono text-sm font-medium text-primary hover:text-primary hover:underline"
-                            >
-                              {product.productCode}
-                            </button>
+                    {tableItems.map((product) => (
+                      <TableRow key={product.id}>
+                        {columns.visible.map((c) => (
+                          <TableCell key={c.key} className={c.cellClassName}>
+                            {c.cell(product)}
                           </TableCell>
-                          <TableCell className="max-w-[220px] truncate font-medium text-foreground">
-                            {product.description}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary" className="font-normal">
-                              {product.category}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{product.uom}</TableCell>
-                          <TableCell className="text-right text-sm tabular-nums text-foreground">
-                            {formatAmount(product.sellingPrice)}
-                          </TableCell>
-                          <TableCell className="text-right text-sm tabular-nums text-foreground">
-                            {formatAmount(product.purchasePrice)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <StockCell stock={stockValue} min={minStockValue} />
-                          </TableCell>
-                          <TableCell>
-                            <ProductStatusPill active={product.isActive} />
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center justify-end gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-muted-foreground"
-                                aria-label="View product"
-                                onClick={() => setViewingProduct(product)}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-muted-foreground"
-                                aria-label="Edit product"
-                                onClick={() => openEdit(product)}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-red-600 dark:text-red-400 hover:bg-red-50 hover:text-red-700"
-                                aria-label="Delete product"
-                                onClick={() => setDeleteTarget(product)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
+                        ))}
+                      </TableRow>
+                    ))}
                   </AnimatedTableBody>
                 </Table>
               )}
