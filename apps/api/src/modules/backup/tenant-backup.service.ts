@@ -294,7 +294,7 @@ export class TenantBackupService {
       };
       const saved = existing
         ? await tx.product.update({ where: { id: existing.id }, data })
-        : await tx.product.create({ data: { ...data, createdById: userId } });
+        : await tx.product.create({ data: { ...data, companyId, createdById: userId } });
       productIdMap.set(String(row.id), saved.id);
     }
 

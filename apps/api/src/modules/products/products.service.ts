@@ -372,6 +372,7 @@ export class ProductsService {
     return this.prisma.$transaction(async (tx) => {
       const product = await tx.product.create({
         data: {
+          companyId,
           productCode: dto.productCode,
           description: dto.description,
           uom: dto.uom,
@@ -1214,6 +1215,7 @@ export class ProductsService {
       if (!validateOnly) {
         const created = await tx.product.create({
           data: {
+            companyId,
             productCode,
             description: row.description,
             uom: row.uom,

@@ -193,13 +193,14 @@ export class PurchaseOrdersService {
 
     const shop = await tx.shop.findUnique({
       where: { id: shopId },
-      select: { shopNumber: true },
+      select: { shopNumber: true, companyId: true },
     });
     const serviceCode = this.shopScopedServiceCode(shop?.shopNumber ?? 'GEN');
     let product = await tx.product.findUnique({ where: { productCode: serviceCode } });
     if (!product) {
       product = await tx.product.create({
         data: {
+          companyId: shop?.companyId ?? null,
           productCode: serviceCode,
           description: 'Service line (PO)',
           uom: 'EA',

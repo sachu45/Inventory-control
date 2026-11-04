@@ -368,6 +368,7 @@ model Company {
   brandingProfile           BrandingProfile?              @relation("CompanyBrandingProfile", fields: [brandingProfileId], references: [id])
   shops                     Shop[]
   suppliers                 Supplier[]
+  products                  Product[]
   subscriptionPayments      SubscriptionPayment[]
   subscriptionInvoices      SubscriptionInvoice[]
   engagementSnapshots       CompanyEngagementSnapshot[]
@@ -954,6 +955,11 @@ model Product {
   updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
   createdById      String?        @map("created_by") @db.Uuid
   updatedById      String?        @map("updated_by") @db.Uuid
+  /// Owning tenant (#241). Nullable until the backfill is verified; then required
+  /// and product codes become unique per company.
+  companyId        String?        @map("company_id") @db.Uuid
+
+  company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
 
   plants                 ProductPlant[]
   specifications         ProductSpecification[]
@@ -980,6 +986,7 @@ model Product {
   stockCountItems StockCountItem[] @relation("ProductStockCountItems")
   lowStockAlerts  LowStockAlert[]
 
+  @@index([companyId])
   @@map("products")
 }
 

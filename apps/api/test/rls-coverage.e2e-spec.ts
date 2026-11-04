@@ -15,6 +15,8 @@ const PENDING_RLS: Record<string, string> = {
   audit_logs: 'nullable company_id (platform events)',
   channel_accounts: 'nullable company_id',
   subscription_payments: 'nullable company_id',
+  // company_id added in the #241 expand step; RLS comes with the contract step, once the backfill is verified.
+  products: '#241',
   // Remaining tenant tables (#238).
   agent_tasks: '#238',
   ai_prompt_history: '#238',
