@@ -556,16 +556,23 @@ The frontend re-fetches with `If-None-Match`; `304` when the version and
 preferences are unchanged. The server builds the sidebar from registry + config
 + plan + permissions, so the client never needs to combine them.
 
-### 5.5 Config Templates and Import/Export (Phase 7)
+### 5.5 Business Templates (Phase 7)
 
-- **Export:** a published snapshot plus custom field definitions as a JSON file
-  with `schemaVersion`. Contains no tenant data or IDs other than module/field keys.
-- **Import:** loads the file into the *draft* working set of a target company.
-  It still has to be previewed and published. This is how config moves between
-  staging and production, and how templates are applied.
-- **Templates:** named exports maintained by SoftDigit (e.g. Manufacturing,
-  Retail, Wholesale), stored as files in the repo
-  (`apps/api/src/common/config/templates/`) so they are reviewed like code.
+Full specification in `docs/architecture/2026-11-04-business-templates-spec.md`.
+
+- **Templates:** 12 industry-specific configuration presets (Retail, Wholesale,
+  Manufacturing, etc.) stored as JSON files in
+  `apps/api/src/common/config/templates/`, validated against `MODULE_REGISTRY` in
+  CI. Templates are starting points, not locked modes.
+- **Application:** templates load into the draft working set through
+  `TemplateService.applyToDraft()`. Onboarding auto-publishes; admin application
+  requires explicit preview and publish. Both paths share the same validation
+  pipeline.
+- **Reapplication:** merges template into the current draft, preserving tenant
+  customizations on modules not in the template. Categories are deduplicated.
+- **Provenance:** published snapshots record `sourceTemplate` metadata.
+- **Export/import of tenant config:** deferred — requires sanitization of tenant
+  data, IDs, and sequence counters before it can be safe.
 
 ### 5.6 Workflow and Policy Administration (Phase 6)
 
@@ -862,11 +869,35 @@ first time anything is tested.
 - [ ] Admin UI: approval chain editor, policy rule editor
 - [ ] Integration tests: company-specific workflow runs
 
-### Phase 7 — Templates, Import/Export & Lifecycle Tooling (E08) — Medium
-- [ ] Export/import (into drafts) with `schemaVersion`
-- [ ] Industry templates (Manufacturing, Retail, Wholesale) as reviewed files
-- [ ] Audit diff viewer
+### Phase 7 — Business Templates & Lifecycle Tooling (E08) — Medium
+
+**Full specification:** `2026-11-04-business-templates-spec.md`
+
+**7.1 Template Engine**
+- [ ] `BusinessTemplate` schema, Zod validation, CI checks against `MODULE_REGISTRY`
+- [ ] Template loader service (reads JSON from `apps/api/src/common/config/templates/`)
+- [ ] `TemplateService.applyToDraft()` with initial-setup and reapplication modes
+- [ ] Plan entitlement checks; concurrency lock; category seed deduplication
+- [ ] Template provenance metadata in `ConfigVersion` snapshots
+
+**7.2 Built-In Template Library (wave-based)**
+- [ ] Wave 1: `retail.json`, `wholesale.json` — validates engine against real customers
+- [ ] Wave 2: `manufacturing.json`, `construction.json`
+- [ ] Wave 3: `restaurant.json`, `pharmacy.json`, `electronics.json`, `textiles.json`, `auto-parts.json`, `agriculture.json`, `fmcg.json`, `ecommerce.json`
+
+**7.3 Onboarding Integration**
+- [ ] `GET /api/v1/templates` and `GET /api/v1/templates/:key` endpoints
+- [ ] `POST /api/v1/onboarding/apply-template` — transactional: validate → draft → publish → seed
+- [ ] Template picker UI component in onboarding flow ("Start from Scratch" option)
+
+**7.4 Admin Template Application**
+- [ ] `POST /api/v1/platform/tenants/:companyId/draft/apply-template` (draft only)
+- [ ] Admin template library page; apply flow with diff preview
+- [ ] Template provenance display in version history
+
+**7.5 Lifecycle Tooling**
 - [ ] Snapshot schema migration framework (§4.6) + first migration test
+- [ ] Audit diff viewer
 
 ### Phase 8 — Enterprise Validation & Pilot (E09) — Critical
 - [ ] Full security review and pen test of `/platform/*` and config paths
@@ -911,8 +942,14 @@ first time anything is tested.
 - Invalid workflow graphs and out-of-vocabulary policy conditions rejected
 
 ### Phase 7
-- Export from staging → import → preview → publish in production reproduces the config
-- Applying a template produces a valid, publishable draft
+- Every built-in template passes CI validation against `MODULE_REGISTRY` and its Zod schemas
+- Applying a template to a new tenant via onboarding produces a published config version 1
+- Applying a template to an existing tenant via admin loads a draft without auto-publishing
+- Reapplication preserves tenant customizations on modules not in the template
+- Template cannot enable a module the tenant's plan forbids (returns 422 with violations)
+- Category seeds are deduplicated; no duplicates created on reapplication
+- Template provenance recorded in the published snapshot metadata
+- Snapshot schema migration framework upgrades old snapshots correctly
 
 ### Phase 8
 - **Server-side resolution:** p99 < 5ms with warm in-process cache
