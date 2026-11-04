@@ -1,6 +1,6 @@
 ﻿/* eslint-disable no-console */
 import { PrismaClient, RoleName, SubscriptionPlan, SubscriptionStatus } from '@prisma/client';
-import { createPgAdapter } from '../src/prisma/pg-adapter';
+import { PrismaPg } from '@prisma/adapter-pg';
 import * as bcrypt from 'bcrypt';
 
 /**
@@ -142,7 +142,14 @@ const ROLE_DEFINITIONS: Array<{ name: RoleName; permissions: string[] }> = [
 ];
 
 async function main() {
-  const prisma = new PrismaClient({ adapter: createPgAdapter() });
+  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is not set');
+  // The seed bootstraps every tenant table, so it opts out of tenant RLS for its
+  // whole session; without this a non-superuser owner hits fail-closed policies.
+  const adapter = new PrismaPg({
+    connectionString: process.env.DATABASE_URL,
+    options: '-c app.allow_unscoped_access=true',
+  });
+  const prisma = new PrismaClient({ adapter });
   try {
     if (process.env.NODE_ENV === 'production' && process.env.ALLOW_PROD_SEED !== 'true') {
       console.warn('[seed] Skipping production seed: set ALLOW_PROD_SEED=true to override.');

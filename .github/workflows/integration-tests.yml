@@ -46,7 +46,10 @@ jobs:
           --health-timeout 3s
           --health-retries 10
     env:
-      DATABASE_URL: postgresql://retail:retail@localhost:5432/retail_ims
+      # The suite connects as a non-superuser table owner, like production, so
+      # FORCE ROW LEVEL SECURITY applies. The superuser `retail` bypasses RLS and
+      # would let tenant-scoping bugs pass; it is only used to create this role.
+      DATABASE_URL: postgresql://retail_app:retail_app@localhost:5432/retail_ims
       NODE_ENV: test
       JWT_SECRET: ci_jwt_secret_must_be_at_least_32_characters_long
       REFRESH_SECRET: ci_refresh_secret_must_be_at_least_32_chars
@@ -65,6 +68,16 @@ jobs:
       # npm ci (not npm install) ensures the lockfile is respected exactly.
       - run: npm ci
 
+      - name: Create non-superuser database owner (RLS enforced)
+        env:
+          PGPASSWORD: retail
+        run: |
+          psql -h localhost -U retail -d retail_ims -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE retail_app LOGIN PASSWORD 'retail_app' NOSUPERUSER NOBYPASSRLS;
+          ALTER DATABASE retail_ims OWNER TO retail_app;
+          ALTER SCHEMA public OWNER TO retail_app;
+          SQL
+
       - name: Restore Prisma client cache
         id: prisma-cache
         uses: actions/cache@v6
@@ -82,6 +95,14 @@ jobs:
         run: mkdir -p ./storage/exports ./storage/uploads
       - run: npx prisma migrate deploy --schema apps/api/prisma/schema.prisma
       - run: npx prisma db seed --schema apps/api/prisma/schema.prisma
+      # Fails if DATABASE_URL is ever pointed at a role that bypasses RLS again.
+      - name: Check RLS is enforced for the test connection
+        run: |
+          visible=$(psql "$DATABASE_URL" -tAc "SELECT count(*) FROM companies")
+          if [ "$visible" != "0" ]; then
+            echo "::error::DATABASE_URL sees $visible companies without a tenant context; RLS is not enforced"
+            exit 1
+          fi
       # All API e2e suites (workflows plus auth/CSRF, idempotency, PO listing,
       # OpenAPI). Running only the workflow specs let the others go stale.
       - run: npm run test:e2e --workspace=api -- --runInBand --forceExit
