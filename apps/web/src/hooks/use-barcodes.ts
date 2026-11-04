@@ -84,8 +84,13 @@ export function useBarcodeList(params: {
     queryKey: barcodesKeys.list(params),
     queryFn: async () => {
       const { data } = await api.get('/barcodes', { params });
-      return data as {
-        items: Array<{
+      const payload = (data as Record<string, unknown>);
+      const resolved = Array.isArray(payload) ? { items: payload, total: payload.length, page: 1, limit: payload.length }
+        : payload && typeof payload === 'object' && 'data' in payload
+          ? payload.data as Record<string, unknown>
+          : payload;
+      const result = resolved as {
+        items?: Array<{
           id: string;
           barcode: string;
           barcodeType: string;
@@ -94,9 +99,15 @@ export function useBarcodeList(params: {
           product: { id: string; productCode: string; description: string };
           supplier?: { id: string; supplierName: string };
         }>;
-        total: number;
-        page: number;
-        limit: number;
+        total?: number;
+        page?: number;
+        limit?: number;
+      };
+      return {
+        items: Array.isArray(result?.items) ? result.items : [],
+        total: result?.total ?? 0,
+        page: result?.page ?? 1,
+        limit: result?.limit ?? params.limit ?? 25,
       };
     },
   });

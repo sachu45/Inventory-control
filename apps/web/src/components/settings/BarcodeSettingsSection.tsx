@@ -255,7 +255,7 @@ export function BarcodeSettingsSection() {
                       Loading registry items...
                     </TableCell>
                   </TableRow>
-                ) : !registry || registry.items.length === 0 ? (
+                ) : !registry?.items?.length ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       No barcodes found matching the filters.
