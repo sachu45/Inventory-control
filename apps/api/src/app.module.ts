@@ -60,6 +60,7 @@ import { UploadModule } from './common/upload/upload.module';
 import { ObservabilityModule } from './common/observability/observability.module';
 import { TenantConfigModule } from './common/config/config.module';
 import { ConfigAdminModule } from './modules/config-admin/config-admin.module';
+import { MeConfigModule } from './modules/me-config/me-config.module';
 import { FxModule } from './modules/fx/fx.module';
 import { MailModule } from './common/mail/mail.module';
 import { BillingModule } from './modules/billing/billing.module';
@@ -164,6 +165,7 @@ function routeOptsIntoAuthThrottle(context: ExecutionContext): boolean {
     ObservabilityModule,
     TenantConfigModule,
     ConfigAdminModule,
+    MeConfigModule,
     FxModule,
     AuditModule,
     StockModule,
