@@ -5,12 +5,14 @@ import { LayoutDashboard, Package, ShoppingCart, Users, BarChart3, Settings, Git
 import { useAuthStore } from '@/store/authStore';
 import { visibleTools, TOOL_GROUPS } from '@/lib/simple-navigation';
 import { isOrgAdminUser } from '@/lib/roles';
+import { useMeConfig } from '@/hooks/use-me-config';
 
 export function ApplicationLauncher() {
   const [open, setOpen] = useState(false);
   const user = useAuthStore(s => s.user);
+  const meConfig = useMeConfig();
   const navigate = useNavigate();
-  const allowed = new Set(visibleTools(user).map(tool => tool.path));
+  const allowed = new Set(visibleTools(user, meConfig).map(tool => tool.path));
   const has = (id: string) => TOOL_GROUPS.find(group => group.id === id)?.paths.some(path => allowed.has(path));
   const apps = [
     { label: 'Overview', description: 'Business metrics and recent activity', path: '/dashboard', icon: LayoutDashboard, enabled: allowed.has('/dashboard') },

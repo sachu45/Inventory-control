@@ -11,6 +11,7 @@ import { BrandLogo } from '@/components/BrandLogo';
 import { simpleNavigation } from '@/lib/simple-navigation';
 import { preloadRoute } from '@/lib/route-preload';
 import { trackNavOpen } from '@/lib/nav-analytics';
+import { useMeConfig } from '@/hooks/use-me-config';
 
 type SidebarProps = {
   collapsed: boolean; onCollapsedChange: (collapsed: boolean) => void;
@@ -27,7 +28,8 @@ export function Sidebar({ collapsed, onCollapsedChange, isMobile = false, mobile
   const [signingOut, setSigningOut] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const expanded = !collapsed || isMobile;
-  const links = simpleNavigation(user);
+  const meConfig = useMeConfig();
+  const links = simpleNavigation(user, meConfig);
   const section = new URLSearchParams(location.search).get('section');
   const initials = (user?.name ?? 'User').split(' ').map(part => part[0]).slice(0, 2).join('').toUpperCase();
 

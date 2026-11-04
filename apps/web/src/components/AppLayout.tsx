@@ -13,6 +13,7 @@ import { resetClientSessionState } from '@/lib/reset-session-state';
 import { Sidebar } from './Sidebar';
 import { Toaster } from '@/components/ui/sonner';
 import { useAuthStore } from '@/store/authStore';
+import { useMeConfigSync } from '@/hooks/use-me-config';
 import { api } from '@/api/client';
 import { cn } from '@/lib/cn';
 import {
@@ -57,6 +58,8 @@ export function AppLayout({ children, active }: AppLayoutProps) {
   const user = useAuthStore((s) => s.user);
   const clear = useAuthStore((s) => s.clear);
   const isMobile = useIsMobile();
+  // Loads /me/config so navigation follows the company's module config.
+  useMeConfigSync();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
     typeof window !== 'undefined' ? false : true,
   );

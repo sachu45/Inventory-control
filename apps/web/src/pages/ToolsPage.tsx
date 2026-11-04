@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { ArrowRight, Search } from '@/components/ui/icons';
 import { useAuthStore } from '@/store/authStore';
 import { visibleTools, TOOL_GROUPS, TOOL_COPY } from '@/lib/simple-navigation';
+import { useMeConfig } from '@/hooks/use-me-config';
 
 export function ToolsPage() {
   const [params] = useSearchParams();
@@ -14,10 +15,11 @@ export function ToolsPage() {
 
 function ToolsContent() {
   const user = useAuthStore(s => s.user);
+  const meConfig = useMeConfig();
   const [params] = useSearchParams();
   const [query, setQuery] = useState('');
   const section = TOOL_GROUPS.find(group => group.id === params.get('section'));
-  const tools = visibleTools(user);
+  const tools = visibleTools(user, meConfig);
   const search = query.trim().toLowerCase();
   const groups = (section ? [section] : TOOL_GROUPS).map(group => ({ ...group, items: group.paths.flatMap(path => {
     const item = tools.find(tool => tool.path === path);

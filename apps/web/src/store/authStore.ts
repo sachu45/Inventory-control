@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, PersistStorage } from 'zustand/middleware';
+import type { CachedMeConfig } from '@/api/me-config';
 
 const STORAGE_KEY = 'retail-ims-auth-state';
 
@@ -48,6 +49,9 @@ type AuthState = {
   accessToken: string | null;
   user: AuthUser | null;
   initialized: boolean;
+  /** Last `/me/config` response for `user`; null until loaded, or when it failed (built-in sidebar is used). */
+  meConfig: CachedMeConfig | null;
+  setMeConfig: (meConfig: CachedMeConfig | null) => void;
   setSession: (accessToken: string, user: AuthUser) => void;
   setInitialized: (initialized: boolean) => void;
   setUser: (user: AuthUser) => void;
@@ -60,6 +64,8 @@ export const useAuthStore = create<AuthState>()(
       accessToken: null,
       user: null,
       initialized: false,
+      meConfig: null,
+      setMeConfig: (meConfig) => set({ meConfig }),
       setSession: (accessToken, user) =>
         set({
           accessToken,
@@ -68,7 +74,7 @@ export const useAuthStore = create<AuthState>()(
         }),
       setInitialized: (initialized) => set({ initialized }),
       setUser: (user) => set((state) => ({ ...state, user })),
-      clear: () => set({ accessToken: null, user: null, initialized: true }),
+      clear: () => set({ accessToken: null, user: null, meConfig: null, initialized: true }),
     }),
     {
       name: STORAGE_KEY,
@@ -76,6 +82,8 @@ export const useAuthStore = create<AuthState>()(
       partialize: (state) => ({
         accessToken: state.accessToken,
         user: state.user,
+        // Kept so a reload renders the configured sidebar at once and revalidates with its ETag.
+        meConfig: state.meConfig,
       }),
     },
   ),

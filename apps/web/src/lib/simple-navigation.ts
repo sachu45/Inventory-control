@@ -1,6 +1,7 @@
 import type { AuthUser } from '@/store/authStore';
 import { isOrgAdminUser, isPlatformAdminUser } from '@/lib/roles';
-import { SIDEBAR_SECTIONS, flattenLinks, type SidebarLink } from '@/lib/sidebar-navigation';
+import { SIDEBAR_SECTIONS, flattenLinks, sectionsFromMeConfig, type SidebarLink } from '@/lib/sidebar-navigation';
+import type { MeConfig } from '@/api/me-config';
 import { menuIcons } from '@/config/iconMap';
 import { MoreHorizontal } from '@/components/ui/icons';
 
@@ -32,7 +33,17 @@ export const TOOL_COPY: Record<string, [string, string]> = {
   '/platform/subscriptions': ['Platform admin', 'Manage platform subscriptions and health'],
 };
 
-export function visibleTools(user: AuthUser | null | undefined): SidebarLink[] {
+/**
+ * The tools this user can open. With a `/me/config` response the server's sidebar
+ * is used as is (plan, permission and business config already applied); without
+ * one, the built-in sections and their permission gates are the fallback.
+ */
+export function visibleTools(user: AuthUser | null | undefined, config?: MeConfig | null): SidebarLink[] {
+  if (config) {
+    return sectionsFromMeConfig(config)
+      .flatMap(s => flattenLinks(s.children))
+      .filter(link => !link.requirePlatformAdmin || isPlatformAdminUser(user));
+  }
   const admin = isOrgAdminUser(user);
   return SIDEBAR_SECTIONS.flatMap(s => flattenLinks(s.children)).filter(link =>
     (!link.requireOrgAdmin || admin) &&
@@ -49,8 +60,8 @@ export const TOOL_GROUPS = [
   { id: 'review', label: 'Reports & other tools', description: 'Check progress and review requests.', paths: ['/reports', '/approvals', '/platform/subscriptions'] },
 ];
 
-export function simpleNavigation(user: AuthUser | null | undefined) {
-  const tools = visibleTools(user);
+export function simpleNavigation(user: AuthUser | null | undefined, config?: MeConfig | null) {
+  const tools = visibleTools(user, config);
   const can = (path: string) => tools.some(t => t.path === path);
   const groupPaths = (id: string) => TOOL_GROUPS.find(g => g.id === id)!.paths;
   return [
