@@ -9,9 +9,11 @@ import {
   VerifySenderOtpDto,
 } from './dto/email-sender.dto';
 import { EmailSenderService } from './email-sender.service';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('settings')
 @ApiBearerAuth()
+@RequiresModule('settings')
 @Controller('settings/email-notifications/senders')
 export class EmailSenderController {
   constructor(private readonly emailSenders: EmailSenderService) {}

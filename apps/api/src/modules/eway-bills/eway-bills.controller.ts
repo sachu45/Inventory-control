@@ -27,8 +27,10 @@ import {
   RecordEwayBillNumberDto,
   EwayBillFilterDto,
 } from './dto/eway-bill.dto';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('E-Way Bills')
+@RequiresModule('eway-bills')
 @Controller('eway-bills')
 @UseGuards(JwtAuthGuard)
 @RequirePermission('shop:read')

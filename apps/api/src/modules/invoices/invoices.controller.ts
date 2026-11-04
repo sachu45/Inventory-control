@@ -6,9 +6,11 @@ import type { RequestUser } from '../../common/types/request-user';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { ListInvoicesDto } from './dto/list-invoices.dto';
 import { InvoicesService } from './invoices.service';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('invoices')
 @ApiBearerAuth()
+@RequiresModule('invoices')
 @Controller('invoices')
 export class InvoicesController {
   constructor(private readonly invoices: InvoicesService) {}

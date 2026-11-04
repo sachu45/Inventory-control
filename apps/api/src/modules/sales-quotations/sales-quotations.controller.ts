@@ -6,9 +6,11 @@ import type { RequestUser } from '../../common/types/request-user';
 import { CreateSalesQuotationDto } from './dto/create-sales-quotation.dto';
 import { UpdateSalesQuotationDto } from './dto/update-sales-quotation.dto';
 import { SalesQuotationsService } from './sales-quotations.service';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('sales-quotations')
 @ApiBearerAuth()
+@RequiresModule('sales-quotations')
 @Controller('sales-quotations')
 export class SalesQuotationsController {
   constructor(private readonly salesQuotations: SalesQuotationsService) {}

@@ -4,9 +4,11 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { WarehouseService } from './warehouse.service';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('warehouse')
 @ApiBearerAuth()
+@RequiresModule('warehouse')
 @Controller('warehouse')
 export class WarehouseController {
   constructor(private readonly warehouse: WarehouseService) {}

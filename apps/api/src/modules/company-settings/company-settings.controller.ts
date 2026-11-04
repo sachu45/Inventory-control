@@ -5,9 +5,11 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import type { RequestUser } from '../../common/types/request-user';
 import { CompanySettingsService } from './company-settings.service';
 import { UpsertSettingDto } from './dto/upsert-setting.dto';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('company-settings')
 @ApiBearerAuth()
+@RequiresModule('settings')
 @Controller('company-settings')
 export class CompanySettingsController {
   constructor(private readonly service: CompanySettingsService) {}

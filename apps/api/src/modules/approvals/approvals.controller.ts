@@ -26,8 +26,10 @@ import {
   ApprovalListResponseDto,
   ApprovalFilterDto,
 } from './dto';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('Approvals')
+@RequiresModule('approvals')
 @Controller('approvals')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()

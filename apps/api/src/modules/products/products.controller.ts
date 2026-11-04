@@ -26,9 +26,11 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { SearchHsnDto } from './dto/search-hsn.dto';
 import { GstHsnService } from './gst-hsn.service';
 import { ProductsService } from './products.service';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('products')
 @ApiBearerAuth()
+@RequiresModule('products')
 @Controller('products')
 export class ProductsController {
   constructor(

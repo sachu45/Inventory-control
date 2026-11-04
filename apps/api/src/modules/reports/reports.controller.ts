@@ -6,9 +6,11 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import type { RequestUser } from '../../common/types/request-user';
 import { CreateSavedFilterDto } from './dto/create-saved-filter.dto';
 import { ReportsService } from './reports.service';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('reports')
 @ApiBearerAuth()
+@RequiresModule('reports')
 @Controller('reports')
 export class ReportsController {
   constructor(private readonly reports: ReportsService) {}

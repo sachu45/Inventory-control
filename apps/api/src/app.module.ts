@@ -3,6 +3,7 @@ import { ExecutionContext, MiddlewareConsumer, Module, NestModule } from '@nestj
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR, Reflector } from '@nestjs/core';
 import { TenantRlsInterceptor } from './common/tenant/tenant-rls.interceptor';
+import { ModuleEnabledGuard } from './common/config/module-enabled.guard';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -217,6 +218,8 @@ function routeOptsIntoAuthThrottle(context: ExecutionContext): boolean {
     { provide: APP_GUARD, useClass: PermissionsGuard },
     // Runs after auth so req.user is known; expired plans become read-only.
     { provide: APP_GUARD, useClass: SubscriptionWriteGuard },
+    // Runs after the plan check; refuses modules the company's config has disabled.
+    { provide: APP_GUARD, useClass: ModuleEnabledGuard },
     { provide: APP_INTERCEPTOR, useClass: TenantRlsInterceptor },
   ],
 })

@@ -5,10 +5,12 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { PreviewEmailTemplateDto, UpdateEmailNotificationsDto } from './dto/update-email-notifications.dto';
 import { EmailNotificationsService } from './email-notifications.service';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('settings')
 @ApiBearerAuth()
 @UseInterceptors(new StripReadonlyBodyInterceptor())
+@RequiresModule('settings')
 @Controller('settings/email-notifications')
 export class EmailNotificationsController {
   constructor(private readonly emailNotifications: EmailNotificationsService) {}

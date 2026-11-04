@@ -6,9 +6,11 @@ import type { RequestUser } from '../../common/types/request-user';
 import { CreateStorageLocationDto } from './dto/create-storage-location.dto';
 import { UpdateStorageLocationDto } from './dto/update-storage-location.dto';
 import { StorageLocationsService } from './storage-locations.service';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('storage-locations')
 @ApiBearerAuth()
+@RequiresModule('storage-locations')
 @Controller('storage-locations')
 export class StorageLocationsController {
   constructor(private readonly storageLocations: StorageLocationsService) {}

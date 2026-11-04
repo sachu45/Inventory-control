@@ -7,9 +7,11 @@ import { AcceptAutoLinkQuotationDto } from './dto/accept-auto-link-quotation.dto
 import { CreateQuotationDto } from './dto/create-quotation.dto';
 import { UpdateQuotationDto } from './dto/update-quotation.dto';
 import { QuotationsService } from './quotations.service';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('quotations')
 @ApiBearerAuth()
+@RequiresModule('rfqs')
 @Controller('quotations')
 export class QuotationsController {
   constructor(private readonly quotations: QuotationsService) {}

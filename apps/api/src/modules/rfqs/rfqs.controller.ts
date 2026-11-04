@@ -6,9 +6,11 @@ import type { RequestUser } from '../../common/types/request-user';
 import { CreateRfqDto } from './dto/create-rfq.dto';
 import { UpdateRfqDto } from './dto/update-rfq.dto';
 import { RfqsService } from './rfqs.service';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('rfqs')
 @ApiBearerAuth()
+@RequiresModule('rfqs')
 @Controller('rfqs')
 export class RfqsController {
   constructor(private readonly rfqs: RfqsService) {}

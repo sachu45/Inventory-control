@@ -16,6 +16,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { AuditService } from '../audit/audit.service';
 import { DashboardService } from './dashboard.service';
 import { DashboardEventDto } from './dto/dashboard-event.dto';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 const EVENT_ACTION: Record<DashboardEventDto['type'], AuditAction> = {
   opened: AuditAction.VIEW_DASHBOARD,
@@ -27,6 +28,7 @@ const EVENT_ACTION: Record<DashboardEventDto['type'], AuditAction> = {
 
 @ApiTags('dashboard')
 @ApiBearerAuth()
+@RequiresModule('dashboard')
 @Controller('dashboard')
 export class DashboardController {
   constructor(

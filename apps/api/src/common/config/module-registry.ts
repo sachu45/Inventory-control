@@ -159,6 +159,8 @@ export const MODULE_REGISTRY: Readonly<Record<ModuleKey, ModuleDefinition>> = {
     sidebarPath: '/companies',
     sidebarIcon: 'companies',
     inSidebar: false,
+    // Most screens read the company profile and shop list; disabling them would break the app shell.
+    alwaysEnabled: true,
     requiredPermission: 'company:read',
   }),
   plants: defineModule('plants', {
@@ -168,6 +170,8 @@ export const MODULE_REGISTRY: Readonly<Record<ModuleKey, ModuleDefinition>> = {
     sidebarPath: '/plants',
     sidebarIcon: 'plants',
     inSidebar: false,
+    // Most screens read the company profile and shop list; disabling them would break the app shell.
+    alwaysEnabled: true,
     requiredPermission: 'shop:read',
   }),
   'storage-locations': defineModule('storage-locations', {

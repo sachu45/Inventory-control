@@ -4,9 +4,11 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { DocumentSeriesService } from './document-series.service';
 import { UpdateDocumentSeriesDto } from './dto/update-document-series.dto';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('settings')
 @ApiBearerAuth()
+@RequiresModule('settings')
 @Controller('settings/document-series')
 export class DocumentSeriesController {
   constructor(private readonly series: DocumentSeriesService) {}

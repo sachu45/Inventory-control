@@ -14,9 +14,11 @@ import { ListPurchaseOrdersDto } from './dto/list-purchase-orders.dto';
 import { PurchaseOrdersService } from './purchase-orders.service';
 import { PoCancelService } from './po-cancel.service';
 import { RequestPoCancelDto, ConfirmPoCancelDto } from './dto/cancel-purchase-order.dto';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('purchase-orders')
 @ApiBearerAuth()
+@RequiresModule('purchase-orders')
 @Controller('purchase-orders')
 export class PurchaseOrdersController {
   constructor(

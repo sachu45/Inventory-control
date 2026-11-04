@@ -16,6 +16,7 @@ import { MailService } from '../../common/mail/mail.service';
 import { rfqInviteHtml, rfqInviteSubject, rfqInviteText } from '../../common/mail/rfq-invite.template';
 import { SubscriptionService } from '../billing/subscription.service';
 import { NotificationService } from '../notifications/services/notification.service';
+import { ModuleAccessService } from '../../common/config/module-access.service';
 
 @Injectable()
 export class SupplierPortalService {
@@ -27,6 +28,7 @@ export class SupplierPortalService {
     private readonly subscriptions: SubscriptionService,
     private readonly notifications: NotificationService,
     private readonly mail: MailService,
+    private readonly modules: ModuleAccessService,
   ) {}
 
   /**
@@ -62,11 +64,13 @@ export class SupplierPortalService {
           suppliers: { some: { supplierId: supplier.id } },
         },
         orderBy: { postedAt: 'desc' },
-        select: { id: true, rfqNumber: true, title: true, deadline: true },
+        select: { id: true, rfqNumber: true, title: true, deadline: true, shopId: true },
         take: 10,
       });
       for (const rfq of rfqs) {
         if (rfq.deadline && endOfDay(rfq.deadline) < Date.now()) continue;
+        // Skipped quietly, like a plan without the portal, so the reply stays the same.
+        if (!(await this.modules.isEnabled(supplier.companyId, rfq.shopId, 'supplier-portal'))) continue;
         const content = this.mail.buildRfqInviteContent({
           rfqId: rfq.id,
           rfqNumber: rfq.rfqNumber,
@@ -139,6 +143,10 @@ export class SupplierPortalService {
       },
     });
     if (!rfq) throw new NotFoundException('RFQ not available');
+    // The portal has no signed-in user, so the module check uses the token's company and the RFQ's shop.
+    if (supplier.companyId) {
+      await this.modules.assertEnabled(supplier.companyId, rfq.shopId, 'supplier-portal');
+    }
     return { supplier, rfq };
   }
 

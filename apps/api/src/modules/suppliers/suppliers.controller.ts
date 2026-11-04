@@ -18,8 +18,10 @@ import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { ListSuppliersDto } from './dto/list-suppliers.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
 import { SuppliersService } from './suppliers.service';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('suppliers')
+@RequiresModule('suppliers')
 @Controller('suppliers')
 export class SuppliersController {
   constructor(private readonly suppliers: SuppliersService) {}

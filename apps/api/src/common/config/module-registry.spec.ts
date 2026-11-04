@@ -61,6 +61,12 @@ describe('MODULE_REGISTRY', () => {
     }
   });
 
+  it('keeps the app shell modules always enabled', () => {
+    for (const key of ['companies', 'plants', 'settings', 'upgrade'] as const) {
+      expect(MODULE_REGISTRY[key].alwaysEnabled).toBe(true);
+    }
+  });
+
   it('customizable and locked mandatory fields never overlap', () => {
     for (const mod of modules) {
       const locked = new Set(mod.lockedMandatoryFields);

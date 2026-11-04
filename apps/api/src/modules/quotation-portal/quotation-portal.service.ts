@@ -1,12 +1,13 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, SalesQuotationStatus } from '@prisma/client';
+import { ModuleAccessService } from '../../common/config/module-access.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { asMoney, roundMoney } from '../../common/utils/money';
 import { RequestQuotationRevisionDto } from './dto/request-quotation-revision.dto';
 
 const quoteInclude = {
   customer: { select: { customerName: true, email: true } },
-  shop: { select: { shopName: true, shopNumber: true } },
+  shop: { select: { shopName: true, shopNumber: true, companyId: true } },
   items: {
     include: {
       product: { select: { productCode: true, description: true } },
@@ -16,7 +17,10 @@ const quoteInclude = {
 
 @Injectable()
 export class QuotationPortalService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly modules: ModuleAccessService,
+  ) {}
 
   private async findByToken(portalToken: string) {
     const row = await this.prisma.salesQuotationHeader.findUnique({
@@ -24,6 +28,10 @@ export class QuotationPortalService {
       include: quoteInclude,
     });
     if (!row) throw new NotFoundException('Quotation link is invalid or has expired');
+    // The portal has no signed-in user, so the module check uses the quotation's company and shop.
+    if (row.shop.companyId) {
+      await this.modules.assertEnabled(row.shop.companyId, row.shopId, 'sales-quotations');
+    }
     return row;
   }
 
@@ -40,7 +48,7 @@ export class QuotationPortalService {
       customerRequestedTotal: row.customerRequestedTotal?.toString() ?? null,
       customerRequestNote: row.customerRequestNote,
       customer: row.customer,
-      shop: row.shop,
+      shop: { shopName: row.shop.shopName, shopNumber: row.shop.shopNumber },
       canRespond,
       items: row.items.map((item) => ({
         id: item.id,

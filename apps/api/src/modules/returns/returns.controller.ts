@@ -23,9 +23,11 @@ import { CreateSupplierReturnDto } from './dto/create-supplier-return.dto';
 import { UpdateSupplierReturnDto } from './dto/update-supplier-return.dto';
 import { UploadSupplierReturnImageDto } from './dto/upload-supplier-return-image.dto';
 import { ReturnsService } from './returns.service';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('Returns')
 @ApiBearerAuth()
+@RequiresModule('returns')
 @Controller('returns')
 export class ReturnsController {
   constructor(private readonly service: ReturnsService) {}

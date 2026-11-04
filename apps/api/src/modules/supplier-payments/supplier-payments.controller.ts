@@ -7,9 +7,11 @@ import { CreateSupplierPaymentDto } from './dto/create-supplier-payment.dto';
 import { ListSupplierPaymentsDto } from './dto/list-supplier-payments.dto';
 import { ReverseSupplierPaymentDto } from './dto/reverse-supplier-payment.dto';
 import { SupplierPaymentsService } from './supplier-payments.service';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('supplier-payments')
 @ApiBearerAuth()
+@RequiresModule('supplier-payments')
 @Controller('supplier-payments')
 export class SupplierPaymentsController {
   constructor(private readonly supplierPayments: SupplierPaymentsService) {}

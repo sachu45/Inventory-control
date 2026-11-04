@@ -7,9 +7,11 @@ import { CreateSupplierBillDto } from './dto/create-supplier-bill.dto';
 import { ListSupplierBillsDto } from './dto/list-supplier-bills.dto';
 import { VoidSupplierBillDto } from './dto/void-supplier-bill.dto';
 import { SupplierBillsService } from './supplier-bills.service';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('supplier-bills')
 @ApiBearerAuth()
+@RequiresModule('supplier-bills')
 @Controller('supplier-bills')
 export class SupplierBillsController {
   constructor(private readonly supplierBills: SupplierBillsService) {}

@@ -30,8 +30,10 @@ import {
   UpdateNotificationPreferenceDto,
   NotificationPreferenceResponseDto,
 } from './dto';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('Notifications')
+@RequiresModule('notifications')
 @Controller('notifications')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()

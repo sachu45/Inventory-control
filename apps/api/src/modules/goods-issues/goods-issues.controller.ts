@@ -8,9 +8,11 @@ import type { RequestUser } from '../../common/types/request-user';
 import { CreateGoodsIssueDto } from './dto/create-goods-issue.dto';
 import { UpdateGoodsIssueDto } from './dto/update-goods-issue.dto';
 import { GoodsIssuesService } from './goods-issues.service';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('goods-issues')
 @ApiBearerAuth()
+@RequiresModule('goods-issues')
 @Controller('goods-issues')
 export class GoodsIssuesController {
   constructor(private readonly service: GoodsIssuesService) {}

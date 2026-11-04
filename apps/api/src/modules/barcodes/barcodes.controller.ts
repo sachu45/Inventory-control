@@ -10,9 +10,11 @@ import { LookupBarcodeDto } from './dto/lookup-barcode.dto';
 import { ListBarcodesDto } from './dto/list-barcodes.dto';
 import { UpdateBarcodeDto } from './dto/update-barcode.dto';
 import { MarkInvalidBarcodeDto } from './dto/mark-invalid-barcode.dto';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('barcodes')
 @ApiBearerAuth()
+@RequiresModule('products')
 @Controller('barcodes')
 export class BarcodesController {
   constructor(private readonly barcodes: BarcodesService) {}

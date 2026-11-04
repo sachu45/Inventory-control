@@ -9,9 +9,11 @@ import { UpdateBrandingProfileDto } from '../../common/branding/dto/update-brand
 import { CreateShopDto } from './dto/create-shop.dto';
 import { UpdateShopDto } from './dto/update-shop.dto';
 import { ShopsService } from './shops.service';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('shops')
 @ApiBearerAuth()
+@RequiresModule('plants')
 @Controller('shops')
 export class ShopsController {
   constructor(private readonly shops: ShopsService) {}

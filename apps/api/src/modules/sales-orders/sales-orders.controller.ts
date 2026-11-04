@@ -7,9 +7,11 @@ import { CreateSalesOrderDto } from './dto/create-sales-order.dto';
 import { ListSalesOrdersDto } from './dto/list-sales-orders.dto';
 import { UpdateSalesOrderDto } from './dto/update-sales-order.dto';
 import { SalesOrdersService } from './sales-orders.service';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('sales-orders')
 @ApiBearerAuth()
+@RequiresModule('sales')
 @Controller('sales-orders')
 export class SalesOrdersController {
   constructor(private readonly salesOrders: SalesOrdersService) {}

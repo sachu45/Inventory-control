@@ -6,9 +6,11 @@ import type { RequestUser } from '../../common/types/request-user';
 import { CreateStockTransferDto } from './dto/create-stock-transfer.dto';
 import { ListStockTransfersDto } from './dto/list-stock-transfers.dto';
 import { StockTransfersService } from './stock-transfers.service';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('stock-transfers')
 @ApiBearerAuth()
+@RequiresModule('stock-transfers')
 @Controller('stock-transfers')
 export class StockTransfersController {
   constructor(private readonly service: StockTransfersService) {}

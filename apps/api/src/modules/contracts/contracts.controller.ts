@@ -6,9 +6,11 @@ import type { RequestUser } from '../../common/types/request-user';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { UpdateContractDto } from './dto/update-contract.dto';
 import { ContractsService } from './contracts.service';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('contracts')
 @ApiBearerAuth()
+@RequiresModule('contracts')
 @Controller('contracts')
 export class ContractsController {
   constructor(private readonly contracts: ContractsService) {}

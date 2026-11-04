@@ -8,6 +8,7 @@ import { ConfigDraftService } from './config-draft.service';
 import { ConfigPublishService } from './config-publish.service';
 import { ConfigResolverService } from './config-resolver.service';
 import { TenantConfigModule } from './config.module';
+import { ModuleAccessService } from './module-access.service';
 import { ModuleRegistryService } from './module-registry.service';
 import { UserPreferenceService } from './user-preference.service';
 
@@ -36,12 +37,14 @@ describe('TenantConfigModule', () => {
       ConfigPublishService,
       UserPreferenceService,
       ModuleRegistryService,
+      ModuleAccessService,
     ]) {
       expect(moduleRef.get(provider)).toBeInstanceOf(provider);
     }
     const resolver = moduleRef.get(ConfigResolverService);
     expect((moduleRef.get(ConfigPublishService) as unknown as { resolver: unknown }).resolver).toBe(resolver);
     expect((moduleRef.get(UserPreferenceService) as unknown as { resolver: unknown }).resolver).toBe(resolver);
+    expect((moduleRef.get(ModuleAccessService) as unknown as { resolver: unknown }).resolver).toBe(resolver);
     await moduleRef.close();
   });
 });

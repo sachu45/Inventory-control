@@ -1,4 +1,4 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { signSupplierPortalToken } from '../../common/crypto/portal-token';
 import { SupplierPortalService } from './supplier-portal.service';
 
@@ -29,8 +29,12 @@ describe('SupplierPortalService', () => {
       }),
       sendTenantMail: jest.fn().mockResolvedValue({}),
     } as any;
-    const service = new SupplierPortalService(prisma, {} as any, subscriptions, {} as any, mail);
-    return { service, prisma, mail };
+    const modules = {
+      isEnabled: jest.fn().mockResolvedValue(true),
+      assertEnabled: jest.fn().mockResolvedValue(undefined),
+    } as any;
+    const service = new SupplierPortalService(prisma, {} as any, subscriptions, {} as any, mail, modules);
+    return { service, prisma, mail, modules };
   }
 
   it('answers request-link the same way for unknown emails and sends nothing', async () => {
@@ -79,5 +83,33 @@ describe('SupplierPortalService', () => {
     const select = prisma.rfqHeader.findFirst.mock.calls[0][0].select;
     expect(select.notes).toBeUndefined();
     expect(select.createdById).toBeUndefined();
+  });
+
+  it('refuses a valid token when the company has disabled the supplier portal, checking the RFQ shop', async () => {
+    const { service, prisma, modules } = setup();
+    prisma.supplier.findFirst.mockResolvedValue({ id: 'sup-1', supplierName: 'Acme', email: 'a@b.c', companyId: 'c1' });
+    prisma.rfqHeader.findFirst.mockResolvedValue({ id: 'rfq-1', rfqNumber: 'RFQ-00001', shopId: 'shop-1', items: [] });
+    const disabled = new ForbiddenException({ code: 'MODULE_DISABLED' });
+    modules.assertEnabled.mockRejectedValue(disabled);
+    const token = signSupplierPortalToken({ rfqId: 'rfq-1', supplierId: 'sup-1', expiresAt: Date.now() + 60_000 });
+    await expect(service.getSession(token)).rejects.toBe(disabled);
+    await expect(service.submitQuote({ token, items: [] } as any)).rejects.toBe(disabled);
+    expect(modules.assertEnabled).toHaveBeenCalledWith('c1', 'shop-1', 'supplier-portal');
+  });
+
+  it('sends no link for RFQs whose shop has the supplier portal disabled, with the same reply', async () => {
+    const { service, prisma, mail, modules } = setup();
+    prisma.supplier.findMany.mockResolvedValue([
+      { id: 'sup-1', supplierName: 'Acme', email: 'sales@acme.test', companyId: 'c1' },
+    ]);
+    prisma.rfqHeader.findMany.mockResolvedValue([
+      { id: 'rfq-1', rfqNumber: 'RFQ-00001', title: 'Steel', deadline: null, shopId: 'shop-off' },
+      { id: 'rfq-2', rfqNumber: 'RFQ-00002', title: 'Wire', deadline: null, shopId: 'shop-on' },
+    ]);
+    modules.isEnabled.mockImplementation(async (_c: string, shopId: string) => shopId === 'shop-on');
+    const res = await service.requestLink({ email: 'sales@acme.test' });
+    expect(res.ok).toBe(true);
+    expect(mail.buildRfqInviteContent).toHaveBeenCalledTimes(1);
+    expect(mail.buildRfqInviteContent).toHaveBeenCalledWith(expect.objectContaining({ rfqId: 'rfq-2' }));
   });
 });

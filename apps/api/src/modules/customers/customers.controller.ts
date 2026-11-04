@@ -7,9 +7,11 @@ import { CreateCustomerDto } from './dto/create-customer.dto';
 import { ListCustomersDto } from './dto/list-customers.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { CustomersService } from './customers.service';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('customers')
 @ApiBearerAuth()
+@RequiresModule('customers')
 @Controller('customers')
 export class CustomersController {
   constructor(private readonly customers: CustomersService) {}

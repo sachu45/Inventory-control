@@ -6,9 +6,11 @@ import type { RequestUser } from '../../common/types/request-user';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { ListPaymentsDto } from './dto/list-payments.dto';
 import { PaymentsService } from './payments.service';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('payments')
 @ApiBearerAuth()
+@RequiresModule('payments')
 @Controller('payments')
 export class PaymentsController {
   constructor(private readonly payments: PaymentsService) {}

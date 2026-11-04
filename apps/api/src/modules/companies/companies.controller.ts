@@ -9,9 +9,11 @@ import { UpdateBrandingProfileDto } from '../../common/branding/dto/update-brand
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { CompaniesService } from './companies.service';
+import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('companies')
 @ApiBearerAuth()
+@RequiresModule('companies')
 @Controller('companies')
 export class CompaniesController {
   constructor(private readonly companies: CompaniesService) {}

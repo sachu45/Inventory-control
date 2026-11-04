@@ -26,10 +26,17 @@ export class ModuleRegistryService {
   ): boolean {
     const mod = MODULE_REGISTRY[key];
     return (
-      config.modules[key].enabled &&
-      mod.dependsOn.every((dep) => config.modules[dep].enabled) &&
+      this.isEnabledInConfig(key, config) &&
       (mod.planGate === null || planAllowsFeature(plan, mod.planGate)) &&
       (mod.requiredPermission === null || permissions.has(mod.requiredPermission))
+    );
+  }
+
+  /** The config layer of `isUsable`: the module and the modules it depends on are enabled. */
+  isEnabledInConfig(key: ModuleKey, config: Pick<ResolvedConfig, 'modules'>): boolean {
+    return (
+      config.modules[key].enabled &&
+      MODULE_REGISTRY[key].dependsOn.every((dep) => config.modules[dep].enabled)
     );
   }
 
