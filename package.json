@@ -41,15 +41,16 @@
     "dev:mobile": "npm run start --workspace=mobile",
     "dev:mobile:clear": "npm run start:clear --workspace=mobile",
     "mobile:link-deps": "node apps/mobile/scripts/link-hoisted-deps.cjs",
-    "build": "npm run build --workspace=@retail-ims/shared-types && npm run build --workspace=api && npm run build --workspace=web",
-    "test": "npm run test --workspace=api && npm run test --workspace=web",
+    "build": "npm run build --workspace=@retail-ims/shared-types && npm run build --workspace=api && npm run build --workspace=web && npm run build --workspace=admin",
+    "test": "npm run test --workspace=api && npm run test --workspace=web && npm run test --workspace=admin",
     "db:purge-test-data": "npm run db:purge-test-data --workspace=api",
     "test:workflows": "npm run test:e2e:workflows --workspace=api",
     "test:playwright": "npm run test:e2e --workspace=web",
-    "lint": "npm run lint --workspace=api --if-present && npm run lint --workspace=web --if-present",
+    "lint": "npm run lint --workspace=api --if-present && npm run lint --workspace=web --if-present && npm run lint --workspace=admin --if-present",
     "check:runtime-health": "node scripts/runtime-health-check.mjs",
     "check:bundle-budget": "node scripts/check-web-bundle-budget.mjs",
-    "check:api-slo": "node scripts/check-api-slo.mjs"
+    "check:api-slo": "node scripts/check-api-slo.mjs",
+    "dev:admin": "npm run dev --workspace=admin"
   },
   "overrides": {
     "bullmq": "^6.4.0",
