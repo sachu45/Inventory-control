@@ -404,6 +404,7 @@ model Company {
 
   // Enterprise Configuration
   tenantModuleConfigs TenantModuleConfig[]
+  userPreferences     UserPreference[]
 
   // Agent Platform (WhatsApp assistant)
   channelAccounts    ChannelAccount[]
@@ -872,6 +873,9 @@ model User {
 
   // Unused legacy table, kept for existing data
   platformAuditLogs PlatformAuditLog[]
+
+  // Enterprise Configuration
+  preferences UserPreference[]
 
   @@index([deletedAt])
   @@map("users")
@@ -4340,8 +4344,26 @@ model TenantModuleConfig {
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   shop    Shop?   @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
+  // The migration creates this index with NULLS NOT DISTINCT, which Prisma cannot
+  // express; declaring it here stops `migrate dev` from generating a DROP for it.
+  @@unique([companyId, shopId, moduleKey], map: "tenant_module_configs_scope_key")
   @@index([companyId])
   @@map("tenant_module_configs")
+}
+
+model UserPreference {
+  id        String   @id @default(uuid()) @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  scope     String
+  prefs     Json     @default("{}")
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId, scope])
+  @@map("user_preferences")
 }
 
 model CompanyHealthScoreConfig {
