@@ -49,9 +49,10 @@ describe('TenantConfigModule in AppModule (e2e)', () => {
 
   beforeAll(async () => {
     if (!enabled) return;
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    // Started outside any TenantContext, as in production (see helpers/system-access.ts).
+    const moduleRef = await TenantContext.exit(() => Test.createTestingModule({ imports: [AppModule] }).compile());
     app = moduleRef.createNestApplication();
-    await app.init();
+    await TenantContext.exit(() => app.init());
     prisma = app.get(PrismaService);
     drafts = app.get(ConfigDraftService);
     publisher = app.get(ConfigPublishService);

@@ -8,6 +8,7 @@
   "globalSetup": "<rootDir>/test/global-setup-e2e.ts",
   "globalTeardown": "<rootDir>/test/global-teardown-e2e.ts",
   "setupFilesAfterEnv": [
+    "<rootDir>/test/helpers/system-access.ts",
     "<rootDir>/test/helpers/reset-throttle.ts"
   ],
   "forceExit": true,

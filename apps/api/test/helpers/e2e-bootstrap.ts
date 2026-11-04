@@ -9,6 +9,7 @@ import { AppModule } from '../../src/app.module';
 import { AllExceptionsFilter } from '../../src/common/filters/all-exceptions.filter';
 import { ResponseEnvelopeInterceptor } from '../../src/common/interceptors/response-envelope.interceptor';
 import { requestContextMiddleware } from '../../src/common/context/request-context.middleware';
+import { TenantContext } from '../../src/common/tenant/tenant-context';
 
 export const E2E_DB_ENABLED = HAS_EXPLICIT_DATABASE_URL;
 
@@ -21,7 +22,30 @@ export async function getSharedE2eApp(): Promise<INestApplication> {
   return _sharedApp;
 }
 
-export async function createE2eApp(): Promise<INestApplication> {
+/**
+ * Builds the app and starts its HTTP server outside any TenantContext, the way
+ * production starts. Test code runs with explicit system access (see
+ * system-access.ts), but the app must not inherit it: requests, timers and
+ * workers start with no context, so TENANT_CONTEXT_MODE=strict tests the app's
+ * own entry points.
+ */
+export function createE2eApp(): Promise<INestApplication> {
+  return TenantContext.exit(() => buildE2eApp());
+}
+
+/** Listens on an ephemeral port so supertest reuses this server instead of listening inside a test. */
+export async function listenOutsideTenantContext(app: INestApplication): Promise<void> {
+  const server = app.getHttpServer() as import('http').Server;
+  if (server.listening) return;
+  await TenantContext.exit(
+    () => new Promise<void>((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(0, '127.0.0.1', () => resolve());
+    }),
+  );
+}
+
+async function buildE2eApp(): Promise<INestApplication> {
   restoreExplicitEnv();
   // The suites share one client IP and log in far more often than the per-IP
   // brute-force limits allow, so rate limiting is disabled for e2e apps.
@@ -44,5 +68,6 @@ export async function createE2eApp(): Promise<INestApplication> {
   app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalInterceptors(new ResponseEnvelopeInterceptor(app.get(Reflector)));
   await app.init();
+  await listenOutsideTenantContext(app);
   return app;
 }

@@ -18,4 +18,9 @@ export const TenantContext = {
    */
   runWithSystemAccess: <T>(fn: () => Promise<T>): Promise<T> =>
     storage.run({ companyId: null, inRLSTx: false, systemAccess: true }, async () => await fn()),
+  /**
+   * Runs `fn`, and everything it starts asynchronously, with no context at all.
+   * Tests use it to start the app the way production does, outside any tenant.
+   */
+  exit: <T>(fn: () => T): T => storage.exit(fn),
 };

@@ -16,6 +16,10 @@ describe('TENANT_CONTEXT_MODE (e2e)', () => {
     return prisma;
   };
 
+  // Test code runs with system access (helpers/system-access.ts); these checks need no context at all.
+  // Awaited inside exit: Prisma queries are lazy and run in the context they are awaited in.
+  const none = <T>(fn: () => Promise<T>): Promise<T> => TenantContext.exit(async () => await fn());
+
   afterAll(async () => {
     if (saved === undefined) delete process.env.TENANT_CONTEXT_MODE;
     else process.env.TENANT_CONTEXT_MODE = saved;
@@ -27,8 +31,8 @@ describe('TENANT_CONTEXT_MODE (e2e)', () => {
     const prisma = await client(undefined);
     const all = await TenantContext.runWithSystemAccess(() => prisma.company.count());
     expect(all).toBeGreaterThan(0);
-    expect(await prisma.company.count()).toBe(all);
-    expect(await prisma.$transaction([prisma.company.count()])).toEqual([all]);
+    expect(await none(() => prisma.company.count())).toBe(all);
+    expect(await none(() => prisma.$transaction([prisma.company.count()]))).toEqual([all]);
   });
 
   it('strict mode: no context sees no tenant rows and cannot write them; explicit system access still works', async () => {
@@ -37,11 +41,11 @@ describe('TENANT_CONTEXT_MODE (e2e)', () => {
     const all = await TenantContext.runWithSystemAccess(() => prisma.company.count());
     expect(all).toBeGreaterThan(0);
 
-    expect(await prisma.company.count()).toBe(0);
-    expect(await prisma.$transaction([prisma.company.count()])).toEqual([0]);
-    expect(await prisma.$transaction(async (tx) => tx.company.count())).toBe(0);
+    expect(await none(() => prisma.company.count())).toBe(0);
+    expect(await none(() => prisma.$transaction([prisma.company.count()]))).toEqual([0]);
+    expect(await none(() => prisma.$transaction(async (tx) => tx.company.count()))).toBe(0);
     await expect(
-      prisma.company.create({ data: { companyCode: `STRICT-${Date.now()}`, companyName: 'strict probe' } }),
+      none(() => prisma.company.create({ data: { companyCode: `STRICT-${Date.now()}`, companyName: 'strict probe' } })),
     ).rejects.toThrow(/row-level security/);
 
     // A tenant context still sees its own company.

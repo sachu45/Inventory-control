@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import SwaggerParser from '@apidevtools/swagger-parser';
 import { AppModule } from '../src/app.module';
+import { TenantContext } from '../src/common/tenant/tenant-context';
 
 /**
  * Smoke test that the Swagger document we ship is structurally valid OpenAPI.
@@ -15,12 +16,11 @@ describe('OpenAPI document', () => {
 
   beforeAll(async () => {
     if (!process.env.DATABASE_URL) return;
-    const moduleRef = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
+    // Started outside any TenantContext, as in production (see helpers/system-access.ts).
+    const moduleRef = await TenantContext.exit(() => Test.createTestingModule({ imports: [AppModule] }).compile());
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix('api/v1');
-    await app.init();
+    await TenantContext.exit(() => app.init());
   });
 
   afterAll(async () => {

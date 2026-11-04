@@ -6,6 +6,8 @@ import { AppModule } from '../src/app.module';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
 import { ResponseEnvelopeInterceptor } from '../src/common/interceptors/response-envelope.interceptor';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { TenantContext } from '../src/common/tenant/tenant-context';
+import { listenOutsideTenantContext } from './helpers/e2e-bootstrap';
 
 /**
  * Idempotency replay smoke test. Verifies the IdempotencyKey table is the
@@ -22,7 +24,8 @@ describe('Idempotency (e2e)', () => {
 
   beforeAll(async () => {
     if (!enabled) return;
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    // Started outside any TenantContext, as in production (see helpers/system-access.ts).
+    const moduleRef = await TenantContext.exit(() => Test.createTestingModule({ imports: [AppModule] }).compile());
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix('api/v1');
     app.useGlobalPipes(
@@ -35,7 +38,8 @@ describe('Idempotency (e2e)', () => {
     );
     app.useGlobalFilters(new AllExceptionsFilter());
     app.useGlobalInterceptors(new ResponseEnvelopeInterceptor(app.get(Reflector)));
-    await app.init();
+    await TenantContext.exit(() => app.init());
+    await listenOutsideTenantContext(app);
     prisma = app.get(PrismaService);
   });
 
