@@ -1,20 +1,57 @@
 # SoftDigit IMS — Enterprise Customization Technical Architecture Specification
 
-**Date:** 2026-11-03 (Revision 2: 2026-11-04)
+**Date:** 2026-11-03 (revised 2026-11-04)
 **Author:** Architecture Team
-**Status:** Revision 2 — Reconciled with architecture review findings
+**Status:** Draft — Revision 2, pending review
+
+---
+
+## 0. Revision Log
+
+**Revision 2 (2026-11-04)** — addresses the architecture review on PR #174.
+This version supersedes the partial reconciliation merged in PR #182, which kept
+the five-level merge, the undefined `role_ui_overrides` table, `/admin/tenants`,
+`/me/sidebar` and `UserConfigOverride`. Its additions (guard execution order,
+API-level field enforcement, custom field lifecycle) are covered in §9.1, §9.2
+and §4.5. GitHub issues #147–#185 are written against this version.
+
+| Change | Section |
+|---|---|
+| Business configuration, authorization and personal preferences are now three separate layers. Removed the role/user levels from config merging. | §3.1 |
+| Versioning moved from Phase 7 to Phase 1. Runtime reads only immutable published snapshots; drafts are never live. Rollback creates a new version. | §4.3, §5.3 |
+| Cache redesigned around versioned snapshots (version in key, no TTL-based invalidation, single-flight, Redis-down fallback). | §5.2 |
+| Module registry gains `dependsOn` and a per-module config schema; publish validates both. | §4.1, §5.3 |
+| Custom fields: backend validation, field lifecycle rules, field permissions, indexing strategy. Model stays in Phase 5. | §4.5 |
+| Module config (mandatory fields etc.) is enforced at the API, not only in the UI. | §9.2 |
+| Workflow admin is an interface over the existing engines; no new engine, no arbitrary expressions. | §5.6 |
+| Tests are written in every phase; Phase 8 is final validation and pilot. | §11, §12 |
+| "Production-ready" claims replaced with "Exists — verify"; Phase 1 includes a verification task. | §2.1 |
+
+**Fixed inconsistencies in Revision 1:**
+- The resolver read a `role_ui_overrides` table that no model defined. Role-specific visibility is now handled by field permissions (§4.5, §9.2).
+- `@@unique([companyId, shopId, moduleKey])` does not stop duplicate company-wide rows, because Postgres treats NULLs as distinct. Fixed with `NULLS NOT DISTINCT` (§4.2).
+- The spec said `/me/sidebar` and `/admin/...` while the issues said `/me/config` and `/platform/...`. Unified on `/me/config` and the existing `platform/` prefix (§8).
+- Performance targets disagreed (spec: p99 <5ms; issue #173: p95 <50ms). They measure different things; both are now stated explicitly (§12).
+- "Three new tables for Phase 1-2" included `CustomFieldDefinition`, which belongs to Phase 5.
+
+**Review suggestions not adopted:**
+- *Cache keys containing `roleId`, `userId`, `moduleKey` and version.* This would create one cache entry per user per module and make invalidation a fan-out problem. Business config does not vary by role or user (§3.1), so the cache is one immutable snapshot per company version, plus a small per-user preferences entry. The version is still in the key, which is what the review's concern needs.
 
 ---
 
 ## 1. Executive Summary
 
-Scale the existing SoftDigit IMS from a subscription-tiered SaaS into a fully
-customizable enterprise IMS platform where **every module's behaviour, visibility,
-fields, workflows and branding are configurable per-tenant** from an internal
+Scale the existing SoftDigit IMS from a subscription-tiered SaaS into a
+customizable enterprise IMS platform where **each module's behaviour, visibility,
+fields, workflows and branding are configurable per tenant** from an internal
 SoftDigit admin dashboard — without forking the codebase.
 
 **Core principle:** One codebase, one deployment. Every ₹10L client gets a
 tailored experience through configuration, not code branches.
+
+**Build order principle:** The configuration engine (data contracts, publish
+lifecycle, validation, security boundaries, tests) is the product foundation.
+The admin dashboard is only an interface to it and comes after the engine.
 
 ---
 
@@ -22,22 +59,25 @@ tailored experience through configuration, not code branches.
 
 ### 2.1 What Already Exists (Reuse — Don't Rebuild)
 
+"Exists" means the code is present. Each item's behaviour and test coverage must
+be verified before the new layer depends on it (Phase 1 task, §11).
+
 | Capability | Location | Status |
 |---|---|---|
-| Multi-tenant isolation | `apps/api/src/common/tenant/tenant-rls.interceptor.ts` + `tenant-context.ts` — AsyncLocalStorage with `companyId` scoping | Production-ready |
-| Per-company feature flags | `apps/api/src/common/workflow-engine/ops/feature-flags.service.ts` — Redis-cached, env fallback, per-company overrides via `NotificationPolicy` | Production-ready |
-| Role-based permissions | `apps/api/src/common/auth/role-permissions.ts` — per-company overrides stored in `system_settings`, `resource:action` format | Production-ready |
-| Subscription plan gating | `apps/api/src/common/plans/plan-config.ts` — TRIAL/PRO/PLUS with `planAllowsFeature()` and `PLAN_LIMITS` | Production-ready |
-| Subscription write guard | `apps/api/src/modules/billing/guards/subscription-write.guard.ts` — expired plans become read-only | Production-ready |
-| Frontend feature gate | `apps/web/src/components/TrialFeatureGate.tsx` — plan-based feature locking with upgrade CTA | Production-ready |
-| Policy engine | `apps/api/src/common/workflow-engine/policy/` — condition trees, fact evaluation, priority-ordered rules | Production-ready |
-| Workflow engine | `apps/api/src/common/workflow-engine/graph/` — versioned DAG compiler, runtime, thread runner | Production-ready |
-| Branding system | `apps/api/src/common/branding/` — profiles, document branding, media assets per company | Production-ready |
-| Platform admin | `apps/api/src/modules/platform/` — `PlatformAdminGuard`, audit service, subscription dashboard | Basic — needs expansion |
-| Approval workflows | `apps/api/src/modules/approvals/` — configurable approval chains | Production-ready |
-| Company settings store | Prisma model `CompanySetting` — key/value per company | Production-ready |
-| System settings store | Prisma model `SystemSetting` — global key/value with JSON | Production-ready |
-| Sidebar navigation | `apps/web/src/lib/sidebar-navigation.ts` — hierarchical sections with permission gates | Hardcoded — needs to become config-driven |
+| Multi-tenant isolation | `apps/api/src/common/tenant/tenant-rls.interceptor.ts` + `tenant-context.ts` — AsyncLocalStorage with `companyId` scoping | Exists — verify |
+| Per-company feature flags | `apps/api/src/common/workflow-engine/ops/feature-flags.service.ts` — Redis-cached, env fallback, per-company overrides via `NotificationPolicy` | Exists — verify |
+| Role-based permissions | `apps/api/src/common/auth/role-permissions.ts` — per-company overrides stored in `system_settings`, `resource:action` format | Exists — verify |
+| Subscription plan gating | `apps/api/src/common/plans/plan-config.ts` — TRIAL/PRO/PLUS with `planAllowsFeature()` and `PLAN_LIMITS` | Exists — verify |
+| Subscription write guard | `apps/api/src/modules/billing/guards/subscription-write.guard.ts` — expired plans become read-only | Exists — verify |
+| Frontend feature gate | `apps/web/src/components/TrialFeatureGate.tsx` — plan-based feature locking with upgrade CTA | Exists |
+| Policy engine | `apps/api/src/common/workflow-engine/policy/` — condition trees, fixed comparators, priority-ordered rules | Exists — verify |
+| Workflow engine | `apps/api/src/common/workflow-engine/graph/` — versioned DAG compiler, runtime, thread runner | Exists — verify |
+| Branding system | `apps/api/src/common/branding/` — profiles, document branding, media assets per company | Exists — verify |
+| Platform admin | `apps/api/src/modules/platform/` — `PlatformAdminGuard`, audit service, subscription dashboard (`platform/subscriptions`) | Basic — needs expansion |
+| Approval workflows | `apps/api/src/modules/approvals/` | Exists — verify |
+| Company settings store | Prisma model `CompanySetting` — key/value per company | Exists |
+| System settings store | Prisma model `SystemSetting` — global key/value with JSON | Exists |
+| Sidebar navigation | `apps/web/src/lib/sidebar-navigation.ts` — sections with permission gates | Hardcoded — becomes config-driven |
 
 ### 2.2 What's Missing (Must Build)
 
@@ -45,16 +85,17 @@ tailored experience through configuration, not code branches.
 |---|---|
 | Module registry | No concept of "module" as a configurable unit — modules are NestJS classes imported in `app.module.ts` |
 | Tenant module configuration | `FeatureFlagsService` covers workflow features only (7 flags), not all 30+ modules |
-| Per-user module overrides | No user-level config beyond role permissions |
+| Config publish lifecycle | Feature flags are live-on-write; no draft, publish or rollback |
+| Config validation | No schema for module settings; no dependency checks between modules |
+| Personal UI preferences | None beyond role permissions |
 | Custom field definitions | No dynamic field system — all fields are Prisma schema columns |
-| Config versioning / publishing | Feature flags are live-on-write, no draft/publish/rollback |
 | Admin dashboard app | No `apps/admin` exists |
-| Config-driven sidebar | `SIDEBAR_SECTIONS` is a hardcoded array, not fetched from API |
-| Per-tenant UI layout config | No mechanism to customize forms, tables, dashboard widgets per company |
+| Config-driven sidebar | `SIDEBAR_SECTIONS` is a hardcoded array |
+| Per-tenant UI layout config | No way to customize forms, tables, dashboard widgets per company |
 
 ### 2.3 Existing Data Model (Key Tables)
 
-**150+ Prisma models** in a 4333-line schema. Key structural ones for this work:
+**150+ Prisma models** in a 4333-line schema. Postgres 15 (`docker/docker-compose.yml`, CI). Key structural ones for this work:
 
 - `Company` — tenant root, carries subscription fields
 - `Shop` — plants/branches within a company
@@ -71,41 +112,62 @@ tailored experience through configuration, not code branches.
 
 ## 3. Target Architecture
 
-### 3.1 Configuration Resolution Hierarchy
+### 3.1 Three Separate Layers
+
+Revision 1 merged Platform → Company → Shop → Role → User into one config. That
+mixed business rules with authorization and personal taste, and let a user
+preference override a business requirement. They are now three layers that
+never merge into each other:
 
 ```
-Platform Defaults (code + env)
-  └─► Company Config (tenant_module_configs table)
-        └─► Shop/Plant Config (tenant_module_configs with shopId)
-              └─► Role Config (role permissions + role_ui_overrides)
-                    └─► User Override (user_config_overrides table)
+┌──────────────────────────────────────────────────────────────┐
+│ 1. BUSINESS CONFIGURATION  (set by SoftDigit admins)          │
+│    Platform defaults (MODULE_REGISTRY)                         │
+│      └─► Company config     (published snapshot)               │
+│            └─► Shop/Plant overrides (same snapshot)            │
+│    = resolved business config: modules on/off, mandatory and  │
+│      hidden fields, number formats, thresholds, labels         │
+├──────────────────────────────────────────────────────────────┤
+│ 2. AUTHORIZATION  (existing, unchanged)                        │
+│    Plan entitlements (planAllowsFeature)                       │
+│    + role permissions (PermissionsGuard, resource:action)      │
+│    + field permissions (§4.5)                                  │
+│    + resource-level checks in services                         │
+├──────────────────────────────────────────────────────────────┤
+│ 3. PERSONAL PREFERENCES  (set by each user)                    │
+│    Table column order, hidden *optional* columns, default      │
+│    sort and filters, sidebar pin/order.                        │
+│    Restricted schema. Cannot touch forms, mandatory fields,    │
+│    module enablement or anything in layer 1.                   │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-**Resolution algorithm** (implemented as `ConfigResolverService`):
+**A feature is usable only when all of these hold:**
+
+```
+module enabled in business config
+  AND all dependsOn modules enabled
+  AND plan allows module.planGate
+  AND user has module.requiredPermission
+```
+
+Each check is evaluated independently. Config can only *narrow* what plan and
+permissions allow; it can never grant access.
+
+**Resolution** (business layer only):
 
 ```typescript
-// Pseudocode — each level merges into the previous
-async resolveModuleConfig(
-  companyId: string,
-  shopId: string | null,
-  roleId: string,
-  userId: string,
-  moduleKey: string,
-): Promise<ResolvedModuleConfig> {
-  const platform  = MODULE_REGISTRY[moduleKey].defaults;
-  const company   = await this.getCompanyConfig(companyId, moduleKey);
-  const shop      = shopId ? await this.getShopConfig(companyId, shopId, moduleKey) : {};
-  const role      = await this.getRoleUiOverride(companyId, roleId, moduleKey);
-  const user      = await this.getUserOverride(companyId, userId, moduleKey);
-
-  return deepMerge(platform, company, shop, role, user);
+resolve(snapshot: PublishedSnapshot, shopId: string | null): ResolvedBusinessConfig {
+  // snapshot already contains registry defaults merged with company config,
+  // computed once at publish time (§5.3)
+  const shop = shopId ? snapshot.shops[shopId] ?? {} : {};
+  return mergeShopOverrides(snapshot.company, shop); // only keys the registry marks shopOverridable
 }
 ```
 
-**Critical rule:** UI visibility config NEVER grants permissions. The `PermissionsGuard`
-(already a global APP_GUARD) independently checks `resource:action` permissions on
-every request. A sidebar item visible in config but missing the permission is still
-blocked at the API.
+Shop overrides are limited to keys each module's schema marks
+`shopOverridable` (e.g. number formats, local thresholds). A shop cannot
+disable a mandatory field that the company requires.
 
 ### 3.2 System Architecture Diagram
 
@@ -114,110 +176,72 @@ blocked at the API.
 │                     SOFTDIGIT ADMIN (apps/admin)                    │
 │  React + Mantine │ PlatformAdminGuard │ Internal SoftDigit team     │
 │                                                                     │
-│  Tenant Mgmt │ Module Config │ UI Builder │ Workflow Config         │
-│  Custom Fields │ Branding │ Roles │ Limits │ Audit │ Versioning    │
+│  Tenants │ Module Config │ Draft/Preview/Publish │ Custom Fields     │
+│  Workflows │ Branding │ Roles │ Templates │ Audit & Diff            │
 └──────────────────────────────┬──────────────────────────────────────┘
-                               │ REST API (same apps/api)
+                               │ REST API (same apps/api, /platform/*)
 ┌──────────────────────────────▼──────────────────────────────────────┐
 │                    CONFIGURATION LAYER (new)                        │
 │                                                                     │
-│  ModuleRegistryService     │ Defines available modules & defaults   │
-│  ConfigResolverService     │ Hierarchical config resolution         │
-│  ConfigVersioningService   │ Draft → Preview → Publish → Rollback  │
-│  CustomFieldService        │ JSON Schema field definitions          │
+│  MODULE_REGISTRY          │ Modules, defaults, schemas, dependencies│
+│  ConfigDraftService       │ Edits the draft working set             │
+│  ConfigPublishService     │ Validate → compile → immutable snapshot │
+│  ConfigResolverService    │ Reads published snapshot (cached)       │
+│  UserPreferenceService    │ Personal preferences (restricted)       │
+│  CustomFieldService       │ Field definitions + value validation    │
 │                                                                     │
-│  ── Adapts into existing ──                                         │
-│  FeatureFlagsService       │ Workflow feature toggles (kept as-is)  │
-│  PolicyEngine              │ Business rules per tenant              │
-│  WorkflowEngine            │ Configurable approval/dunning/routing  │
-│  BrandingService           │ Per-tenant branding                    │
-│  SubscriptionService       │ Plan limits & feature gating           │
+│  ── Adapts into existing (no new engines) ──                        │
+│  FeatureFlagsService │ PolicyEngine │ WorkflowEngine │ Branding     │
+│  SubscriptionService │ PermissionsGuard                             │
 └──────────────────────────────┬──────────────────────────────────────┘
                                │
 ┌──────────────────────────────▼──────────────────────────────────────┐
 │                    EXISTING BUSINESS MODULES                        │
+│  Products │ PurchaseOrders │ Sales │ Invoices │ Warehouse │ ...     │
 │                                                                     │
-│  Products │ PurchaseOrders │ Sales │ Invoices │ Warehouse │ Stock   │
-│  Suppliers │ Customers │ RFQs │ Contracts │ Returns │ Payments     │
-│  GoodsReceipts │ GoodsIssues │ StockTransfers │ Reports │ ...      │
-│                                                                     │
-│  Each module reads its config via ConfigResolverService              │
-│  Each module checks permissions via existing PermissionsGuard       │
+│  Read config via ConfigResolverService                              │
+│  Enforce mandatory/hidden fields + custom fields on writes (§9.2)   │
+│  Permissions via existing PermissionsGuard                          │
 └──────────────────────────────┬──────────────────────────────────────┘
                                │
 ┌──────────────────────────────▼──────────────────────────────────────┐
-│                    DATA & INFRASTRUCTURE                             │
-│                                                                     │
-│  PostgreSQL (RLS) │ Redis (config cache) │ BullMQ │ S3 │ Sentry   │
+│  PostgreSQL 15 (RLS) │ Redis (snapshot cache) │ BullMQ │ S3 │ Sentry │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 4. Database Schema — New Models
+## 4. Data Contracts
 
 ### 4.1 Module Registry (code-defined, not DB)
 
-The module registry lives in code as a TypeScript constant — not in the database.
-This prevents config corruption from creating phantom modules.
+The registry is a TypeScript constant. Config rows can only reference modules
+that exist in code, so config corruption cannot create phantom modules.
 
 **New file:** `apps/api/src/common/config/module-registry.ts`
 
 ```typescript
-export interface ModuleDefinition {
-  key: string;                    // e.g. 'products', 'purchase-orders'
-  label: string;                  // Human-readable name
+export interface ModuleDefinition<S extends z.ZodTypeAny = z.ZodTypeAny> {
+  key: ModuleKey;                    // e.g. 'products', 'purchase-orders'
+  label: string;
   description: string;
-  sidebarSection: string;         // Maps to SidebarSectionId
-  sidebarPath: string;            // e.g. '/products'
-  sidebarIcon: string;            // Icon key from iconMap
-  defaultEnabled: boolean;        // Platform default
-  planGate: PlanFeature | null;   // Existing plan feature gate, or null if always available
+  sidebarSection: SidebarSectionId;
+  sidebarPath: string;
+  sidebarIcon: string;               // Icon key from iconMap
+  defaultEnabled: boolean;           // Matches today's behaviour (§10)
+  planGate: PlanFeature | null;      // Existing plan feature gate
   requiredPermission: string | null; // e.g. 'product:read'
-  customizableFields: string[];   // Field keys that can be shown/hidden/required
-  supportsCustomFields: boolean;  // Whether JSON custom fields are allowed
-  supportsWorkflows: boolean;     // Whether workflow rules apply
-  dependsOn: string[];           // Module keys this module requires (validated on enable/disable)
+  dependsOn: ModuleKey[];            // Must be enabled for this module to be enabled
+  configSchema: S;                   // zod schema for this module's settings
+  defaults: z.infer<S>;              // Must parse against configSchema (unit-tested)
+  shopOverridable: (keyof z.infer<S>)[]; // Keys a shop may override
+  customizableFields: string[];      // Standard fields that can be mandatory/hidden
+  lockedMandatoryFields: string[];   // Fields the platform always requires (cannot be hidden)
+  supportsCustomFields: boolean;
+  supportsWorkflows: boolean;
 }
 
-// Module dependency validation: disabling a module that others depend on
-// returns a 409 listing the dependent modules. Enabling a module auto-checks
-// that all its dependencies are enabled for the tenant.
-
-export const MODULE_REGISTRY: Record<string, ModuleDefinition> = {
-  'dashboard': {
-    key: 'dashboard',
-    label: 'Dashboard',
-    description: 'Overview KPIs and insights',
-    sidebarSection: 'overview',
-    sidebarPath: '/dashboard',
-    sidebarIcon: 'dashboard',
-    defaultEnabled: true,
-    planGate: null,
-    requiredPermission: null,
-    customizableFields: [],
-    supportsCustomFields: false,
-    supportsWorkflows: false,
-    dependsOn: [],
-  },
-  'products': {
-    key: 'products',
-    label: 'Products',
-    description: 'Product catalog and master data',
-    sidebarSection: 'master-data',
-    sidebarPath: '/products',
-    sidebarIcon: 'products',
-    defaultEnabled: true,
-    planGate: null,
-    requiredPermission: 'product:read',
-    customizableFields: [
-      'hsnCode', 'brand', 'taxPreference', 'minStock',
-      'maxStock', 'reorderPoint', 'batchTracking', 'expiryTracking',
-    ],
-    supportsCustomFields: true,
-    supportsWorkflows: false,
-    dependsOn: [],
-  },
+export const MODULE_REGISTRY = {
   'purchase-orders': {
     key: 'purchase-orders',
     label: 'Purchase Orders',
@@ -228,313 +252,375 @@ export const MODULE_REGISTRY: Record<string, ModuleDefinition> = {
     defaultEnabled: true,
     planGate: 'purchase_orders',
     requiredPermission: 'purchase_order:read',
-    customizableFields: [
-      'expectedDeliveryDate', 'logistics', 'taxFields',
-      'lineDescription', 'supplierRef',
-    ],
+    dependsOn: ['products', 'suppliers'],
+    configSchema: z.object({
+      mandatoryFields: z.array(z.enum(['expectedDeliveryDate', 'logistics', 'taxFields', 'lineDescription', 'supplierRef'])),
+      hiddenFields: z.array(z.enum(['expectedDeliveryDate', 'logistics', 'taxFields', 'lineDescription', 'supplierRef'])),
+      poNumberFormat: z.string().regex(/^[A-Z0-9\-{}:]+$/).max(40),
+      maxPoValueWithoutApproval: z.number().int().nonnegative(),
+      label: z.string().max(40).optional(),
+    }).strict(),
+    defaults: { mandatoryFields: [], hiddenFields: [], poNumberFormat: 'PO-{YYYY}-{SEQ:5}', maxPoValueWithoutApproval: 0 },
+    shopOverridable: ['poNumberFormat'],
+    customizableFields: ['expectedDeliveryDate', 'logistics', 'taxFields', 'lineDescription', 'supplierRef'],
+    lockedMandatoryFields: ['supplierId', 'lines'],
     supportsCustomFields: true,
     supportsWorkflows: true,
-    dependsOn: ['products'],    // POs depend on the products module
   },
-  // ... one entry per module (all 30+)
-};
+  // ... one entry per module (all 30+); see issue #158 for the full table
+} as const satisfies Record<string, ModuleDefinition>;
 ```
 
-### 4.2 New Prisma Models
+Schemas use `.strict()` so unknown keys are rejected instead of silently stored.
+Approval *levels* are not a module setting; they live in the workflow/policy
+layer (§5.6) so there is one source of truth for approvals.
 
-**Three new tables for Phase 1-2. Not more.**
+**Registry invariants (unit-tested in CI):**
+- `defaults` parses against `configSchema`
+- every `dependsOn` key exists in the registry
+- the dependency graph has no cycles
+- `hiddenFields ∩ lockedMandatoryFields = ∅` is enforced by a schema refinement
+
+### 4.2 Draft Working Set — `TenantModuleConfig`
+
+The rows admins edit. **Never read by tenant requests.** Only the publish step
+reads them.
 
 ```prisma
-// ─── Tenant Module Configuration ──────────────────────────────────
-// Per-company (and optionally per-shop) module settings.
-// This replaces the need to overload FeatureFlagsService or NotificationPolicy.
-
 model TenantModuleConfig {
   id         String   @id @default(uuid()) @db.Uuid
   companyId  String   @map("company_id") @db.Uuid
   shopId     String?  @map("shop_id") @db.Uuid        // null = company-wide
-  moduleKey  String   @map("module_key")               // e.g. 'products', 'purchase-orders'
-  enabled    Boolean  @default(true)
-  config     Json     @default("{}")                    // Module-specific settings
-  //   config example for purchase-orders:
-  //   {
-  //     "approvalLevels": 4,
-  //     "mandatoryFields": ["expectedDeliveryDate", "logistics"],
-  //     "hiddenFields": ["lineDescription"],
-  //     "poNumberFormat": "PO-{YYYY}-{SEQ:5}",
-  //     "maxPoValueWithoutApproval": 100000
-  //   }
-  version    Int      @default(1)                       // Optimistic concurrency
+  moduleKey  String   @map("module_key")
+  enabled    Boolean?                                  // null = inherit (shop rows) / registry default
+  config     Json     @default("{}")                   // Partial settings; validated against configSchema
+  revision   Int      @default(1)                      // Optimistic concurrency for draft edits
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-  createdBy  String?  @map("created_by") @db.Uuid
   updatedBy  String?  @map("updated_by") @db.Uuid
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   shop    Shop?   @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
-  @@unique([companyId, shopId, moduleKey])  // PostgreSQL 15: NULLS NOT DISTINCT — nullable shopId participates in uniqueness
   @@index([companyId])
   @@map("tenant_module_configs")
 }
-
-
-// ─── User Config Override ─────────────────────────────────────────
-// Per-user overrides (sidebar order, hidden columns, personal preferences).
-// NEVER contains permission grants — only UI preferences.
-
-model UserConfigOverride {
-  id         String   @id @default(uuid()) @db.Uuid
-  companyId  String   @map("company_id") @db.Uuid
-  userId     String   @map("user_id") @db.Uuid
-  moduleKey  String   @map("module_key")
-  config     Json     @default("{}")
-  //   config example:
-  //   {
-  //     "hiddenColumns": ["hsnCode", "brand"],
-  //     "defaultSort": "name:asc",
-  //     "sidebarPinned": true
-  //   }
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([companyId, userId, moduleKey])
-  @@index([companyId, userId])
-  @@map("user_config_overrides")
-}
-
-
-// ─── Custom Field Definition ──────────────────────────────────────
-// Dynamic fields added to modules per tenant.
-
-model CustomFieldDefinition {
-  id            String   @id @default(uuid()) @db.Uuid
-  companyId     String   @map("company_id") @db.Uuid
-  moduleKey     String   @map("module_key")            // e.g. 'products'
-  fieldKey      String   @map("field_key")             // e.g. 'warehouse_zone'
-  label         String                                  // Display name
-  fieldType     String   @map("field_type")            // text | number | date | select | boolean
-  options       Json?                                   // For select: ["Zone A", "Zone B"]
-  required      Boolean  @default(false)
-  defaultValue  Json?    @map("default_value")
-  sortOrder     Int      @default(0) @map("sort_order")
-  isActive      Boolean  @default(true) @map("is_active")
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  @@unique([companyId, moduleKey, fieldKey])
-  @@index([companyId, moduleKey])
-  @@map("custom_field_definitions")
-}
 ```
 
-### 4.3 Custom Field Values Storage
+**Uniqueness:** Prisma's `@@unique([companyId, shopId, moduleKey])` would allow
+duplicate company-wide rows because Postgres treats NULLs as distinct. The
+migration adds the constraint in raw SQL instead:
 
-Custom field values are stored as a `Json` column on existing entity tables
-(`customFields Json? @map("custom_fields")`). This avoids an EAV anti-pattern
-while keeping queries simple.
+```sql
+CREATE UNIQUE INDEX tenant_module_configs_scope_key
+  ON tenant_module_configs (company_id, shop_id, module_key) NULLS NOT DISTINCT;
+```
 
-**Tables that get a `custom_fields` column** (Phase 5):
-- `products`
-- `purchase_order_headers`
-- `sales_order_headers`
-- `invoice_headers`
-- `suppliers`
-- `customers`
-- `goods_receipt_headers`
-- `goods_issue_headers`
+**Draft writes** use `UPDATE ... WHERE id = $1 AND revision = $2`, incrementing
+`revision`. Zero rows updated → `409 Conflict` (another admin edited it).
 
-### 4.4 Config Versioning — Immutable Published Snapshots
+Each draft write validates the partial `config` against
+`configSchema.partial()`. Full validation happens at publish.
 
-Config versioning is implemented from Phase 2 onward (not deferred to Phase 7).
-Every publish creates an **immutable snapshot** — published versions are never
-mutated. Rollback creates a new version whose snapshot copies a previous one.
+### 4.3 Published Snapshots — `ConfigVersion` (Phase 1)
 
-**Revision 2 decisions:**
-- No `draft` status on `ConfigVersion`. Drafts live as uncommitted
-  `TenantModuleConfig` rows. The `ConfigVersion` table only holds published
-  (immutable) snapshots.
-- Publication captures a consistent snapshot under an advisory lock with an
-  expected base version to prevent concurrent publish conflicts (HTTP 409).
-- Every draft mutation is tied to a draft revision; publication captures the
-  draft atomically so a concurrent draft edit cannot slip through.
+Immutable. The only config source tenant requests ever read.
 
 ```prisma
 model ConfigVersion {
   id            String   @id @default(uuid()) @db.Uuid
   companyId     String   @map("company_id") @db.Uuid
-  version       Int                                       // Monotonically increasing per company
-  snapshot      Json                                      // Full immutable config snapshot
-  publishedAt   DateTime @default(now()) @map("published_at") @db.Timestamptz(6)
+  version       Int                                    // Monotonic per company, starts at 1
+  schemaVersion Int      @map("schema_version")        // Snapshot format version (§4.6)
+  snapshot      Json                                   // Fully resolved company + shop config
+  sourceVersion Int?     @map("source_version")        // Set when this version is a rollback
+  changeNote    String?  @map("change_note")
   publishedBy   String   @map("published_by") @db.Uuid
-  baseVersionId String?  @map("base_version_id") @db.Uuid // The version this was published from
-  rollbackOfId  String?  @map("rollback_of_id") @db.Uuid  // Non-null if this is a rollback
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  publishedAt   DateTime @default(now()) @map("published_at") @db.Timestamptz(6)
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@unique([companyId, version])
-  @@index([companyId])
   @@map("config_versions")
 }
 ```
 
-**Publication algorithm:**
-1. Acquire advisory lock on `companyId`
-2. Verify `expectedBaseVersion` matches the current latest published version (409 if not)
-3. Snapshot all `TenantModuleConfig` + `CustomFieldDefinition` rows for the company
-4. Insert immutable `ConfigVersion` row with incremented version number
-5. Invalidate the config cache for the company
-6. Release advisory lock
+- **Active version** = the highest `version` for the company. No status column,
+  no pointer to keep in sync.
+- **Rows are never updated or deleted** (enforced by revoking `UPDATE`/`DELETE`
+  on the table from the app role, or a trigger).
+- **No snapshot yet** (all existing companies) → resolver uses registry defaults,
+  which equal today's behaviour.
 
----
-
-## 5. New Backend Services
-
-### 5.1 Module Registry Service
-
-**File:** `apps/api/src/common/config/module-registry.service.ts`
-
-Wraps the code-defined `MODULE_REGISTRY` and enriches it with the company's
-subscription plan to determine which modules are available.
+Snapshot shape:
 
 ```typescript
-@Injectable()
-export class ModuleRegistryService {
-  constructor(private readonly subscriptions: SubscriptionService) {}
+type PublishedSnapshot = {
+  schemaVersion: 1;
+  version: number;
+  company: Record<ModuleKey, { enabled: boolean; config: ModuleConfig }>; // registry defaults already merged
+  shops: Record<ShopId, Partial<Record<ModuleKey, { enabled?: boolean; config: Partial<ModuleConfig> }>>>;
+  customFields: Record<ModuleKey, CustomFieldDefinitionSnapshot[]>;       // added in Phase 5
+};
+```
 
-  async getAvailableModules(companyId: string): Promise<ModuleDefinition[]> {
-    const snapshot = await this.subscriptions.getSnapshot(companyId);
-    return Object.values(MODULE_REGISTRY).filter((mod) => {
-      if (!mod.planGate) return true;
-      return planAllowsFeature(snapshot.plan as SubscriptionPlan, mod.planGate);
-    });
-  }
+### 4.4 Personal Preferences — `UserPreference`
+
+Renamed from `UserConfigOverride` so the name says what it is.
+
+```prisma
+model UserPreference {
+  id         String   @id @default(uuid()) @db.Uuid
+  companyId  String   @map("company_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  scope      String                                    // moduleKey, or 'sidebar'
+  prefs      Json     @default("{}")
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId, scope])
+  @@map("user_preferences")
 }
 ```
 
-### 5.2 Config Resolver Service
+`prefs` is validated against a fixed zod schema:
+`{ columnOrder?, hiddenColumns?, defaultSort?, defaultFilters?, pinned?, order? }`.
+When read, `hiddenColumns` entries that are mandatory in the business config are
+dropped, so a preference can never hide what the business requires. Preferences
+are not versioned or published; they are the user's own.
 
-**File:** `apps/api/src/common/config/config-resolver.service.ts`
+### 4.5 Custom Fields (Phase 5)
 
-The core resolution engine. Uses **version-based caching** — not TTL-based.
+**Definition model:**
 
-**Revision 2 caching strategy:**
+```prisma
+model CustomFieldDefinition {
+  id            String    @id @default(uuid()) @db.Uuid
+  companyId     String    @map("company_id") @db.Uuid
+  moduleKey     String    @map("module_key")
+  fieldKey      String    @map("field_key")             // Immutable after creation; ^[a-z][a-z0-9_]{1,39}$
+  label         String
+  fieldType     String    @map("field_type")            // text | number | date | boolean | select | multiselect
+  options       Json?                                    // select/multiselect: [{ value, label, archived? }]
+  validation    Json?                                    // { min?, max?, maxLength?, pattern? } — fixed vocabulary
+  required      Boolean   @default(false)
+  defaultValue  Json?     @map("default_value")
+  searchable    Boolean   @default(false)               // Appears in list filters
+  readRoles     String[]  @map("read_roles")            // Empty = everyone with module read permission
+  writeRoles    String[]  @map("write_roles")           // Empty = everyone with module write permission
+  sortOrder     Int       @default(0) @map("sort_order")
+  archivedAt    DateTime? @map("archived_at") @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-The resolved business configuration is identical for all users in a company at a
-given published version. The cache key therefore does NOT include `roleId` or
-`userId` — role-specific authorization and personal preferences are resolved
-separately (see below).
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-**Cache key pattern:**
-- Business config: `cfg:v{publishedVersion}:{companyId}:{shopId|_}:{moduleKey}`
-- User preferences: `cfg:user:{companyId}:{userId}:{moduleKey}`
+  @@unique([companyId, moduleKey, fieldKey])
+  @@map("custom_field_definitions")
+}
+```
 
-**How it works:**
-1. On publish, the new version number is written to Redis (`cfg:current:{companyId}`)
-2. Business config reads embed the current version in the cache key
-3. Published config snapshots are immutable, so cached entries never go stale
-4. Old version cache entries are evicted lazily (no TTL needed for correctness,
-   but a long TTL like 24h prevents unbounded growth)
-5. User preference cache entries use a short TTL (60s) since they are mutable
+Definitions are edited as drafts and take effect only when published (they are
+included in the snapshot).
 
-**Three separate resolution paths (Revision 2):**
-- **Business configuration** — company/shop-level module settings from the
-  published snapshot. Cached at company/version level. Identical for all users.
-- **Authorization** — role permissions resolved via existing `PermissionsGuard`
-  and `role-permissions.ts`. Not part of the config cache.
-- **Personal preferences** — user-level UI overrides from `UserConfigOverride`.
-  Cached per user with short TTL.
+**Values** go in a `custom_fields Jsonb` column on each supporting table
+(`products`, `suppliers`, `customers`, PO/SO/invoice/GR/GI headers). Not EAV.
 
-**Cache invalidation:**
-- Business config: invalidated on publish (new version = new cache keys automatically)
-- User preferences: delete on write to `user_config_overrides`
+**Backend validation (mandatory):** every create/update on a supporting entity
+validates `custom_fields` against the published definitions. Unknown keys are
+rejected, `required` is enforced, types and `validation` rules are checked, and
+`writeRoles` is enforced. Frontend validation is a convenience only.
 
-**Shop-level configuration:** If shop-level business config differs from the
-company default, the cache key includes `shopId`. The published snapshot must
-account for shop-level overrides by including them in the snapshot or by noting
-which shops have inherited vs. overridden configuration.
+**Lifecycle rules:**
 
-### 5.3 Config Admin Service
+| Change | Allowed? |
+|---|---|
+| Rename label, reorder, change default | Yes |
+| Change `fieldKey` | No — create a new field |
+| Change `fieldType` | Only while no record has a value for it |
+| Add select option | Yes |
+| Remove select option | Archive the option; existing values stay readable |
+| Make `required` true | Only with a backfill value, or applies to new/edited records only (admin chooses) |
+| Delete field | No — archive. Archived fields are hidden, not validated, values retained |
+| Restore archived field | Yes |
 
-**File:** `apps/api/src/modules/config-admin/config-admin.service.ts`
+**Query/index strategy:**
+- One GIN index (`jsonb_path_ops`) per table for equality/containment filters on `searchable` fields.
+- Range filters and sorting on a specific field: add an expression index for
+  that field on demand (an ops task, measured first). Not automatic.
+- Uniqueness of custom field values: out of scope for v1.
 
-CRUD operations for tenant module configs, user overrides and custom fields.
-Protected by `PlatformAdminGuard`. Every write produces an audit log entry.
+**Field permissions** (`readRoles`/`writeRoles`) also cover the need that
+Revision 1 tried to meet with role UI overrides: e.g. hide a cost field from
+`SALES`. Read filtering happens in the API response, not only in the UI.
 
-### 5.4 Sidebar Config Endpoint
+### 4.6 Snapshot Schema Migrations
 
-**File:** `apps/api/src/modules/config-admin/sidebar-config.controller.ts`
+`schemaVersion` identifies the snapshot format. When a module's `configSchema`
+changes incompatibly, ship a migration function `migrate_N_to_N+1(snapshot)` in
+`apps/api/src/common/config/migrations/`. The resolver upgrades old snapshots in
+memory on read; the next publish writes the new format. Existing rows are never
+rewritten.
 
-New endpoint: `GET /api/v1/me/sidebar`
+---
 
-Returns the resolved sidebar for the authenticated user, replacing the hardcoded
-`SIDEBAR_SECTIONS`. The frontend fetches this once on login and caches it in
-the auth store.
+## 5. Backend Services
+
+### 5.1 Module Registry Service
+
+`apps/api/src/common/config/module-registry.service.ts` — exposes the registry and
+computes availability with the plan:
 
 ```typescript
-// Response shape
-type SidebarConfigResponse = {
-  sections: Array<{
-    id: string;
-    title: string;
-    children: Array<{
-      kind: 'link';
-      label: string;   // May be renamed per-tenant (e.g. "Plants" → "Branches")
-      path: string;
-      icon: string;
-      badge?: { type: string };
-    }>;
-  }>;
+isUsable(mod, snapshot, plan, permissions): boolean {
+  const cfg = snapshot.company[mod.key];
+  return cfg.enabled
+    && mod.dependsOn.every((d) => snapshot.company[d].enabled)
+    && (!mod.planGate || planAllowsFeature(plan, mod.planGate))
+    && (!mod.requiredPermission || permissions.has(mod.requiredPermission));
+}
+```
+
+### 5.2 Config Resolver Service and Cache
+
+`apps/api/src/common/config/config-resolver.service.ts`
+
+Because published snapshots are immutable, caching is simple and safe:
+
+| Key | Value | TTL |
+|---|---|---|
+| `cfg:v1:{companyId}:latest` | latest version number | 5s (also deleted on publish) |
+| `cfg:v1:{companyId}:snap:{version}` | snapshot JSON | 24h — immutable, so it never goes stale |
+| `cfg:v1:pref:{companyId}:{userId}` | user preferences | 5 min, deleted on write |
+
+- **Read path:** in-process LRU (keyed the same way) → Redis → Postgres.
+- **Publish:** commits the new version, then deletes `…:latest`. Every node sees
+  the new version within the 5s pointer TTL (immediately on the node that published).
+- **Stale writes impossible:** a snapshot key's content never changes, so a slow
+  writer can only write the correct content.
+- **Stampede:** single-flight per key per process (one in-flight DB load; other
+  callers await it).
+- **Redis unavailable:** fall through to Postgres (one indexed row read), log a
+  metric, keep serving. Never fall back to registry defaults when a snapshot
+  exists — that could re-enable modules a tenant disabled.
+- **Tenant scoping:** every key starts with `companyId` taken from
+  `TenantContext`, never from request input.
+- **Provenance (effective-config viewer):** `resolve(..., { explain: true })`
+  returns, per key, the layer that set it (registry default / company / shop).
+  Admin-only.
+
+### 5.3 Config Draft and Publish Services
+
+`ConfigDraftService` — CRUD on `TenantModuleConfig` with revision checks (§4.2).
+
+`ConfigPublishService.publish(companyId, expectedBaseVersion, note)`:
+
+1. Transaction with `pg_advisory_xact_lock(hash(companyId))` — one publish per company at a time.
+2. Check latest version equals `expectedBaseVersion`; otherwise `409` (someone published since the admin previewed).
+3. Load drafts, merge with registry defaults, and validate each module against its full `configSchema`.
+4. Validate the dependency graph: no enabled module with a disabled `dependsOn`.
+5. Validate shop rows only override `shopOverridable` keys.
+6. Insert `ConfigVersion` with `version = expectedBaseVersion + 1`.
+7. Write audit entry (actor, versions, diff summary).
+8. After commit: delete `cfg:v1:{companyId}:latest`.
+
+Validation failures return all errors at once (`422` with a list), not just the first.
+
+**Preview:** `compileDraft(companyId)` runs steps 3–5 without writing and returns
+the would-be snapshot plus a diff against the active version. Admins can
+resolve it as any user of the company. Nothing a tenant sees changes.
+
+**Rollback(targetVersion):** copies the snapshot of `targetVersion` into a *new*
+version with `sourceVersion = targetVersion`, and resets drafts to match it.
+History is preserved.
+
+**Diff:** structural JSON diff between any two versions, used by preview, the
+audit log and the admin UI.
+
+### 5.4 User-Facing Config Endpoint
+
+`GET /api/v1/me/config` — one call at login/app load:
+
+```typescript
+type MeConfigResponse = {
+  version: number;                       // also sent as ETag
+  modules: Record<ModuleKey, { usable: boolean; label: string; config: ModuleConfig }>;
+  sidebar: SidebarSection[];             // server-built: usable modules only, in config order
+  preferences: Record<string, UserPrefs>;
 };
 ```
+
+The frontend re-fetches with `If-None-Match`; `304` when the version and
+preferences are unchanged. The server builds the sidebar from registry + config
++ plan + permissions, so the client never needs to combine them.
+
+### 5.5 Config Templates and Import/Export (Phase 7)
+
+- **Export:** a published snapshot plus custom field definitions as a JSON file
+  with `schemaVersion`. Contains no tenant data or IDs other than module/field keys.
+- **Import:** loads the file into the *draft* working set of a target company.
+  It still has to be previewed and published. This is how config moves between
+  staging and production, and how templates are applied.
+- **Templates:** named exports maintained by SoftDigit (e.g. Manufacturing,
+  Retail, Wholesale), stored as files in the repo
+  (`apps/api/src/common/config/templates/`) so they are reviewed like code.
+
+### 5.6 Workflow and Policy Administration (Phase 6)
+
+No new engine. The admin layer manages the existing engines' data:
+
+- `WorkflowGraph` / `WorkflowVersion` per company, compiled with the existing
+  compiler before save; invalid graphs are rejected.
+- Policy rules use only the existing condition vocabulary
+  (`all`/`any`/`not`, comparators `eq/ne/gt/gte/lt/lte/in`) over a fixed list of
+  facts per module. No scripts, no free-form expressions, no executable code.
+- Approval chains (e.g. "PO ≥ ₹50,000 also needs Finance") are expressed as
+  policy rules + workflow graphs, not as module settings.
+- Workflow graphs keep their own existing versioning. Config snapshots reference
+  them by graph ID, not by copying them.
 
 ---
 
 ## 6. Files to Modify (Existing Codebase)
 
-### 6.1 Backend Changes
+### 6.1 Backend
 
 | File | Change |
 |---|---|
-| `apps/api/src/app.module.ts` | Import new `ConfigModule` |
-| `apps/api/prisma/schema.prisma` | Add 3 new models (§4.2), add `custom_fields` column to 8 entity tables (Phase 5), add relations to `Company`, `Shop`, `User` |
-| `apps/api/src/common/plans/plan-config.ts` | No change — reuse `planAllowsFeature()` as-is |
-| `apps/api/src/common/workflow-engine/ops/feature-flags.service.ts` | No change — keep for workflow-specific flags |
-| `apps/api/src/common/auth/role-permissions.ts` | No change — keep for permission resolution |
-| `apps/api/src/modules/platform/platform-subscriptions.controller.ts` | Expand with config admin endpoints (or new controller) |
-| `apps/api/src/modules/platform/platform.module.ts` | Import ConfigAdminModule |
+| `apps/api/src/app.module.ts` | Import `ConfigModule` |
+| `apps/api/prisma/schema.prisma` | Phase 1: `TenantModuleConfig`, `ConfigVersion`, `UserPreference` + relations. Phase 5: `CustomFieldDefinition`, `custom_fields` columns |
+| `apps/api/src/common/plans/plan-config.ts` | No change |
+| `apps/api/src/common/workflow-engine/ops/feature-flags.service.ts` | No change — keep for workflow flags |
+| `apps/api/src/common/auth/role-permissions.ts` | No change |
+| `apps/api/src/modules/platform/platform.module.ts` | Import `ConfigAdminModule` |
+| Business module write services (PO, SO, products, …) | Phase 4: enforce mandatory/hidden fields; Phase 5: validate custom fields |
 
-### 6.2 Frontend Changes
+### 6.2 Frontend
 
 | File | Change |
 |---|---|
-| `apps/web/src/lib/sidebar-navigation.ts` | Replace hardcoded `SIDEBAR_SECTIONS` with a function that reads from API response; keep as fallback |
-| `apps/web/src/components/Sidebar.tsx` | Fetch sidebar config from `/api/v1/me/sidebar` instead of importing `SIDEBAR_SECTIONS` directly |
-| `apps/web/src/store/authStore.ts` | Add `sidebarConfig` and `moduleConfig` to the auth store, fetched on login |
-| `apps/web/src/components/TrialFeatureGate.tsx` | Extend to also check module-enabled status from config, not just plan features |
+| `apps/web/src/lib/sidebar-navigation.ts` | Build from `/me/config` `sidebar`; keep `SIDEBAR_SECTIONS` as fallback |
+| `apps/web/src/components/Sidebar.tsx` | Read sidebar from config query |
+| `apps/web/src/store/authStore.ts` | Hold `MeConfigResponse` |
+| `apps/web/src/components/TrialFeatureGate.tsx` | Also check `modules[key].usable` |
 
 ### 6.3 New Files
 
 | File | Purpose |
 |---|---|
-| `apps/api/src/common/config/module-registry.ts` | Module definitions constant |
-| `apps/api/src/common/config/module-registry.service.ts` | Plan-aware module availability |
-| `apps/api/src/common/config/config-resolver.service.ts` | Hierarchical config resolution with Redis cache |
-| `apps/api/src/common/config/config.module.ts` | NestJS module wiring |
-| `apps/api/src/modules/config-admin/config-admin.module.ts` | Admin config management module |
-| `apps/api/src/modules/config-admin/config-admin.controller.ts` | CRUD API for tenant configs |
-| `apps/api/src/modules/config-admin/config-admin.service.ts` | Business logic for config CRUD |
-| `apps/api/src/modules/config-admin/sidebar-config.controller.ts` | `/me/sidebar` endpoint |
-| `apps/api/src/modules/config-admin/custom-fields.controller.ts` | Custom field definition CRUD |
-| `apps/api/src/modules/config-admin/custom-fields.service.ts` | Custom field logic + validation |
-| `apps/api/src/modules/config-admin/dto/*.dto.ts` | Validation DTOs |
-| `apps/admin/` | Entire new admin dashboard app (see §7) |
+| `apps/api/src/common/config/module-registry.ts` | Registry constant + types |
+| `apps/api/src/common/config/module-registry.service.ts` | Availability checks |
+| `apps/api/src/common/config/config-resolver.service.ts` | Snapshot reads + cache |
+| `apps/api/src/common/config/config-draft.service.ts` | Draft CRUD |
+| `apps/api/src/common/config/config-publish.service.ts` | Validate, publish, preview, rollback, diff |
+| `apps/api/src/common/config/user-preference.service.ts` | Preferences |
+| `apps/api/src/common/config/migrations/` | Snapshot schema migrations |
+| `apps/api/src/common/config/config.module.ts` | Wiring |
+| `apps/api/src/modules/config-admin/*` | `/platform/tenants/...` controllers + DTOs |
+| `apps/api/src/modules/me-config/*` | `/me/config`, `/me/preferences` |
+| `apps/admin/` | Admin dashboard (§7) |
 
 ---
 
@@ -542,383 +628,298 @@ type SidebarConfigResponse = {
 
 ### 7.1 Tech Stack
 
-Same as `apps/web` for consistency:
-- React 18 + TypeScript
-- Mantine UI (already used in `apps/web`)
-- TanStack Query + React Router
-- Vite build
+Same as `apps/web`: React 18 + TypeScript, Mantine, TanStack Query, React Router, Vite.
 
 ### 7.2 Auth
 
-Reuses the same JWT auth from `apps/api`. The `PlatformAdminGuard` already
-checks `user.isPlatformAdmin` — admin dashboard API calls are gated by this.
+Same JWT auth as `apps/api`. All calls hit `/platform/*`, gated by `PlatformAdminGuard`.
 
-### 7.3 Page Structure
+### 7.3 Pages
 
 ```
 apps/admin/src/pages/
-  DashboardPage.tsx          — Overview: tenant count, health, activity
-  TenantsPage.tsx             — List all companies, subscription status, quick actions
-  TenantDetailPage.tsx        — Single company: config, users, billing, audit
-  ModuleConfigPage.tsx        — Configure modules for a selected company
-  CustomFieldsPage.tsx        — Manage custom field definitions per company/module
-  UserOverridesPage.tsx       — Per-user config within a company
-  WorkflowConfigPage.tsx      — Expose workflow graph editor for company workflows
-  BrandingPage.tsx            — Company branding (extends existing branding system)
-  RolesPermissionsPage.tsx    — Configure role permission overrides per company
-  AuditLogPage.tsx            — View all config changes with rollback
-  ConfigVersionsPage.tsx      — Publish/rollback management (integrated from Phase 2)
+  DashboardPage.tsx        — Tenant count, health, activity
+  TenantsPage.tsx          — Companies, subscription status
+  TenantDetailPage.tsx     — One company: config, users, billing, audit
+  ModuleConfigPage.tsx     — Draft editor (forms generated from configSchema)
+  PublishPage.tsx          — Preview, diff vs active, validation errors, publish
+  VersionsPage.tsx         — History, diff any two versions, rollback
+  EffectiveConfigPage.tsx  — "Why is this value set?" provenance view
+  CustomFieldsPage.tsx     — Field definitions per module (Phase 5)
+  WorkflowConfigPage.tsx   — Workflow graphs + policy rules (Phase 6)
+  BrandingPage.tsx         — Existing branding system
+  RolesPermissionsPage.tsx — Role permission overrides
+  TemplatesPage.tsx        — Apply template / import / export (Phase 7)
+  AuditLogPage.tsx         — All config changes with diffs
 ```
 
-### 7.4 Module Config Editor (Key Screen)
-
-For each company, the admin sees a table of all modules with toggles and a config
-editor. Example for "Purchase Orders" for Company X:
+### 7.4 Module Config Editor
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  Purchase Orders — Acme Manufacturing Ltd                        │
+│  Purchase Orders — Acme Manufacturing Ltd        Draft (rev 7)   │
 ├──────────────────────────────────────────────────────────────────┤
-│  Enabled: [✓]                                                    │
+│  Enabled: [✓]        Requires: Products ✓, Suppliers ✓           │
 │                                                                  │
-│  Approval Levels:        [4]                                     │
-│  PO Number Format:       [PO-{YYYY}-{SEQ:5}]                   │
-│  Max PO without approval: [₹1,00,000]                           │
+│  PO Number Format:        [PO-{YYYY}-{SEQ:5}]   (shop-overridable)│
+│  Max PO without approval: [₹1,00,000]                            │
 │                                                                  │
-│  Mandatory Fields:                                               │
-│    [✓] Expected Delivery Date                                    │
-│    [✓] Logistics / Transport                                     │
-│    [ ] Tax Fields                                                │
-│    [ ] Line Description                                          │
+│  Mandatory Fields:   [✓] Expected Delivery  [✓] Logistics        │
+│  Hidden Fields:      [ ] Supplier Reference                      │
+│  Always required:    Supplier, Lines (platform-locked)           │
 │                                                                  │
-│  Hidden Fields:                                                  │
-│    [ ] Supplier Reference                                        │
+│  Approvals: managed in Workflows → "PO approval" (v3)            │
 │                                                                  │
-│  Custom Fields: (2 defined)                                      │
-│    [Internal Project Code]  text, required                       │
-│    [Budget Center]          select: [Ops, R&D, Sales]           │
-│                                                                  │
-│  [Save Draft]  [Preview as Company]  [Publish]                   │
+│  [Save Draft]   [Preview & Diff]   [Publish…]                    │
 └──────────────────────────────────────────────────────────────────┘
 ```
+
+Forms are generated from each module's `configSchema`, so adding a setting in
+code makes it editable without new admin UI.
 
 ---
 
 ## 8. API Contracts
 
-### 8.1 Admin Config APIs (PlatformAdmin-only)
+All admin routes live under the existing `platform/` prefix and are gated by
+`PlatformAdminGuard`. All mutations are audited and rate-limited (existing
+`ThrottlerGuard`, stricter limit for `/platform/*`).
+
+### 8.1 Admin APIs
 
 ```
-# Tenant module configs
-GET    /api/v1/admin/tenants                           # List all companies
-GET    /api/v1/admin/tenants/:companyId                # Company detail + current configs
-GET    /api/v1/admin/tenants/:companyId/modules        # All module configs for company
-PUT    /api/v1/admin/tenants/:companyId/modules/:key   # Upsert module config
-DELETE /api/v1/admin/tenants/:companyId/modules/:key   # Reset to platform defaults
+# Tenants
+GET    /api/v1/platform/tenants
+GET    /api/v1/platform/tenants/:companyId
 
-# Per-shop overrides
-PUT    /api/v1/admin/tenants/:companyId/shops/:shopId/modules/:key
-DELETE /api/v1/admin/tenants/:companyId/shops/:shopId/modules/:key
+# Draft working set
+GET    /api/v1/platform/tenants/:companyId/draft/modules
+PUT    /api/v1/platform/tenants/:companyId/draft/modules/:key          # body: { enabled?, config, revision }
+DELETE /api/v1/platform/tenants/:companyId/draft/modules/:key          # reset to registry default
+PUT    /api/v1/platform/tenants/:companyId/draft/shops/:shopId/modules/:key
+DELETE /api/v1/platform/tenants/:companyId/draft/shops/:shopId/modules/:key
 
-# User overrides
-GET    /api/v1/admin/tenants/:companyId/users/:userId/overrides
-PUT    /api/v1/admin/tenants/:companyId/users/:userId/overrides/:key
-DELETE /api/v1/admin/tenants/:companyId/users/:userId/overrides/:key
+# Preview / publish / versions
+POST   /api/v1/platform/tenants/:companyId/draft/preview               # → snapshot, diff, validation errors
+POST   /api/v1/platform/tenants/:companyId/publish                     # body: { expectedBaseVersion, note }
+GET    /api/v1/platform/tenants/:companyId/versions
+GET    /api/v1/platform/tenants/:companyId/versions/:v
+GET    /api/v1/platform/tenants/:companyId/versions/:a/diff/:b
+POST   /api/v1/platform/tenants/:companyId/versions/:v/rollback        # body: { expectedBaseVersion, note }
+GET    /api/v1/platform/tenants/:companyId/effective?userId=&shopId=   # provenance view
 
-# Custom fields
-GET    /api/v1/admin/tenants/:companyId/custom-fields?module=products
-POST   /api/v1/admin/tenants/:companyId/custom-fields
-PUT    /api/v1/admin/tenants/:companyId/custom-fields/:id
-DELETE /api/v1/admin/tenants/:companyId/custom-fields/:id
+# Custom fields (Phase 5) — draft, published with the rest
+GET    /api/v1/platform/tenants/:companyId/draft/custom-fields?module=products
+POST   /api/v1/platform/tenants/:companyId/draft/custom-fields
+PATCH  /api/v1/platform/tenants/:companyId/draft/custom-fields/:id
+POST   /api/v1/platform/tenants/:companyId/draft/custom-fields/:id/archive
+POST   /api/v1/platform/tenants/:companyId/draft/custom-fields/:id/restore
 
-# Config versioning (Phase 2 — publishing; Phase 7 — UI)
-GET    /api/v1/admin/tenants/:companyId/config-versions
-POST   /api/v1/admin/tenants/:companyId/config-versions/publish    # 409 on concurrent conflict
-POST   /api/v1/admin/tenants/:companyId/config-versions/:id/rollback
+# Templates / import / export (Phase 7)
+GET    /api/v1/platform/templates
+GET    /api/v1/platform/tenants/:companyId/versions/:v/export
+POST   /api/v1/platform/tenants/:companyId/draft/import               # file or templateKey
 
 # Audit
-GET    /api/v1/admin/tenants/:companyId/audit?type=config
+GET    /api/v1/platform/tenants/:companyId/audit?type=config
 ```
 
-### 8.2 User-Facing Config APIs
+### 8.2 User-Facing APIs
 
 ```
-# Resolved sidebar for current user
-GET    /api/v1/me/sidebar
-
-# Resolved module config for current user + current company
-GET    /api/v1/me/modules/:key/config
-
-# Custom fields for a module (for form rendering)
-GET    /api/v1/modules/:key/custom-fields
-
-# User's own preferences (self-service, not admin)
-PUT    /api/v1/me/modules/:key/preferences
+GET    /api/v1/me/config                       # §5.4; ETag = version + prefs hash
+PUT    /api/v1/me/preferences/:scope           # restricted schema (§4.4)
 ```
+
+Custom field definitions for form rendering are part of `modules[key].config`
+in `/me/config`, filtered by the user's `readRoles`.
 
 ---
 
 ## 9. Security Model
 
-### 9.1 Permission vs. Configuration Separation
+### 9.1 Request Pipeline
 
 ```
-                  ┌─────────────────┐
-                  │   API Request    │
-                  └────────┬────────┘
-                           │
-                  ┌────────▼────────┐
-                  │  JwtAuthGuard   │  ← Authentication
-                  └────────┬────────┘
-                           │
-                  ┌────────▼────────┐
-                  │PermissionsGuard │  ← Authorization (resource:action)
-                  └────────┬────────┘        BLOCKS if permission missing
-                           │                 Config CANNOT override this
-                  ┌────────▼────────┐
-                  │SubscriptionWrite│  ← Plan enforcement
-                  │     Guard       │        BLOCKS writes on expired plans
-                  └────────┬────────┘
-                           │
-                  ┌────────▼────────┐
-                  │ TenantRlsInterc │  ← Tenant isolation
-                  └────────┬────────┘
-                           │
-                  ┌────────▼────────┐
-                  │  Module Config   │  ← Customization (fields, workflows, UI)
-                  │  Resolution      │        Only SHAPES the response, never
-                  └────────┬────────┘        grants access
-                           │
-                  ┌────────▼────────┐
-                  │ Business Logic   │
-                  └─────────────────┘
+JwtAuthGuard          → authentication
+PermissionsGuard      → resource:action      (config cannot override)
+SubscriptionWriteGuard→ plan enforcement     (config cannot override)
+ModuleEnabledGuard    → NEW: 403 MODULE_DISABLED if module not usable for this company
+TenantRlsInterceptor  → tenant isolation (interceptors run after all guards)
+Business logic        → reads resolved config; validates writes against it (§9.2)
 ```
 
-### 9.2 NestJS Guard Execution Order
+`ModuleEnabledGuard` closes a gap: hiding a module in the sidebar is not enough;
+its API must also refuse requests when the tenant has disabled it. Controllers
+opt in with `@RequiresModule('<key>')`. Because guards run before interceptors,
+the guard takes `companyId` from the authenticated `request.user` (the same
+source `TenantRlsInterceptor` uses), not from `TenantContext`.
 
-**Critical implementation detail:** NestJS guards execute **before** interceptors.
-The `TenantRlsInterceptor` populates `AsyncLocalStorage` with `companyId`, but
-guards cannot depend on it being available yet.
+### 9.2 API-Level Enforcement of Business Config
 
-Therefore, any module-level guard (e.g. `ModuleEnabledGuard` from issue #179)
-must obtain `companyId` from a source available during guard execution:
-- `request.user.companyId` — from the JWT payload, set by `JwtAuthGuard`
-- NOT from `AsyncLocalStorage` (populated by the interceptor, which runs later)
-- NOT from an arbitrary client-provided header or query parameter (untrusted)
+Business config affects what the API accepts, not only what the UI shows:
 
-**Execution order:**
-```
-JwtAuthGuard → PermissionsGuard → ModuleEnabledGuard → SubscriptionWriteGuard
-  → TenantRlsInterceptor (AsyncLocalStorage) → Controller
-```
+- **Mandatory fields:** create/update DTO validation adds the company's
+  `mandatoryFields` for that module at runtime. Missing → `422`.
+- **Hidden fields:** values for hidden fields are ignored on write and omitted on read.
+- **Locked fields:** `lockedMandatoryFields` are always required regardless of config.
+- **Custom fields:** validated per §4.5, including `writeRoles`.
+- **Field read permissions:** fields with `readRoles` are stripped from responses
+  for other roles (lists, details, exports, PDFs).
 
-The `companyId` from `request.user` is trusted because it comes from the verified
-JWT token. Never accept a client-supplied `companyId` for authorization decisions.
+### 9.3 Admin Security
 
-### 9.3 Admin Dashboard Security
+- All admin routes behind `PlatformAdminGuard`; every mutation audited with actor, before/after and IP
+- Admin dashboard on a separate subdomain (e.g. `admin.softdigit.app`)
+- `isPlatformAdmin` set only via database/ops procedure, never via API
+- Stricter rate limits on `/platform/*`
+- Bulk operations bounded (max 50 modules per request)
 
-- All admin API routes behind `PlatformAdminGuard` (already exists)
-- Every config write logged to `PlatformAuditLog` (already exists)
-- Admin dashboard deployed on a separate subdomain (e.g. `admin.softdigit.app`)
-- Admin users are flagged `isPlatformAdmin: true` in the `User` table
+### 9.4 Isolation Tests — from Phase 1, not Phase 8
 
-### 9.4 Cross-Tenant Isolation Tests (Phase 8)
-
-Automated tests that must pass before each release:
-- User from Company A cannot read Company B's module configs
-- User from Company A cannot read Company B's custom field values
-- Config change for Company A does not affect Company B's resolved config
-- Cache invalidation for Company A does not clear Company B's cache
-- Admin API rejects non-platform-admin users with 403
+Written alongside the code that could break them:
+- Company A's users cannot read Company B's config, preferences or custom field values
+- Publishing for Company A does not change Company B's resolved config or cache keys
+- Cache keys are derived from `TenantContext`, never request input (test with spoofed IDs)
+- Non-platform-admin → `403` on every `/platform/*` route (route table test, so new routes are covered automatically)
+- Config never grants access: a module enabled in config but blocked by plan or permission stays blocked
 
 ---
 
 ## 10. Backward Compatibility Strategy
 
-### 10.1 Zero Breaking Changes for Existing Customers
+1. **Registry defaults equal current behaviour.** A company with no `ConfigVersion`
+   gets exactly today's experience. A regression test asserts the default
+   sidebar equals today's `SIDEBAR_SECTIONS` (after permission filtering).
+2. **Sidebar fallback.** If `/me/config` fails, the frontend uses `SIDEBAR_SECTIONS`.
+3. **Custom fields are additive.** `custom_fields` defaults to `null`; nothing
+   appears without published definitions.
+4. **Plan gating stays authoritative.** Config cannot enable a module the plan forbids.
 
-1. **Module registry defaults match current behavior.** Every module currently
-   active is `defaultEnabled: true`. Existing companies with no `TenantModuleConfig`
-   rows get exactly the same experience they have today.
-
-2. **Sidebar fallback.** If `/api/v1/me/sidebar` fails or returns empty, the
-   frontend falls back to the hardcoded `SIDEBAR_SECTIONS`. This ensures the
-   app works during migration.
-
-3. **Custom fields are additive.** The `custom_fields` JSON column defaults to
-   `null`. Existing records are unaffected. Custom fields only appear when
-   `CustomFieldDefinition` rows exist for that company/module.
-
-4. **Plan gating still works.** `planAllowsFeature()` runs before module config.
-   A TRIAL company cannot enable a PRO-only module through config — the plan
-   gate takes precedence.
-
-### 10.2 Migration Path
-
-1. Deploy new schema (additive — no existing columns change)
-2. Deploy new services (ConfigResolver, ModuleRegistry) — inactive until frontend calls them
-3. Deploy updated frontend with config-driven sidebar (with fallback)
-4. Onboard first enterprise client: create their `TenantModuleConfig` rows via admin API
-5. Gradually build admin dashboard UI while API is usable via curl/Postman
+**Migration path:** additive schema → services deployed but unused → frontend
+with fallback → first enterprise client configured through the admin API
+(Postman) while the dashboard is built.
 
 ---
 
 ## 11. Implementation Phases & GitHub Epics
 
-### Phase 1 — Configuration Foundation (E01 + E02)
+Each phase ships its own tests. Phase 8 is final validation and pilot, not the
+first time anything is tested.
 
-**Epic E01: Tenant Configuration Foundation**
-- [ ] Create `TenantModuleConfig` Prisma model + migration
-- [ ] Create `UserConfigOverride` Prisma model + migration
-- [ ] Add Company/Shop/User relations in schema
-- [ ] Implement `ConfigResolverService` with Redis caching
-- [ ] Write config resolution unit tests (hierarchy merge, cache invalidation)
-- [ ] Write cross-tenant isolation tests
+### Phase 1 — Configuration Engine Foundation (E01 + E02) — Critical
 
-**Epic E02: Module Registry & Resolution**
-- [ ] Define `MODULE_REGISTRY` constant with all 30+ modules
-- [ ] Implement `ModuleRegistryService` (plan-aware filtering)
-- [ ] Create `/api/v1/me/sidebar` endpoint
-- [ ] Create `/api/v1/me/modules/:key/config` endpoint
-- [ ] Wire sidebar endpoint into existing `PermissionsGuard` checks
-- [ ] Integration tests: sidebar resolves correctly per role + company config
+**E01: Tenant Configuration Foundation**
+- [ ] Verify existing infrastructure claims in §2.1 (behaviour + tests); record gaps as issues
+- [ ] `TenantModuleConfig` (draft working set) + `NULLS NOT DISTINCT` unique index
+- [ ] `ConfigVersion` (immutable published snapshots)
+- [ ] `UserPreference` (restricted schema)
+- [ ] `ConfigDraftService` with revision-based optimistic concurrency
+- [ ] `ConfigPublishService`: validate, publish, preview, rollback, diff (no UI)
+- [ ] Isolation and publish-concurrency tests
 
-### Phase 2 — Platform Admin APIs (E03)
+**E02: Module Registry & Resolution**
+- [ ] `MODULE_REGISTRY` with all modules, `configSchema`, `defaults`, `dependsOn`, `shopOverridable`
+- [ ] Registry invariant tests (defaults parse, deps exist, no cycles)
+- [ ] `ConfigResolverService` with versioned snapshot cache (§5.2)
+- [ ] `ModuleRegistryService.isUsable`
+- [ ] `ConfigModule` wiring
+- [ ] Resolver tests: defaults, shop overrides, Redis-down, stampede, provenance
 
-**Epic E03: Platform Admin APIs + Config Publishing**
-- [ ] Create `ConfigAdminModule` with `PlatformAdminGuard`
-- [ ] `GET/PUT/DELETE /admin/tenants/:id/modules/:key` — module config CRUD
-- [ ] `GET/PUT/DELETE /admin/tenants/:id/shops/:shopId/modules/:key` — shop overrides
-- [ ] `GET/PUT/DELETE /admin/tenants/:id/users/:userId/overrides/:key` — user overrides
-- [ ] Create `ConfigVersion` Prisma model + migration (immutable published snapshots, see §4.4)
-- [ ] Implement `ConfigPublishingService` — advisory lock, expected base version, atomic snapshot
-- [ ] `POST /admin/tenants/:id/config-versions/publish` — publish with 409 on conflict
-- [ ] `POST /admin/tenants/:id/config-versions/:id/rollback` — create new version from old snapshot
-- [ ] Config change audit logging via existing `PlatformAuditLog`
-- [ ] Input validation DTOs with class-validator
-- [ ] API integration tests including concurrent publish conflict (409)
+### Phase 2 — Admin & User APIs (E03) — Critical
+- [ ] `/platform/tenants/...` draft, preview, publish, versions, diff, rollback, effective
+- [ ] `/me/config` (with ETag) and `/me/preferences`
+- [ ] `ModuleEnabledGuard`
+- [ ] Audit logging, DTO validation, rate limits
+- [ ] Route-table test: every `/platform/*` route requires platform admin
 
-### Phase 3 — Admin Dashboard (E04)
+### Phase 3 — Admin Dashboard (E04) — High
+- [ ] Scaffold `apps/admin`; auth; tenant list/detail
+- [ ] Schema-driven module config editor (draft)
+- [ ] Preview & diff, publish with validation errors, version history, rollback
+- [ ] Effective-config (provenance) view
+- [ ] Build + deploy pipeline
 
-**Epic E04: Admin Dashboard App**
-- [ ] Scaffold `apps/admin` (Vite + React + Mantine + React Router)
-- [ ] Implement auth flow (reuse JWT from `apps/api`)
-- [ ] Dashboard overview page (tenant list, health, subscription stats)
-- [ ] Tenant detail page with module config editor
-- [ ] Module toggle + config JSON editor per company
-- [ ] Shop-level override editor
-- [ ] User override editor
-- [ ] Wire to Turborepo build pipeline
-- [ ] Add to `.github/workflows/deploy.yml`
+### Phase 4 — Dynamic UI & API Enforcement (E05) — High
+- [ ] Sidebar from `/me/config` with fallback
+- [ ] Module gate combining plan + `usable`
+- [ ] Module label renaming; table column visibility; dashboard widget visibility
+- [ ] API-level enforcement of mandatory/hidden/locked fields (§9.2) in business module write paths
+- [ ] Tests: default config ≡ today's behaviour; enforcement per module
 
-### Phase 4 — Dynamic UI (E05)
+### Phase 5 — Custom Fields (E06) — High
+- [ ] `CustomFieldDefinition` + `custom_fields` columns + GIN indexes
+- [ ] Draft/publish integration (definitions in snapshot)
+- [ ] Backend value validation + field permissions on all supporting entities
+- [ ] Lifecycle rules (§4.5) enforced in the API
+- [ ] Frontend form renderer, table columns, filters for `searchable` fields
+- [ ] Admin field builder UI
 
-**Epic E05: Dynamic UI Configuration**
-- [ ] Refactor `sidebar-navigation.ts` to consume `/me/sidebar` response
-- [ ] Update `Sidebar.tsx` to fetch config on mount (with hardcoded fallback)
-- [ ] Add module label renaming support (e.g. "Plants" → "Branches")
-- [ ] Config-driven table column visibility per module
-- [ ] Config-driven mandatory/optional fields per module
-- [ ] Dashboard widget visibility per company
-- [ ] Update `TrialFeatureGate.tsx` to check module config + plan together
+### Phase 6 — Workflow & Policy Admin (E07) — Medium
+- [ ] Admin API over existing `WorkflowGraph`/`WorkflowVersion` (compile before save)
+- [ ] Admin API for policy rules using the existing condition vocabulary only
+- [ ] Expose `FeatureFlagsService.setEnabled()` per company
+- [ ] Admin UI: approval chain editor, policy rule editor
+- [ ] Integration tests: company-specific workflow runs
 
-### Phase 5 — Custom Fields (E06)
+### Phase 7 — Templates, Import/Export & Lifecycle Tooling (E08) — Medium
+- [ ] Export/import (into drafts) with `schemaVersion`
+- [ ] Industry templates (Manufacturing, Retail, Wholesale) as reviewed files
+- [ ] Audit diff viewer
+- [ ] Snapshot schema migration framework (§4.6) + first migration test
 
-**Epic E06: Custom Field Engine**
-- [ ] Create `CustomFieldDefinition` Prisma model + migration
-- [ ] Add `custom_fields Json?` column to 8 entity tables (migration)
-- [ ] Implement `CustomFieldService` (CRUD, validation, rendering metadata)
-- [ ] Admin API endpoints for custom field management
-- [ ] Frontend: dynamic form renderer that reads field definitions
-- [ ] Frontend: custom field columns in data tables
-- [ ] Admin dashboard: custom field builder UI
-- [ ] Validation: JSON Schema-based field validation on API writes
-
-### Phase 6 — Workflow & Policy Admin (E07)
-
-**Epic E07: Workflow & Policy Administration**
-- [ ] Admin endpoints to list/create/update `WorkflowGraph` per company
-- [ ] Admin endpoints to manage `NotificationPolicy` rules per company
-- [ ] Expose existing `FeatureFlagsService.setEnabled()` in admin API
-- [ ] Admin dashboard: visual workflow editor (graph nodes + edges)
-- [ ] Admin dashboard: policy rule editor
-- [ ] Admin dashboard: approval chain configuration per module
-- [ ] Integration test: workflow runs with company-specific config
-
-### Phase 7 — Config Versioning UI & Advanced Lifecycle (E08)
-
-**Epic E08: Configuration Versioning UI**
-
-Note: The `ConfigVersion` model and immutable publish/rollback mechanism are
-implemented in Phase 2 (see §4.4). Phase 7 adds the admin dashboard UI and
-advanced lifecycle features on top.
-
-- [ ] Admin dashboard: version history timeline with diff viewer
-- [ ] Admin dashboard: preview mode ("view as Company X, User Y, Shop Z")
-- [ ] Admin dashboard: publish confirmation with version comparison
-- [ ] Admin dashboard: rollback button with impact preview
-- [ ] Admin dashboard: audit trail per published version
-- [ ] Implement version diff service (compare two published snapshots)
-
-### Phase 8 — Enterprise Validation (E09)
-
-**Epic E09: Enterprise Security & Testing**
-- [ ] Cross-tenant config isolation test suite (automated)
-- [ ] Permission-vs-config separation test suite
-- [ ] Performance test: config resolution under load (target <5ms p99 with cache)
-- [ ] Cache stampede test: cold-start behavior under concurrent requests
-- [ ] Security audit: admin API access controls
-- [ ] Regression suite: existing features unchanged with empty config
-- [ ] First-client pilot checklist and acceptance criteria
+### Phase 8 — Enterprise Validation & Pilot (E09) — Critical
+- [ ] Full security review and pen test of `/platform/*` and config paths
+- [ ] Load test (§12 targets)
+- [ ] Full regression with empty config
+- [ ] First-client pilot checklist and sign-off
 
 ---
 
 ## 12. Acceptance Criteria per Phase
 
 ### Phase 1
-- Config resolution returns correct merged result for Platform→Company→Shop→Role→User
-- Redis cache hit rate >95% for repeated config reads
-- Zero existing tests broken
-- Cross-tenant isolation: Company A's config invisible to Company B
+- Tenant requests read only published snapshots; editing a draft changes nothing a tenant sees
+- Publish is atomic; concurrent publishes for one company → exactly one succeeds, the other gets `409`
+- Publish rejects invalid config and broken dependencies, returning all errors
+- Rollback creates a new version; history intact
+- Resolver keeps serving from Postgres when Redis is down
+- Isolation tests (§9.4) pass; zero existing tests broken
 
 ### Phase 2
-- All admin CRUD endpoints return correct responses
-- Every config write produces an audit log entry
-- Non-platform-admin users get 403 on all admin endpoints
-- Config publish creates an immutable snapshot with correct version number
-- Concurrent publish returns 409 when base version does not match
-- Rollback creates a new version from a prior snapshot (does not mutate)
+- All admin endpoints behave per §8.1; every mutation audited
+- Non-platform-admin → `403` on every `/platform/*` route (route-table test)
+- Disabled module's API returns `403` with code `MODULE_DISABLED` via `ModuleEnabledGuard`
+- `/me/config` returns `304` when unchanged
 
 ### Phase 3
-- Admin can log in, see all tenants, toggle modules, save config
-- Config changes reflect in tenant's sidebar immediately after publish (version-based cache)
+- Admin can edit draft, preview diff, publish, view history and roll back for any tenant
+- Published change visible to the tenant within 5 seconds
 
 ### Phase 4
-- Sidebar renders from API config, not hardcoded array
-- Fallback to hardcoded sidebar works when API is unavailable
-- Module labels customizable (e.g. "Plants" → "Branches")
+- Sidebar renders from `/me/config`; falls back when the API is unavailable
+- Default config renders exactly today's sidebar
+- Mandatory fields are enforced by the API (direct API call without the field → `422`)
 
 ### Phase 5
-- Admin can define custom fields per module per company
-- Custom fields appear in tenant's forms and tables
-- Custom field values persist and display correctly
-- Validation rules enforced on API writes
+- Custom field values validated server-side; unknown keys rejected
+- Field read/write permissions enforced in API responses and writes
+- Archived fields keep their data; type change blocked once values exist
 
 ### Phase 6
-- Admin can configure approval chains per company
-- Admin can toggle workflow features per company
-- Workflow engine respects company-specific config
+- Approval chains configurable per company using existing engines
+- Invalid workflow graphs and out-of-vocabulary policy conditions rejected
 
 ### Phase 7
-- Admin dashboard shows version history with diffs between published snapshots
-- Preview mode renders "view as Company X, User Y, Shop Z"
-- Publish confirmation UI shows what changed since last published version
-- Rollback UI shows impact preview before confirming
+- Export from staging → import → preview → publish in production reproduces the config
+- Applying a template produces a valid, publishable draft
 
 ### Phase 8
-- All isolation tests pass
-- p99 config resolution <5ms (cached)
-- First client onboarded with custom modules, fields and workflows
+- **Server-side resolution:** p99 < 5ms with warm in-process cache
+- **End-to-end `GET /me/config`:** p95 < 50ms at 50 companies × 10 concurrent users
+- **Cold path (cache miss → Postgres):** p95 < 200ms
+- Pen test: no critical/high findings open
+- First client live with custom modules, fields and workflows
 
 ---
 
@@ -926,11 +927,11 @@ advanced lifecycle features on top.
 
 | Role | Phases | Focus |
 |---|---|---|
-| Tech Lead | 1, 2, 9 | Architecture, security model, config resolution algorithm, code review |
-| Backend Lead | 1, 2, 5, 6 | Prisma models, NestJS services, API endpoints, workflow integration |
+| Tech Lead | 1, 2, 8 | Data contracts, publish lifecycle, security model, reviews |
+| Backend Lead | 1, 2, 4, 5, 6 | Prisma models, services, API enforcement, workflow integration |
 | Frontend Lead | 3, 4 | Admin dashboard, dynamic sidebar, config-driven UI |
-| Full-Stack | 5, 7 | Custom fields (backend + frontend), versioning |
-| QA | 8 (ongoing) | Isolation tests, regression, performance |
+| Full-Stack | 5, 7 | Custom fields, templates, import/export |
+| QA | Every phase | Phase tests, isolation, regression, load |
 
 ---
 
@@ -938,67 +939,28 @@ advanced lifecycle features on top.
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| Config resolution adds latency to every request | Medium | High | Version-based Redis cache (immutable snapshots never go stale); cache warm on publish |
-| Custom fields create query performance issues | Medium | Medium | JSON column with GIN index; no EAV pattern |
-| Admin misconfiguration breaks a client's system | High | Critical | Immutable published snapshots (Phase 2); rollback creates new version from prior snapshot |
-| Config schema evolves, old configs become invalid | Medium | High | Version field on configs; migration scripts per schema change |
-| Sidebar config API failure locks users out | Low | Critical | Frontend fallback to hardcoded `SIDEBAR_SECTIONS` |
-| Concurrent publish corrupts config | Low | Critical | Advisory lock + expected base version check (409 conflict); draft revision tracking |
-| Prisma migration drops NULLS NOT DISTINCT constraint | Low | High | Verify constraint in CI; manual migration with explicit `CREATE UNIQUE INDEX` |
-| Module guard reads untrusted companyId | Medium | Critical | Guard reads `companyId` from authenticated `request.user` only, never from client-provided headers/params |
+| Admin misconfiguration breaks a client | High | Critical | Drafts never live; schema + dependency validation at publish; preview + diff; one-click rollback (all Phase 1–3) |
+| Two admins overwrite each other | Medium | High | Draft `revision` checks; `expectedBaseVersion` on publish |
+| Config resolution adds latency | Medium | High | Immutable snapshots, in-process + Redis cache, single-flight |
+| Redis outage | Low | Medium | Postgres fallback; never fall back to defaults when a snapshot exists |
+| Config schema evolves, old snapshots invalid | Medium | High | `schemaVersion` + migration functions (§4.6) |
+| Custom fields slow queries | Medium | Medium | GIN index; per-field expression indexes on measured need |
+| UI-only enforcement bypassed via API | Medium | High | §9.2 enforcement + `ModuleEnabledGuard` |
+| Sidebar API failure locks users out | Low | Critical | Frontend fallback to `SIDEBAR_SECTIONS` |
+| Existing infrastructure weaker than assumed | Medium | High | Phase 1 verification task (§2.1) |
 
 ---
 
-## 15. What This Spec Does NOT Cover (Future Work)
+## 15. Out of Scope (Future Work)
 
-- **Multi-region deployment** — Single deployment for now
-- **Per-tenant database isolation** — RLS is sufficient; separate databases only if a client demands it
-- **Plugin/extension system** — Custom code beyond configuration goes through SoftDigit engineering
-- **White-label mobile app** — Out of scope; existing React web is the primary interface
-- **AI-powered configuration suggestions** — Future optimization using the existing agent platform
-
----
-
----
-
-## 16. API-Level Field Enforcement
-
-Mandatory and hidden field configuration is enforced at the **API layer**, not
-only in the frontend. This prevents clients from bypassing field rules via
-direct API calls.
-
-- **Mandatory fields:** The API validates that fields marked mandatory in
-  `TenantModuleConfig.config.mandatoryFields` are present and non-empty on
-  create/update requests. Missing mandatory fields return 422.
-- **Hidden fields:** Fields marked hidden in `config.hiddenFields` are stripped
-  from API responses. On write requests, hidden fields are silently ignored
-  (not rejected) to avoid breaking integrations.
-- Enforcement is implemented as a NestJS interceptor (`FieldEnforcementInterceptor`)
-  that reads the resolved module config for the current tenant.
+- Multi-region deployment
+- Per-tenant databases (RLS is sufficient unless a client demands it)
+- Plugin/extension system — custom code goes through SoftDigit engineering
+- White-label mobile app
+- Unique constraints on custom field values
+- AI-powered configuration suggestions
 
 ---
 
-## 17. Custom Field Lifecycle Rules
-
-- **Deactivation over deletion:** Custom fields are soft-deactivated (`isActive: false`)
-  rather than deleted. Existing data in `custom_fields` JSON columns is preserved.
-- **Type changes:** Once a custom field has data, its `fieldType` cannot be changed.
-  A new field must be created and the old one deactivated.
-- **Required flag:** Changing `required` from false to true only applies to new records.
-  Existing records are not retroactively validated.
-- **Select options:** Removing a select option does not delete existing data that used
-  it. The value is preserved but flagged as deprecated in the admin UI.
-
----
-
-## Revision History
-
-| Revision | Date | Changes |
-|---|---|---|
-| 1 | 2026-11-03 | Initial architecture specification |
-| 2 | 2026-11-04 | Reconciled with architecture review: version-based caching replaces 30s TTL; immutable published snapshots replace draft ConfigVersion model; publishing moved to Phase 2; added NULLS NOT DISTINCT constraint note; added guard execution order (§9.2); added module dependency validation; added API-level field enforcement (§16); added custom field lifecycle rules (§17); added concurrent publish, constraint and guard risks to risk register |
-
----
-
-*This document should be reviewed and approved before implementation begins.
-It becomes the architectural source of truth for the GitHub project.*
+*This document must be approved before implementation begins. It is the
+architectural source of truth for the GitHub project.*
