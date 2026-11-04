@@ -41,6 +41,7 @@ import type {
   CreateEmailSenderDto,
   UpdateEmailSenderDto,
 } from './dto/email-sender.dto';
+import { TenantContext } from '../../common/tenant/tenant-context';
 
 @Injectable()
 export class EmailSenderService implements OnApplicationBootstrap {
@@ -55,7 +56,8 @@ export class EmailSenderService implements OnApplicationBootstrap {
 
   onApplicationBootstrap() {
     if (process.env.NODE_ENV === 'test') return;
-    void this.reencryptLegacySmtpPasswords().catch((err) =>
+    // Startup work across every tenant: system access is explicit (#239).
+    void TenantContext.runWithSystemAccess(() => this.reencryptLegacySmtpPasswords()).catch((err) =>
       this.logger.warn(`SMTP password re-encryption skipped: ${(err as Error).message}`),
     );
   }

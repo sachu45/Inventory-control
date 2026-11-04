@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { LinkService } from './link.service';
+import { TenantContext } from '../../../common/tenant/tenant-context';
 
 const EXPIRE_SWEEP_MS = 10 * 60_000;
 const PURGE_SWEEP_MS = 24 * 3_600_000;
@@ -20,8 +21,9 @@ export class LinkTokenCleanupService implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly links: LinkService) {}
 
   onModuleInit() {
-    this.expireTimer = setInterval(() => void this.sweepExpired(), EXPIRE_SWEEP_MS);
-    this.purgeTimer = setInterval(() => void this.sweepPurge(), PURGE_SWEEP_MS);
+    // Timers run outside any request, across every tenant: system access is explicit (#239).
+    this.expireTimer = setInterval(() => void TenantContext.runWithSystemAccess(() => this.sweepExpired()), EXPIRE_SWEEP_MS);
+    this.purgeTimer = setInterval(() => void TenantContext.runWithSystemAccess(() => this.sweepPurge()), PURGE_SWEEP_MS);
     this.expireTimer.unref();
     this.purgeTimer.unref();
   }

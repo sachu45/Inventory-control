@@ -5,6 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { OutboxService } from '../../common/event-platform/outbox.service';
 import { ExceptionEngineService } from './exception-engine/exception-engine.service';
 import { EXPIRY_SCAN_QUEUE, DEFAULT_EXPIRY_THRESHOLDS } from './expiry-scan.constants';
+import { TenantContext } from '../../common/tenant/tenant-context';
 
 @Processor(EXPIRY_SCAN_QUEUE)
 export class ExpiryScanProcessor extends WorkerHost {
@@ -18,7 +19,15 @@ export class ExpiryScanProcessor extends WorkerHost {
     super();
   }
 
-  async process(_job: Job) {
+  /**
+   * Background job with no request: system access is explicit rather than the
+   * implicit no-context fallback (#239).
+   */
+  process(_job: Job) {
+    return TenantContext.runWithSystemAccess(() => this.handle(_job));
+  }
+
+  private async handle(_job: Job) {
     const thresholds = DEFAULT_EXPIRY_THRESHOLDS;
     const today = new Date();
     today.setHours(0, 0, 0, 0);

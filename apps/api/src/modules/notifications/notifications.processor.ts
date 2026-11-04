@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { Job } from 'bullmq';
 import { JobFailureService } from '../../common/queues/job-failure.service';
 import { MetricsService } from '../../common/observability/metrics.service';
+import { TenantContext } from '../../common/tenant/tenant-context';
 
 export type NotificationJob = {
   alertEventId: string;
@@ -34,7 +35,15 @@ export class NotificationsProcessor extends WorkerHost {
       .observe(Math.max(0, durationSec));
   }
 
-  async process(job: Job<NotificationJob>): Promise<{ delivered: boolean; statusCode?: number }> {
+  /**
+   * Background job with no request: system access is explicit rather than the
+   * implicit no-context fallback (#239).
+   */
+  process(job: Job<NotificationJob>) {
+    return TenantContext.runWithSystemAccess(() => this.handle(job));
+  }
+
+  private async handle(job: Job<NotificationJob>): Promise<{ delivered: boolean; statusCode?: number }> {
     const url = this.config.get<string>('NOTIFICATIONS_WEBHOOK_URL')?.trim();
     if (!url) {
       // No webhook configured: ack and move on. Alerts remain in DB for the SPA.

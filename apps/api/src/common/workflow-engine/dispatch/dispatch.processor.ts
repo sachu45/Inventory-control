@@ -5,6 +5,7 @@ import { DISPATCH_JOB, NOTIFICATION_DISPATCH_QUEUE } from './dispatch.constants'
 import { DispatchJobData } from './dispatch-job';
 import { DispatchBatchService } from './dispatch-batch.service';
 import { CustomerDispatchService } from './customer-dispatch.service';
+import { TenantContext } from '../../tenant/tenant-context';
 
 /**
  * Worker for the dispatch queue (Plan §11). Performs deferred sends when their
@@ -22,7 +23,15 @@ export class DispatchProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job): Promise<void> {
+  /**
+   * Background job with no request: system access is explicit rather than the
+   * implicit no-context fallback (#239).
+   */
+  process(job: Job) {
+    return TenantContext.runWithSystemAccess(() => this.handle(job));
+  }
+
+  private async handle(job: Job): Promise<void> {
     if (job.name === DISPATCH_JOB.DEFERRED_SEND) {
       await this.dispatch.sendDeferred(job.data as DispatchJobData);
       return;

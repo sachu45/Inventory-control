@@ -23,6 +23,7 @@ import {
 } from './notification-jobs';
 import { NotificationPrefsService } from './notification-prefs.service';
 import { businessDate } from '../ai/tools/business-date';
+import { TenantContext } from '../../../common/tenant/tenant-context';
 
 type AnalyticsResult = {
   totalRevenue?: unknown;
@@ -81,7 +82,15 @@ export class NotificationProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<NotificationJob>): Promise<{ sent: number }> {
+  /**
+   * Background job with no request: system access is explicit rather than the
+   * implicit no-context fallback (#239).
+   */
+  process(job: Job<NotificationJob>) {
+    return TenantContext.runWithSystemAccess(() => this.handle(job));
+  }
+
+  private async handle(job: Job<NotificationJob>): Promise<{ sent: number }> {
     if (!this.adapter.isConfigured()) {
       throw new UnrecoverableError('WhatsApp adapter not configured; notification skipped');
     }

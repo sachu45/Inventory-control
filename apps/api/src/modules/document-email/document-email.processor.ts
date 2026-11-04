@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { DOCUMENT_EMAIL_QUEUE } from './document-email.constants';
 import { DocumentEmailService } from './document-email.service';
+import { TenantContext } from '../../common/tenant/tenant-context';
 
 type OutboxJobData = { outboxId: string };
 
@@ -14,7 +15,15 @@ export class DocumentEmailProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<OutboxJobData>) {
+  /**
+   * Background job with no request: system access is explicit rather than the
+   * implicit no-context fallback (#239).
+   */
+  process(job: Job<OutboxJobData>) {
+    return TenantContext.runWithSystemAccess(() => this.handle(job));
+  }
+
+  private async handle(job: Job<OutboxJobData>) {
     const { outboxId } = job.data;
     try {
       await this.documentEmail.processOutbox(outboxId);

@@ -15,6 +15,7 @@ import {
   backupDeliverySubject,
   backupDeliveryText,
 } from '../../common/mail/backup-delivery.template';
+import { TenantContext } from '../../common/tenant/tenant-context';
 
 type BackupJobPayload = { backupJobId: string };
 
@@ -48,7 +49,15 @@ export class BackupProcessor extends WorkerHost {
     await this.failures.record(job, err);
   }
 
-  async process(job: Job<BackupJobPayload>) {
+  /**
+   * Background job with no request: system access is explicit rather than the
+   * implicit no-context fallback (#239).
+   */
+  process(job: Job<BackupJobPayload>) {
+    return TenantContext.runWithSystemAccess(() => this.handle(job));
+  }
+
+  private async handle(job: Job<BackupJobPayload>) {
     const backupJob = await this.prisma.backupJob.findUnique({ where: { id: job.data.backupJobId } });
     if (!backupJob) throw new Error('Backup job not found');
 

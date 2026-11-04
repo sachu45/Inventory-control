@@ -8,6 +8,7 @@ import { DocumentPdfService } from '../../common/pdf/document-pdf.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JobFailureService } from '../../common/queues/job-failure.service';
 import { MetricsService } from '../../common/observability/metrics.service';
+import { TenantContext } from '../../common/tenant/tenant-context';
 
 type ExportJob = { type: 'po-pdf'; purchaseOrderId: string };
 
@@ -42,7 +43,15 @@ export class ExportProcessor extends WorkerHost {
     await this.failures.record(job, err);
   }
 
-  async process(job: Job<ExportJob>): Promise<{ downloadUrl: string; fileName: string }> {
+  /**
+   * Background job with no request: system access is explicit rather than the
+   * implicit no-context fallback (#239).
+   */
+  process(job: Job<ExportJob>) {
+    return TenantContext.runWithSystemAccess(() => this.handle(job));
+  }
+
+  private async handle(job: Job<ExportJob>): Promise<{ downloadUrl: string; fileName: string }> {
     const dir = this.config.get<string>('EXPORT_STORAGE_DIR', './storage/exports');
     await fs.mkdir(dir, { recursive: true });
 

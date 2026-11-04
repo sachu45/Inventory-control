@@ -13,6 +13,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { EmailNotificationsService } from './email-notifications.service';
 import type { EmailNotificationsConfig } from './email-notifications.constants';
 import { PAYMENT_REMINDER_QUEUE } from './payment-reminder.constants';
+import { TenantContext } from '../../common/tenant/tenant-context';
 
 @Processor(PAYMENT_REMINDER_QUEUE)
 export class PaymentReminderProcessor extends WorkerHost {
@@ -27,7 +28,15 @@ export class PaymentReminderProcessor extends WorkerHost {
     super();
   }
 
-  async process(_job: Job) {
+  /**
+   * Background job with no request: system access is explicit rather than the
+   * implicit no-context fallback (#239).
+   */
+  process(_job: Job) {
+    return TenantContext.runWithSystemAccess(() => this.handle(_job));
+  }
+
+  private async handle(_job: Job) {
     void _job;
     if (!this.mail.isConfigured()) {
       this.logger.warn('Payment reminder job skipped: SMTP not configured');

@@ -7,6 +7,7 @@ import { EngagementTrackerService } from './engagement-tracker.service';
 import { LifecycleOrchestratorService } from './lifecycle-orchestrator.service';
 import { PlatformLifecycleMailService } from './platform-lifecycle-mail.service';
 import { SUBSCRIPTION_LIFECYCLE_QUEUE } from './subscription-lifecycle.constants';
+import { TenantContext } from '../../common/tenant/tenant-context';
 
 @Processor(SUBSCRIPTION_LIFECYCLE_QUEUE)
 export class SubscriptionLifecycleProcessor extends WorkerHost {
@@ -22,7 +23,15 @@ export class SubscriptionLifecycleProcessor extends WorkerHost {
     super();
   }
 
-  async process(_job: Job) {
+  /**
+   * Background job with no request: system access is explicit rather than the
+   * implicit no-context fallback (#239).
+   */
+  process(_job: Job) {
+    return TenantContext.runWithSystemAccess(() => this.handle(_job));
+  }
+
+  private async handle(_job: Job) {
     void _job;
     if (!this.mail.isConfigured()) {
       this.logger.warn('Lifecycle job skipped: SMTP not configured');

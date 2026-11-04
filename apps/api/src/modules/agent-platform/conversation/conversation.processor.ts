@@ -8,6 +8,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { WhatsAppAdapter } from '../channels/whatsapp/whatsapp.adapter';
 import type { QuickReply } from '../channels/channel-adapter.interface';
 import type { WhatsAppSendJob } from './conversation.service';
+import { TenantContext } from '../../../common/tenant/tenant-context';
 
 type InteractivePayload = { buttons: QuickReply[] };
 
@@ -24,7 +25,15 @@ export class ConversationProcessor extends WorkerHost {
     super();
   }
 
-  async process(
+  /**
+   * Background job with no request: system access is explicit rather than the
+   * implicit no-context fallback (#239).
+   */
+  process(job: Job<WhatsAppSendJob>,) {
+    return TenantContext.runWithSystemAccess(() => this.handle(job));
+  }
+
+  private async handle(
     job: Job<WhatsAppSendJob>,
   ): Promise<{ sent: boolean; providerMessageId?: string | null }> {
     const message = await this.prisma.message.findUnique({

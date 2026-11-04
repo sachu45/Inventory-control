@@ -4,6 +4,7 @@ import { Job } from 'bullmq';
 import { PLATFORM_CHECKS_QUEUE } from './platform-notification.constants';
 import { PlatformHealthService } from './platform-health.service';
 import { PlatformRevenueService } from './platform-revenue.service';
+import { TenantContext } from '../../common/tenant/tenant-context';
 
 @Processor(PLATFORM_CHECKS_QUEUE)
 export class PlatformCheckProcessor extends WorkerHost {
@@ -16,7 +17,15 @@ export class PlatformCheckProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<{ kind: string }>) {
+  /**
+   * Background job with no request: system access is explicit rather than the
+   * implicit no-context fallback (#239).
+   */
+  process(job: Job<{ kind: string }>) {
+    return TenantContext.runWithSystemAccess(() => this.handle(job));
+  }
+
+  private async handle(job: Job<{ kind: string }>) {
     const kind = job.data?.kind ?? job.name;
     if (kind === 'health-check') {
       return this.health.runHealthChecks();
