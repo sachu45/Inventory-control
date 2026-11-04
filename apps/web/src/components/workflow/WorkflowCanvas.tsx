@@ -42,13 +42,13 @@ export function WorkflowCanvas({ initial }: { initial: wf.WorkflowGraphDef }) {
       def.nodes.map((n, i) => ({
         id: n.key,
         data: { label: `${n.kind}: ${n.label ?? n.key}` },
-        position: positions[n.key] ?? { x: (i % 2) * 260 + 40, y: Math.floor(i / 1) * 80 + 20 },
+        position: positions[n.key] ?? { x: (i % 2) * 260 + 40, y: Math.floor(i / 2) * 80 + 20 },
         style: {
           borderLeft: `4px solid ${KIND_COLOR[n.kind] ?? '#888'}`,
           borderRadius: 6,
           padding: 6,
           fontSize: 12,
-          background: 'white',
+          background: 'var(--color-card)',
         },
       })),
     [def, positions],

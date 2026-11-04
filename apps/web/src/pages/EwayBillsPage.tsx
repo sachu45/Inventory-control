@@ -119,8 +119,6 @@ export function EwayBillsPage({ createOnly = false }: { createOnly?: boolean }) 
       }
 
       const url = `/api/v1/eway-bills/${active.id}/pdf`;
-      console.log('[EwayBillsPDF] Downloading:', { billId: active.id, billNumber: active.ewayBillNumber, url });
-
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -129,8 +127,6 @@ export function EwayBillsPage({ createOnly = false }: { createOnly?: boolean }) 
         credentials: 'include',
       });
 
-      console.log('[EwayBillsPDF] Response:', { status: response.status, contentType: response.headers.get('content-type') });
-
       if (!response.ok) {
         const text = await response.text();
         console.error('[EwayBillsPDF] Error response:', text);
@@ -138,7 +134,6 @@ export function EwayBillsPage({ createOnly = false }: { createOnly?: boolean }) 
       }
 
       const blob = await response.blob();
-      console.log('[EwayBillsPDF] Blob received:', { size: blob.size, type: blob.type });
 
       if (blob.size === 0) {
         throw new Error('PDF is empty');
@@ -364,18 +359,26 @@ export function EwayBillsPage({ createOnly = false }: { createOnly?: boolean }) 
                         placeholder="Product name"
                         value={item.productName}
                         onChange={(e) => {
-                          const newItems = [...form.items];
-                          newItems[idx].productName = e.target.value;
-                          setForm((prev) => ({ ...prev, items: newItems }));
+                          const value = e.target.value;
+                          setForm((prev) => ({
+                            ...prev,
+                            items: prev.items.map((item, i) =>
+                              i === idx ? { ...item, productName: value } : item
+                            ),
+                          }));
                         }}
                       />
                       <Input
                         placeholder="HSN"
                         value={item.hsnCode}
                         onChange={(e) => {
-                          const newItems = [...form.items];
-                          newItems[idx].hsnCode = e.target.value;
-                          setForm((prev) => ({ ...prev, items: newItems }));
+                          const value = e.target.value;
+                          setForm((prev) => ({
+                            ...prev,
+                            items: prev.items.map((item, i) =>
+                              i === idx ? { ...item, hsnCode: value } : item
+                            ),
+                          }));
                         }}
                       />
                       <Input
@@ -383,9 +386,13 @@ export function EwayBillsPage({ createOnly = false }: { createOnly?: boolean }) 
                         placeholder="Qty"
                         value={item.quantity}
                         onChange={(e) => {
-                          const newItems = [...form.items];
-                          newItems[idx].quantity = e.target.value;
-                          setForm((prev) => ({ ...prev, items: newItems }));
+                          const value = e.target.value;
+                          setForm((prev) => ({
+                            ...prev,
+                            items: prev.items.map((item, i) =>
+                              i === idx ? { ...item, quantity: value } : item
+                            ),
+                          }));
                         }}
                       />
                       <Input
@@ -393,9 +400,13 @@ export function EwayBillsPage({ createOnly = false }: { createOnly?: boolean }) 
                         placeholder="Taxable"
                         value={item.taxableAmount}
                         onChange={(e) => {
-                          const newItems = [...form.items];
-                          newItems[idx].taxableAmount = e.target.value;
-                          setForm((prev) => ({ ...prev, items: newItems }));
+                          const value = e.target.value;
+                          setForm((prev) => ({
+                            ...prev,
+                            items: prev.items.map((item, i) =>
+                              i === idx ? { ...item, taxableAmount: value } : item
+                            ),
+                          }));
                         }}
                       />
                       <Input
@@ -403,9 +414,13 @@ export function EwayBillsPage({ createOnly = false }: { createOnly?: boolean }) 
                         placeholder="GST%"
                         value={item.gstRate}
                         onChange={(e) => {
-                          const newItems = [...form.items];
-                          newItems[idx].gstRate = e.target.value;
-                          setForm((prev) => ({ ...prev, items: newItems }));
+                          const value = e.target.value;
+                          setForm((prev) => ({
+                            ...prev,
+                            items: prev.items.map((item, i) =>
+                              i === idx ? { ...item, gstRate: value } : item
+                            ),
+                          }));
                         }}
                       />
                       <Input
@@ -413,9 +428,13 @@ export function EwayBillsPage({ createOnly = false }: { createOnly?: boolean }) 
                         placeholder="Total"
                         value={item.total}
                         onChange={(e) => {
-                          const newItems = [...form.items];
-                          newItems[idx].total = e.target.value;
-                          setForm((prev) => ({ ...prev, items: newItems }));
+                          const value = e.target.value;
+                          setForm((prev) => ({
+                            ...prev,
+                            items: prev.items.map((item, i) =>
+                              i === idx ? { ...item, total: value } : item
+                            ),
+                          }));
                         }}
                       />
                       <Button

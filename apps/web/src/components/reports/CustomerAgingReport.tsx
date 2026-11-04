@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Fragment } from 'react';
 import { getCustomerAging, getRiskIcon, getRiskLabel, CustomerAgingResponse, CustomerAgingFilters } from '@/api/reports';
 import Loading from '@/components/Loading';
 import ErrorView from '@/components/Error';
@@ -141,8 +141,8 @@ export default function CustomerAgingReport({ shopId }: Props) {
                 </tr>
               ) : (
                 data.items.map((item) => (
-                  <>
-                    <tr key={item.customerId} className="hover:bg-muted">
+                  <Fragment key={item.customerId}>
+                    <tr className="hover:bg-muted">
                       <td className="px-6 py-4 text-sm font-medium text-foreground">{item.customerName}</td>
                       <td className="px-6 py-4 text-sm text-right font-medium text-green-600 dark:text-green-400">
                         ₹{(item.agingBuckets.current_0_30 / 100000).toFixed(2)}L
@@ -212,7 +212,7 @@ export default function CustomerAgingReport({ shopId }: Props) {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 ))
               )}
             </tbody>

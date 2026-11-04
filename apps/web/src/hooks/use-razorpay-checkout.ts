@@ -18,6 +18,9 @@ function loadRazorpayScript(): Promise<void> {
   if (window.Razorpay) return Promise.resolve();
   const existing = document.getElementById(SCRIPT_ID) as HTMLScriptElement | null;
   if (existing) {
+    if ((existing as HTMLScriptElement).dataset.loaded === '1') {
+      return window.Razorpay ? Promise.resolve() : Promise.reject(new Error('Razorpay script loaded but SDK unavailable'));
+    }
     return new Promise((resolve, reject) => {
       existing.addEventListener('load', () => resolve());
       existing.addEventListener('error', () => reject(new Error('Failed to load Razorpay')));
@@ -28,7 +31,7 @@ function loadRazorpayScript(): Promise<void> {
     script.id = SCRIPT_ID;
     script.src = SCRIPT_SRC;
     script.async = true;
-    script.onload = () => resolve();
+    script.onload = () => { script.dataset.loaded = '1'; resolve(); };
     script.onerror = () => reject(new Error('Failed to load Razorpay'));
     document.body.appendChild(script);
   });
