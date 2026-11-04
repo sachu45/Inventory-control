@@ -3,9 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Tharun-code-08/Inventory-control/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Tharun-code-08/Inventory-control/ci.yml?branch=main&label=CI&logo=github&style=for-the-badge" alt="CI" /></a>
-  <a href="https://github.com/Tharun-code-08/Inventory-control/actions/workflows/deploy.yml"><img src="https://img.shields.io/github/actions/workflow/status/Tharun-code-08/Inventory-control/deploy.yml?branch=main&label=Deploy&logo=vercel&style=for-the-badge" alt="Deploy" /></a>
-  <a href="https://github.com/Tharun-code-08/Inventory-control/actions/workflows/codeql.yml"><img src="https://img.shields.io/github/actions/workflow/status/Tharun-code-08/Inventory-control/codeql.yml?branch=main&label=CodeQL&logo=github&style=for-the-badge" alt="CodeQL" /></a>
+  <img src="https://img.shields.io/badge/Repository-private-24292f?style=for-the-badge&logo=github" alt="Private repository" />
   <img src="https://img.shields.io/badge/Tests-840+-34d399?style=for-the-badge&logo=jest&logoColor=white" alt="840+ Tests" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPL--3.0-818cf8?style=for-the-badge" alt="AGPL-3.0" /></a>
 </p>
