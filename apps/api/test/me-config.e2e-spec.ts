@@ -141,6 +141,13 @@ describe('GET /me/config and PUT /me/preferences (e2e)', () => {
     expect(sidebarPaths(viewer.body)).toEqual(expectedSidebar(false, viewerPermissions));
     expect(viewer.body.sidebar.flatMap((s) => s.children).map((c) => c.path)).not.toContain('/dashboard');
     expect(viewer.body.modules.dashboard.usable).toBe(false);
+    expect(viewer.body.modules.dashboard.blockedBy).toBe('role');
+    for (const body of [owner.body, viewer.body]) {
+      for (const [key, mod] of Object.entries(body.modules)) {
+        expect({ key, consistent: mod.usable === (mod.blockedBy === null) }).toEqual({ key, consistent: true });
+      }
+    }
+    expect(Object.values(viewer.body.modules).some((m) => m.blockedBy === 'permission')).toBe(true);
   });
 
   it('applies the published config: disabled modules hidden, labels renamed, plan-gated links locked', async () => {
@@ -149,12 +156,12 @@ describe('GET /me/config and PUT /me/preferences (e2e)', () => {
     expect(body.version).toBe(1);
     const links = body.sidebar.flatMap((s) => s.children);
     expect(links.map((l) => l.key)).not.toContain('contracts');
-    expect(body.modules.contracts.usable).toBe(false);
+    expect(body.modules.contracts).toMatchObject({ usable: false, blockedBy: 'config' });
     expect(links.find((l) => l.key === 'invoices')).toMatchObject({ label: 'Billing Desk', locked: true });
-    expect(body.modules.invoices).toMatchObject({ label: 'Billing Desk', usable: false });
+    expect(body.modules.invoices).toMatchObject({ label: 'Billing Desk', usable: false, blockedBy: 'plan' });
     // TRIAL: still listed (as today, behind an upgrade prompt) but not usable.
     expect(links.find((l) => l.key === 'purchase-orders')).toMatchObject({ locked: true });
-    expect(body.modules['purchase-orders']).toMatchObject({ usable: false, config: { mandatoryFields: ['remarks'] } });
+    expect(body.modules['purchase-orders']).toMatchObject({ usable: false, blockedBy: 'plan', config: { mandatoryFields: ['remarks'] } });
     expect(links.find((l) => l.key === 'products')).toMatchObject({ locked: false });
   });
 

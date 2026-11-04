@@ -26,10 +26,17 @@ export type MeSidebarLink = {
   locked: boolean;
 };
 
+/**
+ * Why a module is not usable, first reason wins: the tenant's config turned it (or a
+ * module it needs) off, the plan excludes it, it is org-admin only, or the user lacks
+ * the permission. Lets the client show the right message: only `plan` gets an upgrade CTA.
+ */
+export type ModuleBlock = 'config' | 'plan' | 'role' | 'permission';
+
 export type MeConfigResponse = {
   /** Published config version in effect; 0 = registry defaults. */
   version: number;
-  modules: Record<ModuleKey, { usable: boolean; label: string; config: ModuleSettings }>;
+  modules: Record<ModuleKey, { usable: boolean; blockedBy: ModuleBlock | null; label: string; config: ModuleSettings }>;
   sidebar: { id: SidebarSectionId; title: string; children: MeSidebarLink[] }[];
   preferences: Record<string, UserPreferences>;
 };
@@ -67,14 +74,20 @@ export class MeConfigService {
       const mod = MODULE_REGISTRY[key];
       const resolved = config.modules[key];
       const roleAllows = !mod.requireOrgAdmin || isOrgAdmin;
-      modules[key] = {
-        usable: roleAllows && this.registry.isUsable(key, config, company.subscriptionPlan, permissions),
-        label: resolved.config.label ?? mod.label,
-        config: resolved.config,
-      };
+      const enabled = resolved.enabled && mod.dependsOn.every((dep) => config.modules[dep].enabled);
+      const usable = roleAllows && this.registry.isUsable(key, config, company.subscriptionPlan, permissions);
+      const blockedBy: ModuleBlock | null = usable
+        ? null
+        : !enabled
+          ? 'config'
+          : mod.planGate && !planAllowsFeature(company.subscriptionPlan, mod.planGate)
+            ? 'plan'
+            : !roleAllows
+              ? 'role'
+              : 'permission';
+      modules[key] = { usable, blockedBy, label: resolved.config.label ?? mod.label, config: resolved.config };
       // Same visibility rule as the web sidebar: org admins see every permission-gated
       // link, and plan-gated links stay visible but locked.
-      const enabled = resolved.enabled && mod.dependsOn.every((dep) => config.modules[dep].enabled);
       const permitted = !mod.requiredPermission || isOrgAdmin || permissions.has(mod.requiredPermission);
       if (mod.inSidebar && enabled && roleAllows && permitted) visible.add(key);
     }

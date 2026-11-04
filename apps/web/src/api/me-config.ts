@@ -22,9 +22,20 @@ export type MeUserPreferences = {
   order?: string[];
 };
 
+export type ModuleBlock = 'config' | 'plan' | 'role' | 'permission';
+
 export type MeConfig = {
   version: number;
-  modules: Record<string, { usable: boolean; label: string; config: { mandatoryFields: string[]; hiddenFields: string[]; label?: string } }>;
+  modules: Record<
+    string,
+    {
+      usable: boolean;
+      /** Why it is not usable; only `plan` warrants an upgrade prompt. Absent from older APIs. */
+      blockedBy?: ModuleBlock | null;
+      label: string;
+      config: { mandatoryFields: string[]; hiddenFields: string[]; label?: string };
+    }
+  >;
   sidebar: MeSidebarSection[];
   preferences: Record<string, MeUserPreferences>;
 };

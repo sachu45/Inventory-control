@@ -6,7 +6,9 @@ import { PageFallback } from '@/components/shared/page-fallback';
 import { lazyPage } from '@/lib/lazy-page';
 import { AppErrorBoundary } from '@/components/AppErrorBoundary';
 import { useSubscription } from '@/hooks/use-subscription';
+import { FeatureGate } from '@/components/FeatureGate';
 import { TrialFeatureGate } from '@/components/TrialFeatureGate';
+import { moduleKeyForPath } from '@/lib/module-routes';
 import { preloadForCurrentRoute } from '@/lib/route-preload';
 const HomePage = lazyPage(() => import('@/pages/HomePage'), 'HomePage');
 const PrivacyPolicyPage = lazyPage(() => import('@/pages/PrivacyPolicyPage'), 'PrivacyPolicyPage');
@@ -97,6 +99,7 @@ const ToolsPage = lazyPage(() => import('@/pages/ToolsPage'), 'ToolsPage');
 const AuthStatusPage = lazyPage(() => import('@/pages/AuthStatusPage'), 'AuthStatusPage');
 
 function Protected({ children }: { children: React.ReactNode }) {
+  const { pathname } = useLocation();
   const initialized = useAuthStore((s) => s.initialized);
   const token = useAuthStore((s) => s.accessToken);
   const user = useAuthStore((s) => s.user);
@@ -104,7 +107,8 @@ function Protected({ children }: { children: React.ReactNode }) {
     return <PageFallback />;
   }
   if (!token || !user) return <Navigate to="/login" replace state={{ from: window.location.pathname + window.location.search }} />;
-  return <>{children}</>;
+  // Every module page: a module the organisation's config switched off is not reachable by URL either.
+  return <FeatureGate module={moduleKeyForPath(pathname)}>{children}</FeatureGate>;
 }
 
 function AdminOnly({ children }: { children: React.ReactNode }) {
