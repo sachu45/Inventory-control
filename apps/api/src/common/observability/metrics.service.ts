@@ -22,6 +22,8 @@ export class MetricsService {
   readonly workflowDispatch: Counter<string>;
   /** Config resolver: Redis failures that fell through to Postgres, by operation. */
   readonly configCacheRedisErrors: Counter<string>;
+  /** Prisma queries made outside any TenantContext, by model, operation and TENANT_CONTEXT_MODE (#239). */
+  readonly prismaMissingTenantContext: Counter<string>;
 
   constructor() {
     collectDefaultMetrics({ register: this.registry });
@@ -83,6 +85,13 @@ export class MetricsService {
       name: 'config_cache_redis_errors_total',
       help: 'Config resolver Redis errors that fell back to Postgres',
       labelNames: ['op'],
+      registers: [this.registry],
+    });
+
+    this.prismaMissingTenantContext = new Counter({
+      name: 'prisma_missing_tenant_context_total',
+      help: 'Prisma queries made outside a TenantContext',
+      labelNames: ['model', 'operation', 'mode'],
       registers: [this.registry],
     });
   }

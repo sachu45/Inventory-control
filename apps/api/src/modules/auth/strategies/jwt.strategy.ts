@@ -5,6 +5,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PrismaService } from '../../../prisma/prisma.service';
 import type { RequestUser } from '../../../common/types/request-user';
 import { resolveRolePermissions } from '../../../common/auth/role-permissions';
+import { TenantContext } from '../../../common/tenant/tenant-context';
 
 type JwtPayload = { sub: string; pwd?: string };
 
@@ -21,7 +22,16 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     });
   }
 
-  async validate(payload: JwtPayload): Promise<RequestUser> {
+  /**
+   * Runs in the auth guard, before TenantRlsInterceptor, so there is no tenant
+   * yet: the user is found by the verified token subject with explicit system
+   * access, and the user's own company comes from that row.
+   */
+  validate(payload: JwtPayload): Promise<RequestUser> {
+    return TenantContext.runWithSystemAccess(() => this.load(payload));
+  }
+
+  private async load(payload: JwtPayload): Promise<RequestUser> {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
       include: { role: true, shop: { select: { companyId: true } } },

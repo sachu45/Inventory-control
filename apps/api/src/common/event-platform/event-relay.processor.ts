@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { EVENT_RELAY_QUEUE } from './event-platform.constants';
 import { EventRelayService } from './event-relay.service';
+import { TenantContext } from '../tenant/tenant-context';
 
 /**
  * Drives EventRelayService.tick on the repeatable relay job. Kept thin: all
@@ -18,7 +19,8 @@ export class EventRelayProcessor extends WorkerHost {
   }
 
   async process(_job: Job): Promise<void> {
-    const result = await this.relay.tick();
+    // Relays every tenant's outbox: a background job, so system access is explicit.
+    const result = await TenantContext.runWithSystemAccess(() => this.relay.tick());
     if (result.claimed > 0) {
       this.logger.debug(
         `Relay tick: claimed=${result.claimed} published=${result.published} failed=${result.failed} dead=${result.dead}`,

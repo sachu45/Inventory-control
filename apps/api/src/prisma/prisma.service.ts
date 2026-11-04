@@ -1,8 +1,10 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import { Prisma, PrismaClient } from '@prisma/client';
 import { RequestContextStore } from '../common/context/request-context';
 import { TenantContext } from '../common/tenant/tenant-context';
+import { MetricsService } from '../common/observability/metrics.service';
 import { createPgAdapter } from './pg-adapter';
+import { MissingTenantContextReporter, tenantAccess, tenantContextMode } from './tenant-access';
 
 /**
  * Models that maintain a `deletedAt` timestamp instead of being hard-deleted.
@@ -31,7 +33,7 @@ function setTenantConfig(
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name);
 
-  constructor() {
+  constructor(@Optional() metrics?: MetricsService) {
     super({
       adapter: createPgAdapter(),
       log: [
@@ -60,6 +62,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     // it so existing `prisma.shop.findMany(...)` calls run with the RLS company
     // context. The extension itself uses the base client to avoid recursion.
     const base = this as unknown as PrismaClient;
+    const mode = tenantContextMode();
+    const reporter = new MissingTenantContextReporter(mode, this.logger, metrics?.prismaMissingTenantContext);
 
     const extended = base.$extends({
       query: {
@@ -70,8 +74,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
               return query(args);
             }
 
-            const companyId = ctx?.companyId ?? '';
-            const systemAccess = ctx ? ctx.systemAccess : true;
+            // Missing contexts are reported where the model method is called (see the
+            // proxy below): by the time Prisma runs this, the caller's stack is gone.
+            const { companyId, systemAccess } = tenantAccess(ctx, mode);
             const inner = { companyId: ctx?.companyId ?? null, inRLSTx: true, systemAccess };
             const scopedQuery = TenantContext.run(inner, () => query(args));
             const [, result] = await base.$transaction([
@@ -95,8 +100,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       if (ctx?.inRLSTx) {
         return extendedTransaction(arg, options);
       }
-      const companyId = ctx?.companyId ?? '';
-      const systemAccess = ctx ? ctx.systemAccess : true;
+      const { companyId, systemAccess, missingContext } = tenantAccess(ctx, mode);
+      if (missingContext) reporter.report('$transaction', typeof arg === 'function' ? 'interactive' : 'batch');
       const inner = { companyId: ctx?.companyId ?? null, inRLSTx: true, systemAccess };
       if (typeof arg === 'function') {
         return extendedTransaction(async (tx: PrismaClient) => {
@@ -125,6 +130,11 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
         if (typeof value === 'function') {
           return (value as (...a: unknown[]) => unknown).bind(extended);
         }
+        // A model delegate used outside any TenantContext: report each call from
+        // the caller's own frame. Inside a context the delegate is returned as is.
+        if (typeof prop === 'string' && !prop.startsWith('$') && isObject(value) && !TenantContext.get()) {
+          return reportingDelegate(prop, value, reporter);
+        }
         return value;
       },
     });
@@ -145,4 +155,22 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   async onModuleDestroy() {
     await this.$disconnect();
   }
+}
+
+function isObject(value: unknown): value is object {
+  return typeof value === 'object' && value !== null;
+}
+
+/** Wraps a model delegate so each method call made without a TenantContext is reported. */
+function reportingDelegate(model: string, delegate: object, reporter: MissingTenantContextReporter): object {
+  return new Proxy(delegate, {
+    get: (target, operation, receiver) => {
+      const member = Reflect.get(target, operation, receiver) as unknown;
+      if (typeof member !== 'function' || typeof operation !== 'string') return member;
+      return (...args: unknown[]) => {
+        if (!TenantContext.get()) reporter.report(model, operation);
+        return (member as (...a: unknown[]) => unknown).apply(target, args);
+      };
+    },
+  });
 }

@@ -19,6 +19,7 @@ import {
   getTrialDays,
 } from '../../common/plans/plan-config';
 import { PrismaService } from '../../prisma/prisma.service';
+import { TenantContext } from '../../common/tenant/tenant-context';
 
 export type SubscriptionSnapshot = {
   plan: SubscriptionPlan;
@@ -161,17 +162,21 @@ export class SubscriptionService {
     const cached = this.writeBlockCache.get(companyId);
     if (cached && Date.now() - cached.at < 60_000) return cached.reason;
 
-    const company = await this.prisma.company.findUnique({
-      where: { id: companyId },
-      select: {
-        subscriptionPlan: true,
-        billingCycle: true,
-        subscriptionStatus: true,
-        trialStartsAt: true,
-        trialEndsAt: true,
-        subscriptionEndsAt: true,
-      },
-    });
+    // Called from SubscriptionWriteGuard, before the tenant context exists, so the
+    // lookup runs in this company's own context rather than with RLS bypassed.
+    const company = await TenantContext.run({ companyId, inRLSTx: false, systemAccess: false }, async () =>
+      await this.prisma.company.findUnique({
+        where: { id: companyId },
+        select: {
+          subscriptionPlan: true,
+          billingCycle: true,
+          subscriptionStatus: true,
+          trialStartsAt: true,
+          trialEndsAt: true,
+          subscriptionEndsAt: true,
+        },
+      }),
+    );
     let reason: string | null = null;
     if (company) {
       const graceDays = Number(process.env.SUBSCRIPTION_GRACE_DAYS ?? 3);

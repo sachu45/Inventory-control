@@ -37,6 +37,7 @@ import { CommonPdfModule } from '@/common/pdf/common-pdf.module';
 import { CacheModule } from '@/common/cache/cache.module';
 import { WorkflowEngineController } from './workflow-engine.controller';
 import { DispatchWebhookController } from './dispatch-webhook.controller';
+import { TenantContext } from '../tenant/tenant-context';
 
 /**
  * Workflow & Automation Engine (Plan §3–§12). Registers:
@@ -127,7 +128,8 @@ export class WorkflowEngineModule implements OnModuleInit, OnApplicationBootstra
   async onApplicationBootstrap(): Promise<void> {
     // Best-effort: a seeding hiccup must never block application startup.
     try {
-      await this.registry.seedSystemWorkflows();
+      // Platform-wide startup work: no request, so system access is explicit.
+      await TenantContext.runWithSystemAccess(() => this.registry.seedSystemWorkflows());
     } catch (err) {
       this.logger.warn(`System workflow seeding skipped: ${(err as Error).message}`);
     }
