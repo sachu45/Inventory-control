@@ -405,6 +405,7 @@ model Company {
   // Enterprise Configuration
   tenantModuleConfigs TenantModuleConfig[]
   userPreferences     UserPreference[]
+  configVersions      ConfigVersion[]
 
   // Agent Platform (WhatsApp assistant)
   channelAccounts    ChannelAccount[]
@@ -4349,6 +4350,24 @@ model TenantModuleConfig {
   @@unique([companyId, shopId, moduleKey], map: "tenant_module_configs_scope_key")
   @@index([companyId])
   @@map("tenant_module_configs")
+}
+
+/// Immutable published config snapshots; a trigger rejects UPDATE and direct DELETE.
+model ConfigVersion {
+  id            String   @id @default(uuid()) @db.Uuid
+  companyId     String   @map("company_id") @db.Uuid
+  version       Int
+  schemaVersion Int      @map("schema_version")
+  snapshot      Json
+  sourceVersion Int?     @map("source_version")
+  changeNote    String?  @map("change_note")
+  publishedBy   String   @map("published_by") @db.Uuid
+  publishedAt   DateTime @default(now()) @map("published_at") @db.Timestamptz(6)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, version])
+  @@map("config_versions")
 }
 
 model UserPreference {
