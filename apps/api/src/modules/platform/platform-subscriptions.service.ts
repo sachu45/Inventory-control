@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { BillingCycle, SubscriptionPlan, SubscriptionStatus } from '@prisma/client';
 import { PLAN_PRICING } from '../../common/plans/plan-config';
+import { TenantContext } from '../../common/tenant/tenant-context';
 import { PrismaService } from '../../prisma/prisma.service';
 
 function mrrForCompany(plan: SubscriptionPlan, cycle: BillingCycle | null): number {
@@ -17,7 +18,12 @@ function mrrForCompany(plan: SubscriptionPlan, cycle: BillingCycle | null): numb
 export class PlatformSubscriptionsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getDashboard() {
+  /** Reads every tenant, so it must not run in the requesting admin's own RLS scope. */
+  getDashboard() {
+    return TenantContext.runWithSystemAccess(() => this.buildDashboard());
+  }
+
+  private async buildDashboard() {
     const now = new Date();
     const thirtyDays = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 

@@ -11,4 +11,11 @@ const storage = new AsyncLocalStorage<TenantCtx>();
 export const TenantContext = {
   get: (): TenantCtx | undefined => storage.getStore(),
   run: <T>(ctx: TenantCtx, fn: () => T): T => storage.run(ctx, fn),
+  /**
+   * Runs platform-wide work (across every tenant) with RLS bypassed. `fn` is awaited
+   * inside the context because Prisma queries are lazy and run in the context they
+   * are awaited in.
+   */
+  runWithSystemAccess: <T>(fn: () => Promise<T>): Promise<T> =>
+    storage.run({ companyId: null, inRLSTx: false, systemAccess: true }, async () => await fn()),
 };

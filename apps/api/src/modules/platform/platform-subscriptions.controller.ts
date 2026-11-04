@@ -2,6 +2,7 @@ import { Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { AuditAction } from '@prisma/client';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { TenantContext } from '../../common/tenant/tenant-context';
 import type { RequestUser } from '../../common/types/request-user';
 import { SubscriptionInvoiceService } from '../subscription-lifecycle/subscription-invoice.service';
 import { PlatformAdminGuard } from './platform-admin.guard';
@@ -32,7 +33,8 @@ export class PlatformSubscriptionsController {
   @Post('backfill-invoices')
   @ApiOperation({ summary: 'Backfill SaaS subscription invoices for all paid companies' })
   async backfillInvoices(@CurrentUser() user: RequestUser) {
-    const result = await this.invoices.backfillAllPaidCompanies();
+    // Platform-wide job: the admin's own request is RLS-scoped to their company.
+    const result = await TenantContext.runWithSystemAccess(() => this.invoices.backfillAllPaidCompanies());
     await this.platformAudit.logPlatformAction({
       userId: user.id,
       adminEmail: user.email,
