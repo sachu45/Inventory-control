@@ -15,10 +15,12 @@ import { PurchaseOrdersService } from './purchase-orders.service';
 import { PoCancelService } from './po-cancel.service';
 import { RequestPoCancelDto, ConfirmPoCancelDto } from './dto/cancel-purchase-order.dto';
 import { RequiresModule } from '../../common/config/requires-module.decorator';
+import { ModuleFields, ModuleFieldsWrite } from '../../common/config/module-fields.interceptor';
 
 @ApiTags('purchase-orders')
 @ApiBearerAuth()
 @RequiresModule('purchase-orders')
+@ModuleFields('purchase-orders')
 @Controller('purchase-orders')
 export class PurchaseOrdersController {
   constructor(
@@ -37,6 +39,7 @@ export class PurchaseOrdersController {
   }
 
   @RequirePermission('purchase_order:create')
+  @ModuleFieldsWrite('create')
   @Post()
   async create(
     @CurrentUser() user: RequestUser,
@@ -64,6 +67,7 @@ export class PurchaseOrdersController {
   }
 
   @RequirePermission('purchase_order:create')
+  @ModuleFieldsWrite('update')
   @Patch(':id')
   update(
     @CurrentUser() user: RequestUser,

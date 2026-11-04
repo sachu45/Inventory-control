@@ -27,10 +27,12 @@ import { SearchHsnDto } from './dto/search-hsn.dto';
 import { GstHsnService } from './gst-hsn.service';
 import { ProductsService } from './products.service';
 import { RequiresModule } from '../../common/config/requires-module.decorator';
+import { ModuleFields, ModuleFieldsWrite } from '../../common/config/module-fields.interceptor';
 
 @ApiTags('products')
 @ApiBearerAuth()
 @RequiresModule('products')
+@ModuleFields('products')
 @Controller('products')
 export class ProductsController {
   constructor(
@@ -54,6 +56,7 @@ export class ProductsController {
   }
 
   @RequirePermission('product:write')
+  @ModuleFieldsWrite('create')
   @Post()
   @ApiOperation({ summary: 'Create a product' })
   create(@CurrentUser() user: RequestUser, @Body() dto: CreateProductDto) {
@@ -119,6 +122,7 @@ export class ProductsController {
   }
 
   @RequirePermission('product:write')
+  @ModuleFieldsWrite('update')
   @Patch(':id')
   @ApiOperation({ summary: 'Update a product' })
   update(

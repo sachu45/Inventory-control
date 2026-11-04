@@ -8,10 +8,12 @@ import { ListSalesOrdersDto } from './dto/list-sales-orders.dto';
 import { UpdateSalesOrderDto } from './dto/update-sales-order.dto';
 import { SalesOrdersService } from './sales-orders.service';
 import { RequiresModule } from '../../common/config/requires-module.decorator';
+import { ModuleFields, ModuleFieldsWrite } from '../../common/config/module-fields.interceptor';
 
 @ApiTags('sales-orders')
 @ApiBearerAuth()
 @RequiresModule('sales')
+@ModuleFields('sales')
 @Controller('sales-orders')
 export class SalesOrdersController {
   constructor(private readonly salesOrders: SalesOrdersService) {}
@@ -25,6 +27,7 @@ export class SalesOrdersController {
   }
 
   @RequirePermission('shop:write')
+  @ModuleFieldsWrite('create')
   @Post()
   @ApiOperation({ summary: 'Create a sales order (DRAFT)' })
   @ApiResponse({ status: 201, description: 'The created sales order with line items.' })
@@ -47,6 +50,7 @@ export class SalesOrdersController {
   }
 
   @RequirePermission('shop:write')
+  @ModuleFieldsWrite('update')
   @Patch(':id')
   @ApiOperation({ summary: 'Update a DRAFT sales order' })
   update(

@@ -189,6 +189,8 @@ export const MODULE_REGISTRY: Readonly<Record<ModuleKey, ModuleDefinition>> = {
     sidebarPath: '/products',
     sidebarIcon: 'products',
     requiredPermission: 'product:read',
+    customizableFields: ['hsnCode', 'materialGroup', 'drawingReference', 'brand'],
+    lockedMandatoryFields: ['productCode', 'description', 'uom', 'category'],
     supportsCustomFields: true,
   }),
   suppliers: defineModule('suppliers', {
@@ -314,6 +316,8 @@ export const MODULE_REGISTRY: Readonly<Record<ModuleKey, ModuleDefinition>> = {
     planGate: 'sales_orders',
     requiredPermission: 'shop:read',
     dependsOn: ['products', 'customers'],
+    customizableFields: ['expectedDate', 'remarks'],
+    lockedMandatoryFields: ['customerId', 'items'],
     supportsCustomFields: true,
   }),
   'goods-issues': defineModule('goods-issues', {
@@ -335,6 +339,8 @@ export const MODULE_REGISTRY: Readonly<Record<ModuleKey, ModuleDefinition>> = {
     planGate: 'invoices',
     requiredPermission: 'shop:read',
     dependsOn: ['customers'],
+    customizableFields: ['dueDate', 'remarks'],
+    lockedMandatoryFields: ['customerId', 'totalValue'],
     supportsCustomFields: true,
     supportsWorkflows: true,
   }),

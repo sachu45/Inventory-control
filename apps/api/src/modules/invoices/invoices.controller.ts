@@ -7,10 +7,12 @@ import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { ListInvoicesDto } from './dto/list-invoices.dto';
 import { InvoicesService } from './invoices.service';
 import { RequiresModule } from '../../common/config/requires-module.decorator';
+import { ModuleFields, ModuleFieldsWrite } from '../../common/config/module-fields.interceptor';
 
 @ApiTags('invoices')
 @ApiBearerAuth()
 @RequiresModule('invoices')
+@ModuleFields('invoices')
 @Controller('invoices')
 export class InvoicesController {
   constructor(private readonly invoices: InvoicesService) {}
@@ -23,6 +25,7 @@ export class InvoicesController {
   }
 
   @RequirePermission('shop:write')
+  @ModuleFieldsWrite('create')
   @Post()
   @ApiOperation({ summary: 'Create an invoice (optionally linked to a sales order)' })
   @ApiResponse({ status: 409, description: 'Sales order has already been invoiced.' })
