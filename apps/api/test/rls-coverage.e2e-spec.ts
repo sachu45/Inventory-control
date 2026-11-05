@@ -1,28 +1,20 @@
 import type { INestApplication } from '@nestjs/common';
+import { AuditAction, PlatformNotificationCategory, PlatformNotificationSeverity } from '@prisma/client';
 import { TenantContext } from '../src/common/tenant/tenant-context';
+import { AuditService } from '../src/modules/audit/audit.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { createE2eApp, E2E_DB_ENABLED } from './helpers/e2e-bootstrap';
 import { seedWorkflowMasterData } from './helpers/workflow-fixture';
 
 /**
  * Tables that carry `company_id` or `shop_id` but do not have forced RLS yet.
- * #238 is working this list down; every table with a NOT NULL company_id is
- * done. Remove a table here in the migration that protects it. A new tenant table must ship with RLS or be added here with a
+ * Only the #241 product tables are left. Remove a table here in the migration
+ * that protects it. A new tenant table must ship with RLS or be added here with a
  * reason, so nothing becomes tenant data without a decision.
  */
 const PENDING_RLS: Record<string, string> = {
-  // company_id is nullable: decide what a NULL row means before adding a policy.
-  audit_logs: 'nullable company_id (platform events)',
-  channel_accounts: 'nullable company_id',
-  subscription_payments: 'nullable company_id',
   // company_id added in the #241 expand step; RLS comes with the contract step, once the backfill is verified.
   products: '#241',
-  // No company_id: owned through a nullable shop_id (#238).
-  alert_events: 'nullable shop_id',
-  user_invitations: 'nullable shop_id',
-  // Both nullable: shared/system rows exist alongside tenant rows (#238).
-  media_assets: 'nullable company_id and shop_id',
-  platform_notifications: 'nullable company_id (platform-wide notices)',
   product_barcodes: 'nullable company_id (moves with products, #241)',
 };
 
@@ -142,5 +134,73 @@ describe('Row-level security coverage (e2e)', () => {
       prisma.notification.updateMany({ where: { userId: b.user.id }, data: { isRead: true } }),
     );
     expect(updated.count).toBe(0);
+  });
+
+  it('keeps platform rows (no tenant key) from tenants, and ties shop-less invitations to the inviter', async () => {
+    if (!E2E_DB_ENABLED) return;
+    const a = await seedWorkflowMasterData(app);
+    const b = await seedWorkflowMasterData(app);
+    const tag = `rls-${Date.now()}`;
+
+    // audit_logs: AuditService writes a platform (NULL company) event from inside a tenant's
+    // request; the tenant can't read it back, nor read or forge another company's rows.
+    await asTenant(a.companyId, () => app.get(AuditService).log({ action: AuditAction.EXPORT_AUDIT, entityType: tag }));
+    await expect(
+      asTenant(a.companyId, () => prisma.auditLog.create({ data: { action: AuditAction.EXPORT_AUDIT, entityType: tag } })),
+    ).rejects.toThrow(/row-level security/);
+    await asTenant(b.companyId, () =>
+      prisma.auditLog.create({ data: { action: AuditAction.EXPORT_AUDIT, entityType: tag, companyId: b.companyId } }),
+    );
+    // Services audit from inside their own transaction; the row must still be written.
+    await asTenant(b.companyId, () =>
+      prisma.$transaction(async () => {
+        await app.get(AuditService).log({ action: AuditAction.EXPORT_AUDIT, entityType: tag, companyId: b.companyId });
+      }),
+    );
+    expect(await asTenant(a.companyId, () => prisma.auditLog.count({ where: { entityType: tag } }))).toBe(0);
+    expect(await asTenant(b.companyId, () => prisma.auditLog.count({ where: { entityType: tag } }))).toBe(2);
+    expect(await TenantContext.runWithSystemAccess(() => prisma.auditLog.count({ where: { entityType: tag } }))).toBe(3);
+    await expect(
+      asTenant(a.companyId, () =>
+        prisma.auditLog.create({ data: { action: AuditAction.EXPORT_AUDIT, entityType: tag, companyId: b.companyId } }),
+      ),
+    ).rejects.toThrow(/row-level security/);
+
+    // platform_notifications: system access only, even for rows about the tenant itself.
+    await TenantContext.runWithSystemAccess(() =>
+      prisma.platformNotification.create({
+        data: {
+          category: PlatformNotificationCategory.SYSTEM,
+          severity: PlatformNotificationSeverity.INFO,
+          notificationKey: tag,
+          title: 'probe',
+          message: 'probe',
+          companyId: a.companyId,
+        },
+      }),
+    );
+    expect(await asTenant(a.companyId, () => prisma.platformNotification.count({ where: { notificationKey: tag } }))).toBe(0);
+
+    // user_invitations: through the shop, or the inviter's shop when there is none.
+    const role = await TenantContext.runWithSystemAccess(() => prisma.role.findFirstOrThrow());
+    const invite = (shopId: string | null, invitedById: string, email: string) => ({
+      email,
+      roleId: role.id,
+      shopId,
+      tokenHash: `${tag}-${email}`,
+      invitedById,
+      expiresAt: new Date(Date.now() + 3600_000),
+    });
+    await asTenant(b.companyId, async () => {
+      await prisma.userInvitation.create({ data: invite(b.shopId, b.user.id, `${tag}-shop@e2e.local`) });
+      await prisma.userInvitation.create({ data: invite(null, b.user.id, `${tag}-noshop@e2e.local`) });
+    });
+    const invites = (companyId: string) =>
+      asTenant(companyId, () => prisma.userInvitation.count({ where: { email: { startsWith: tag } } }));
+    expect(await invites(b.companyId)).toBe(2);
+    expect(await invites(a.companyId)).toBe(0);
+    await expect(
+      asTenant(a.companyId, () => prisma.userInvitation.create({ data: invite(null, b.user.id, `${tag}-forged@e2e.local`) })),
+    ).rejects.toThrow(/row-level security/);
   });
 });

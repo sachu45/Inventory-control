@@ -6,6 +6,7 @@ import {
   PlatformNotificationSeverity,
 } from '@prisma/client';
 import { MailService } from '../../common/mail/mail.service';
+import { TenantContext } from '../../common/tenant/tenant-context';
 import { PrismaService } from '../../prisma/prisma.service';
 import { parsePlatformAdminEmailsFromConfig } from '../platform/platform-admin.util';
 
@@ -48,14 +49,16 @@ export class PlatformNotificationService {
     dedupeHours: number;
   }) {
     const since = new Date(Date.now() - args.dedupeHours * 60 * 60 * 1000);
-    const existing = await this.prisma.platformNotification.findFirst({
-      where: {
-        notificationKey: args.notificationKey,
-        referenceId: args.referenceId ?? null,
-        createdAt: { gte: since },
-      },
-      select: { id: true },
-    });
+    const existing = await TenantContext.runWithSystemAccess(() =>
+      this.prisma.platformNotification.findFirst({
+        where: {
+          notificationKey: args.notificationKey,
+          referenceId: args.referenceId ?? null,
+          createdAt: { gte: since },
+        },
+        select: { id: true },
+      }),
+    );
     return Boolean(existing);
   }
 
@@ -68,19 +71,23 @@ export class PlatformNotificationService {
     });
     if (duplicate) return { skipped: 'duplicate' as const };
 
-    const notification = await this.prisma.platformNotification.create({
-      data: {
-        category: args.category,
-        severity: args.severity,
-        notificationKey: args.notificationKey,
-        title: args.title,
-        message: args.message,
-        actionUrl: args.actionUrl ?? null,
-        referenceType: args.referenceType ?? null,
-        referenceId: args.referenceId ?? null,
-        companyId: args.companyId ?? null,
-      },
-    });
+    // Platform data: written for any company (or none), from whatever request or
+    // job raised it, so it bypasses the caller's tenant scope.
+    const notification = await TenantContext.runWithSystemAccess(() =>
+      this.prisma.platformNotification.create({
+        data: {
+          category: args.category,
+          severity: args.severity,
+          notificationKey: args.notificationKey,
+          title: args.title,
+          message: args.message,
+          actionUrl: args.actionUrl ?? null,
+          referenceType: args.referenceType ?? null,
+          referenceId: args.referenceId ?? null,
+          companyId: args.companyId ?? null,
+        },
+      }),
+    );
 
     if (args.emailImmediate && this.mail?.isConfigured()) {
       await this.emailAdmins({
@@ -147,19 +154,22 @@ export class PlatformNotificationService {
 
   async listForAdmin(adminEmail: string, opts?: { unreadOnly?: boolean; limit?: number }) {
     const email = adminEmail.toLowerCase();
-    const rows = await this.prisma.platformNotification.findMany({
-      where: opts?.unreadOnly
-        ? { reads: { none: { adminEmail: email } } }
-        : undefined,
-      orderBy: { createdAt: 'desc' },
-      take: opts?.limit ?? 100,
-      include: {
-        reads: {
-          where: { adminEmail: email },
-          select: { readAt: true },
+    // The inbox covers every tenant; the admin's own request is scoped to their company.
+    const rows = await TenantContext.runWithSystemAccess(() =>
+      this.prisma.platformNotification.findMany({
+        where: opts?.unreadOnly
+          ? { reads: { none: { adminEmail: email } } }
+          : undefined,
+        orderBy: { createdAt: 'desc' },
+        take: opts?.limit ?? 100,
+        include: {
+          reads: {
+            where: { adminEmail: email },
+            select: { readAt: true },
+          },
         },
-      },
-    });
+      }),
+    );
 
     return rows.map((row) => ({
       id: row.id,

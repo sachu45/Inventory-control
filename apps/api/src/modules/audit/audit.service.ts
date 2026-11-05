@@ -1,3 +1,4 @@
+import { TenantContext } from '../../common/tenant/tenant-context';
 import { Injectable, Logger } from '@nestjs/common';
 import { AuditAction, AuditLog, AuditSeverity, Prisma } from '@prisma/client';
 import type { RequestUser } from '../../common/types/request-user';
@@ -113,7 +114,16 @@ export class AuditService {
         requestId,
       } as any;
 
-      await client.auditLog.create({ data });
+      // A row with no company is a platform event, which only system access may
+      // write (RLS on audit_logs). Platform admins log those from inside their own
+      // company's request, so write them unscoped; tenant rows keep the caller's scope.
+      // detached: the write never joins the caller's transaction (see above), so it
+      // needs its own tenant-scoped one.
+      if (params.companyId) {
+        await TenantContext.detached(() => client.auditLog.create({ data }));
+      } else {
+        await TenantContext.runWithSystemAccess(() => client.auditLog.create({ data }));
+      }
     } catch (error) {
       // Log audit failure but never throw — audit is observability, not critical path
       this.logger.error(`Audit write failed for action ${params.action}:`, error);
