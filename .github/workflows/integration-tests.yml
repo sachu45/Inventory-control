@@ -108,13 +108,16 @@ jobs:
           fi
       # All API e2e suites (workflows plus auth/CSRF, idempotency, PO listing,
       # OpenAPI). Running only the workflow specs let the others go stale.
-      - run: npm run test:e2e --workspace=api -- --runInBand --forceExit
+      # One suite at a time, in a single worker that jest recycles past 1GB
+      # (test/jest-e2e.json): --runInBand kept every suite's modules in one
+      # process until the heap ran out.
+      - run: npm run test:e2e --workspace=api -- --forceExit
       # The same suites with TENANT_CONTEXT_MODE=strict (#239): a query made
       # outside any TenantContext gets no tenant and no system access, so every
       # request, guard, job and timer must set its own context. Test code itself
       # runs with explicit system access (apps/api/test/helpers/system-access.ts).
       - name: API e2e (strict tenant context)
-        run: npm run test:e2e --workspace=api -- --runInBand --forceExit
+        run: npm run test:e2e --workspace=api -- --forceExit
         env:
           TENANT_CONTEXT_MODE: strict
 

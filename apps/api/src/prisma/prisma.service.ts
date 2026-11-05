@@ -29,6 +29,17 @@ function setTenantConfig(
   `;
 }
 
+/**
+ * True when Prisma says this query is not part of any transaction. Prisma puts
+ * the transaction on the (internal) params of queries made through a
+ * transaction client; when it doesn't expose params at all, assume the query
+ * belongs to the open transaction, as before.
+ */
+function isOutsideTransaction(params: unknown): boolean {
+  const internal = (params as { __internalParams?: { transaction?: unknown } }).__internalParams;
+  return internal !== undefined && internal.transaction === undefined;
+}
+
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name);
@@ -68,9 +79,15 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     const extended = base.$extends({
       query: {
         $allModels: {
-          async $allOperations({ args, query }) {
+          async $allOperations(params) {
+            const { args, query } = params;
             const ctx = TenantContext.get();
-            if (ctx?.inRLSTx) {
+            // Inside a tenant transaction its connection already has the RLS config,
+            // so queries made through the transaction client skip setting it. A query
+            // made through the base client while that transaction is open (a service
+            // called from the callback, such as an audit write) runs on another pooled
+            // connection with no tenant, so it sets the config like any other query.
+            if (ctx?.inRLSTx && !isOutsideTransaction(params)) {
               return query(args);
             }
 
@@ -96,10 +113,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       extended,
     );
     const tenantTransaction = (arg: unknown, options?: unknown): Promise<unknown> => {
+      // Always a new transaction on its own connection, even when called while another
+      // is open (a service using this client from inside a callback): Prisma can't nest
+      // interactive transactions, so this one must set the tenant itself.
       const ctx = TenantContext.get();
-      if (ctx?.inRLSTx) {
-        return extendedTransaction(arg, options);
-      }
       const { companyId, systemAccess, missingContext } = tenantAccess(ctx, mode);
       if (missingContext) reporter.report('$transaction', typeof arg === 'function' ? 'interactive' : 'batch');
       const inner = { companyId: ctx?.companyId ?? null, inRLSTx: true, systemAccess };

@@ -13,6 +13,8 @@
   ],
   "forceExit": true,
   "testTimeout": 30000,
+  "maxWorkers": 1,
+  "workerIdleMemoryLimit": "1GB",
   "testEnvironment": "node",
   "testMatch": [
     "<rootDir>/test/**/*.e2e-spec.ts"
