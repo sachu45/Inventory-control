@@ -6,6 +6,7 @@
 } from '@nestjs/common';
 import {
   BillingCycle,
+  Prisma,
   SubscriptionPlan,
   SubscriptionStatus,
 } from '@prisma/client';
@@ -221,8 +222,8 @@ export class SubscriptionService {
     return plan;
   }
 
-  async assertActiveSubscription(companyId: string): Promise<void> {
-    const company = await this.prisma.company.findUnique({ where: { id: companyId } });
+  async assertActiveSubscription(companyId: string, tx?: Prisma.TransactionClient): Promise<void> {
+    const company = await (tx ?? this.prisma).company.findUnique({ where: { id: companyId } });
     if (!company) throw new NotFoundException('Company not found');
     const snap = this.toSnapshot(company);
     if (snap.isTrialExpired) {
@@ -260,14 +261,27 @@ export class SubscriptionService {
     await this.assertFeature(shop.companyId, feature);
   }
 
-  async assertUserLimit(companyId: string): Promise<void> {
-    await this.assertActiveSubscription(companyId);
-    const company = await this.prisma.company.findUnique({ where: { id: companyId } });
+  /**
+   * Serialises plan-limit checks for one company and resource until `tx` ends.
+   * Callers check and create in the same transaction, so of two concurrent
+   * creates the second waits here and then counts the first one's row.
+   */
+  private async lockLimit(tx: Prisma.TransactionClient | undefined, kind: 'users' | 'warehouses' | 'skus', companyId: string) {
+    if (!tx) return;
+    const key = `plan-limit:${kind}:${companyId}`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
+  }
+
+  /** Pass the transaction that creates the user, so the check and the create can't race. */
+  async assertUserLimit(companyId: string, tx?: Prisma.TransactionClient): Promise<void> {
+    await this.assertActiveSubscription(companyId, tx);
+    const company = await (tx ?? this.prisma).company.findUnique({ where: { id: companyId } });
     if (!company) return;
     const limitsKey = company.subscriptionPlan === SubscriptionPlan.PLUS ? 'PLUS' : company.subscriptionPlan === SubscriptionPlan.PRO ? 'PRO' : 'TRIAL';
     const max = PLAN_LIMITS[limitsKey].maxUsers;
     if (max == null) return;
-    const count = await this.prisma.user.count({
+    await this.lockLimit(tx, 'users', companyId);
+    const count = await (tx ?? this.prisma).user.count({
       // Removed users are soft-deleted and must not use up the plan quota.
       where: { shop: { companyId }, deletedAt: null },
     });
@@ -276,31 +290,39 @@ export class SubscriptionService {
     }
   }
 
-  async assertWarehouseLimit(companyId: string): Promise<void> {
-    await this.assertActiveSubscription(companyId);
-    const company = await this.prisma.company.findUnique({ where: { id: companyId } });
+  /** Pass the transaction that creates the shop, so the check and the create can't race. */
+  async assertWarehouseLimit(companyId: string, tx?: Prisma.TransactionClient): Promise<void> {
+    await this.assertActiveSubscription(companyId, tx);
+    const company = await (tx ?? this.prisma).company.findUnique({ where: { id: companyId } });
     if (!company) return;
     const limitsKey = company.subscriptionPlan === SubscriptionPlan.PLUS ? 'PLUS' : company.subscriptionPlan === SubscriptionPlan.PRO ? 'PRO' : 'TRIAL';
     const max = PLAN_LIMITS[limitsKey].maxWarehouses;
     if (max == null) return;
-    const count = await this.prisma.shop.count({ where: { companyId } });
+    await this.lockLimit(tx, 'warehouses', companyId);
+    const count = await (tx ?? this.prisma).shop.count({ where: { companyId } });
     if (count >= max) {
       throw new ForbiddenException(`Your plan allows up to ${max} warehouse(s). Upgrade to add more.`);
     }
   }
 
-  async assertSkuLimit(companyId: string): Promise<void> {
-    await this.assertActiveSubscription(companyId);
-    const company = await this.prisma.company.findUnique({ where: { id: companyId } });
+  /**
+   * Pass the transaction that creates the product, so the check and the create
+   * can't race and rows created earlier in the same transaction (bulk import) count.
+   */
+  async assertSkuLimit(companyId: string, tx?: Prisma.TransactionClient): Promise<void> {
+    await this.assertActiveSubscription(companyId, tx);
+    const company = await (tx ?? this.prisma).company.findUnique({ where: { id: companyId } });
     if (!company) return;
     const limitsKey = company.subscriptionPlan === SubscriptionPlan.PLUS ? 'PLUS' : company.subscriptionPlan === SubscriptionPlan.PRO ? 'PRO' : 'TRIAL';
     const max = PLAN_LIMITS[limitsKey].maxSkus;
     if (max == null) return;
-    const shopIds = await this.prisma.shop.findMany({
+    await this.lockLimit(tx, 'skus', companyId);
+    const db = tx ?? this.prisma;
+    const shopIds = await db.shop.findMany({
       where: { companyId },
       select: { id: true },
     });
-    const count = await this.prisma.productPlant.count({
+    const count = await db.productPlant.count({
       where: { shopId: { in: shopIds.map((s) => s.id) }, isActive: true },
     });
     if (count >= max) {

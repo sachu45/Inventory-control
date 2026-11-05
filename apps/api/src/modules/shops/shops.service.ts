@@ -130,23 +130,24 @@ export class ShopsService {
     // companyId is only accepted when it names that same company.
     this.assertOwnCompany(user, dto.companyId);
     const companyId = user.companyId ?? undefined;
-    if (companyId) {
-      await this.subscriptions.assertWarehouseLimit(companyId);
-    }
-    return this.prisma.shop.create({
-      data: {
-        shopNumber: dto.shopNumber,
-        shopName: dto.shopName,
-        taxId: dto.taxId ?? null,
-        address: dto.address,
-        contactPerson: dto.contactPerson,
-        mobile: dto.mobile,
-        email: dto.email.toLowerCase().trim(),
-        companyId,
-        isActive: dto.isActive ?? true,
-        createdById: user.id,
-      },
-      include: { company: true },
+    // Check the plan limit and create in one transaction, so concurrent creates can't both pass.
+    return this.prisma.$transaction(async (tx) => {
+      if (companyId) await this.subscriptions.assertWarehouseLimit(companyId, tx);
+      return tx.shop.create({
+        data: {
+          shopNumber: dto.shopNumber,
+          shopName: dto.shopName,
+          taxId: dto.taxId ?? null,
+          address: dto.address,
+          contactPerson: dto.contactPerson,
+          mobile: dto.mobile,
+          email: dto.email.toLowerCase().trim(),
+          companyId,
+          isActive: dto.isActive ?? true,
+          createdById: user.id,
+        },
+        include: { company: true },
+      });
     });
   }
 

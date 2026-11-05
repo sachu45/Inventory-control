@@ -245,22 +245,22 @@ export class UsersService {
     await this.assertRoleAssignable(actor, roleId);
 
     const companyId = await this.subscriptions.resolveCompanyIdForUser(actor);
-    if (companyId) {
-      await this.subscriptions.assertUserLimit(companyId);
-    }
-
     const passwordHash = await bcrypt.hash(dto.password, this.bcryptRounds());
-    const created = await this.prisma.user.create({
-      data: {
-        name: dto.name.trim(),
-        email: dto.email.toLowerCase().trim(),
-        passwordHash,
-        roleId,
-        shopId: dto.shopId ?? null,
-        isActive: dto.isActive ?? true,
-      },
-      include: { role: true, shop: true },
-      omit: USER_SECRET_FIELDS,
+    // Check the plan limit and create in one transaction, so concurrent creates can't both pass.
+    const created = await this.prisma.$transaction(async (tx) => {
+      if (companyId) await this.subscriptions.assertUserLimit(companyId, tx);
+      return tx.user.create({
+        data: {
+          name: dto.name.trim(),
+          email: dto.email.toLowerCase().trim(),
+          passwordHash,
+          roleId,
+          shopId: dto.shopId ?? null,
+          isActive: dto.isActive ?? true,
+        },
+        include: { role: true, shop: true },
+        omit: USER_SECRET_FIELDS,
+      });
     });
 
     await this.audit.log({

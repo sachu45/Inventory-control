@@ -366,11 +366,10 @@ export class ProductsService {
     }
     await this.validateAssignments(user, dto.plants);
     const companyId = requireCompanyId(user);
-    if (companyId) {
-      await this.subscriptions.assertSkuLimit(companyId);
-    }
 
     return this.prisma.$transaction(async (tx) => {
+      // In the creating transaction, so concurrent creates can't both pass the limit.
+      await this.subscriptions.assertSkuLimit(companyId, tx);
       const product = await tx.product.create({
         data: {
           customFields: customFieldsInput(dto.customFields),
@@ -1210,7 +1209,8 @@ export class ProductsService {
 
     if (action === 'create') {
       const companyId = requireCompanyId(user);
-      await this.subscriptions.assertSkuLimit(companyId);
+      // tx: rows created earlier in this import count against the limit too.
+      await this.subscriptions.assertSkuLimit(companyId, tx);
       warnings.push(
         incomingCode ? 'SKU was not found and will be created as a new product.' : 'SKU will be auto-generated from the category.',
       );

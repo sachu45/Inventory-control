@@ -122,17 +122,15 @@ export class InviteService {
 
     await this.verifyTurnstile(dto.turnstileToken);
 
-    // Several invites can be pending at once, so the plan limit is checked again here.
-    if (invite.shopId) {
-      const shop = await this.prisma.shop.findUnique({
-        where: { id: invite.shopId },
-        select: { companyId: true },
-      });
-      if (shop?.companyId) await this.subscriptions.assertUserLimit(shop.companyId);
-    }
+    // Several invites can be pending at once, so the plan limit is checked again here,
+    // in the transaction that creates the user.
+    const limitCompanyId = invite.shopId
+      ? (await this.prisma.shop.findUnique({ where: { id: invite.shopId }, select: { companyId: true } }))?.companyId
+      : null;
 
     const passwordHash = await bcrypt.hash(dto.password, this.bcryptRounds());
     const user = await this.prisma.$transaction(async (tx) => {
+      if (limitCompanyId) await this.subscriptions.assertUserLimit(limitCompanyId, tx);
       const created = await tx.user.create({
         data: {
           name: dto.name?.trim() || invite.name || invite.email.split('@')[0],
