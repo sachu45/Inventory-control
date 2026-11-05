@@ -106,11 +106,31 @@ export type DraftModule = {
   dependsOn: string[];
   defaults: ModuleSettings;
   customizableFields: string[];
+  supportsCustomFields: boolean;
   lockedMandatoryFields: string[];
   shopOverridable: string[];
   configSchema: JsonSchema;
   draft: DraftRow | null;
   shops: (DraftRow & { shopId: string })[];
+};
+
+export type CustomFieldType = 'text' | 'number' | 'date' | 'boolean' | 'select' | 'multiselect';
+export type CustomFieldOption = { value: string; label: string; archived?: boolean };
+export type CustomFieldDefinition = {
+  id: string;
+  moduleKey: string;
+  fieldKey: string;
+  label: string;
+  fieldType: CustomFieldType;
+  options: CustomFieldOption[] | null;
+  validation: { min?: number; max?: number; maxLength?: number; pattern?: string } | null;
+  required: boolean;
+  defaultValue: unknown;
+  searchable: boolean;
+  readRoles: string[];
+  writeRoles: string[];
+  sortOrder: number;
+  archivedAt: string | null;
 };
 
 export type ConfigIssue = { path: string; message: string };
@@ -187,5 +207,27 @@ export const configApi = {
       params: { shopId: params.shopId || undefined, userId: params.userId || undefined },
     });
     return unwrap<EffectiveConfig>(res.data);
+  },
+};
+
+const customFieldsPath = (companyId: string) => `${tenantPath(companyId)}/draft/custom-fields`;
+
+export const customFieldApi = {
+  async list(companyId: string): Promise<CustomFieldDefinition[]> {
+    const res = await api.get(customFieldsPath(companyId));
+    return unwrap<CustomFieldDefinition[]>(res.data);
+  },
+  async create(companyId: string, body: Record<string, unknown>): Promise<CustomFieldDefinition> {
+    const res = await api.post(customFieldsPath(companyId), body);
+    return unwrap<CustomFieldDefinition>(res.data);
+  },
+  async update(companyId: string, id: string, body: Record<string, unknown>): Promise<CustomFieldDefinition> {
+    const res = await api.patch(`${customFieldsPath(companyId)}/${encodeURIComponent(id)}`, body);
+    return unwrap<CustomFieldDefinition>(res.data);
+  },
+  /** Fields are archived, never deleted: values stay stored and the field can be restored. */
+  async setArchived(companyId: string, id: string, archived: boolean): Promise<CustomFieldDefinition> {
+    const res = await api.post(`${customFieldsPath(companyId)}/${encodeURIComponent(id)}/${archived ? 'archive' : 'restore'}`);
+    return unwrap<CustomFieldDefinition>(res.data);
   },
 };

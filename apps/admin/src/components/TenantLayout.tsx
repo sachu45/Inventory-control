@@ -7,6 +7,7 @@ import { platformApi } from '@/lib/platform-api';
 const TABS: [string, string][] = [
   ['', 'Overview'],
   ['modules', 'Modules'],
+  ['custom-fields', 'Custom fields'],
   ['publish', 'Preview & publish'],
   ['versions', 'Versions'],
   ['effective', 'Effective config'],

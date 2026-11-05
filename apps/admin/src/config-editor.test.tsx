@@ -28,6 +28,7 @@ function moduleOf(key: string, overrides: Partial<DraftModule> = {}): DraftModul
     dependsOn: [],
     defaults: { mandatoryFields: [], hiddenFields: [] },
     customizableFields: ['remarks', 'lineCategory'],
+    supportsCustomFields: false,
     lockedMandatoryFields: ['supplier'],
     shopOverridable: [],
     configSchema: schema,

@@ -4,6 +4,7 @@ import { RequirePlatformAdmin } from '@/components/RequirePlatformAdmin';
 import { TenantLayout } from '@/components/TenantLayout';
 import { AccessDeniedPage } from '@/pages/AccessDeniedPage';
 import { EffectivePage } from '@/pages/config/EffectivePage';
+import { CustomFieldsPage } from '@/pages/config/CustomFieldsPage';
 import { ModulesPage } from '@/pages/config/ModulesPage';
 import { PublishPage } from '@/pages/config/PublishPage';
 import { VersionsPage } from '@/pages/config/VersionsPage';
@@ -22,6 +23,7 @@ export function App() {
           <Route path="/tenants/:companyId" element={<TenantLayout />}>
             <Route index element={<TenantDetailPage />} />
             <Route path="modules" element={<ModulesPage />} />
+            <Route path="custom-fields" element={<CustomFieldsPage />} />
             <Route path="publish" element={<PublishPage />} />
             <Route path="versions" element={<VersionsPage />} />
             <Route path="effective" element={<EffectivePage />} />

@@ -135,6 +135,7 @@ export class ConfigAdminService {
           dependsOn: mod.dependsOn,
           defaults: mod.defaults,
           customizableFields: mod.customizableFields,
+          supportsCustomFields: mod.supportsCustomFields,
           lockedMandatoryFields: mod.lockedMandatoryFields,
           shopOverridable: mod.shopOverridable,
           configSchema: CONFIG_JSON_SCHEMAS[mod.key],
