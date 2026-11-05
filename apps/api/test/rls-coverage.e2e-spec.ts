@@ -6,8 +6,8 @@ import { seedWorkflowMasterData } from './helpers/workflow-fixture';
 
 /**
  * Tables that carry `company_id` or `shop_id` but do not have forced RLS yet.
- * #238 is working this list down; remove a table here in the migration that
- * protects it. A new tenant table must ship with RLS or be added here with a
+ * #238 is working this list down; every table with a NOT NULL company_id is
+ * done. Remove a table here in the migration that protects it. A new tenant table must ship with RLS or be added here with a
  * reason, so nothing becomes tenant data without a decision.
  */
 const PENDING_RLS: Record<string, string> = {
@@ -17,39 +17,13 @@ const PENDING_RLS: Record<string, string> = {
   subscription_payments: 'nullable company_id',
   // company_id added in the #241 expand step; RLS comes with the contract step, once the backfill is verified.
   products: '#241',
-  // Remaining tenant tables (#238).
-  agent_tasks: '#238',
-  ai_prompt_history: '#238',
-  ai_settings: '#238',
-  ai_usage_logs: '#238',
-  alert_events: '#238',
-  company_engagement_snapshots: '#238',
-  company_health_score_configs: '#238',
-  conversations: '#238',
-  customer_contact_channels: '#238',
-  device_registrations: '#238',
-  document_email_outbox: '#238',
-  document_series_config: '#238',
-  followup_threads: '#238',
-  lifecycle_campaign_enrollments: '#238',
-  media_assets: '#238',
-  notification_audit_logs: '#238',
-  notification_deliveries: '#238',
-  notification_preferences: '#238',
-  notification_rules: '#238',
-  notification_subscriptions: '#238',
-  notification_templates: '#238',
-  notifications: '#238',
-  outbox_events: '#238',
-  platform_notifications: '#238',
-  product_barcodes: '#238',
-  scan_logs: '#238',
-  user_channel_links: '#238',
-  user_devices: '#238',
-  user_invitations: '#238',
-  whatsapp_devices: '#238',
-  whatsapp_link_tokens: '#238',
-  whatsapp_verifications: '#238',
+  // No company_id: owned through a nullable shop_id (#238).
+  alert_events: 'nullable shop_id',
+  user_invitations: 'nullable shop_id',
+  // Both nullable: shared/system rows exist alongside tenant rows (#238).
+  media_assets: 'nullable company_id and shop_id',
+  platform_notifications: 'nullable company_id (platform-wide notices)',
+  product_barcodes: 'nullable company_id (moves with products, #241)',
 };
 
 describe('Row-level security coverage (e2e)', () => {
@@ -142,6 +116,30 @@ describe('Row-level security coverage (e2e)', () => {
     // An update from A matches no rows: RLS hides B's row from A's UPDATE.
     const updated = await asTenant(a.companyId, () =>
       prisma.salesQuotationHeader.updateMany({ where: { id: quote.id }, data: { remarks: 'from A' } }),
+    );
+    expect(updated.count).toBe(0);
+  });
+
+  it("hides another company's notifications and AI settings, and refuses writes into them", async () => {
+    if (!E2E_DB_ENABLED) return;
+    const a = await seedWorkflowMasterData(app);
+    const b = await seedWorkflowMasterData(app);
+    await asTenant(b.companyId, async () => {
+      await prisma.notification.create({ data: { userId: b.user.id, companyId: b.companyId, title: 'rls', message: 'probe', type: 'GOODS_RECEIPT_CREATED', module: 'GOODS_RECEIPT' } });
+      await prisma.aiSettings.create({ data: { companyId: b.companyId } });
+    });
+
+    expect(await asTenant(b.companyId, () => prisma.notification.count({ where: { userId: b.user.id } }))).toBe(1);
+    expect(await asTenant(a.companyId, () => prisma.notification.count({ where: { userId: b.user.id } }))).toBe(0);
+    expect(await asTenant(a.companyId, () => prisma.aiSettings.findUnique({ where: { companyId: b.companyId } }))).toBeNull();
+
+    await expect(
+      asTenant(a.companyId, () =>
+        prisma.notification.create({ data: { userId: b.user.id, companyId: b.companyId, title: 'x', message: 'from A', type: 'GOODS_RECEIPT_CREATED', module: 'GOODS_RECEIPT' } }),
+      ),
+    ).rejects.toThrow(/row-level security/);
+    const updated = await asTenant(a.companyId, () =>
+      prisma.notification.updateMany({ where: { userId: b.user.id }, data: { isRead: true } }),
     );
     expect(updated.count).toBe(0);
   });
