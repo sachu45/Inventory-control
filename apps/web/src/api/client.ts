@@ -27,7 +27,7 @@ function requestHadAuthorization(config: InternalAxiosRequestConfig | undefined)
 
 function isPublicAuthEndpoint(config: InternalAxiosRequestConfig | undefined): boolean {
   const path = `${config?.baseURL ?? ''}${config?.url ?? ''}`;
-  return path.includes('/auth/login') || path.includes('/auth/refresh');
+  return path.includes('/auth/login') || path.includes('/auth/refresh') || path.includes('/auth/onboarding/');
 }
 
 type AuthEnvelope = {

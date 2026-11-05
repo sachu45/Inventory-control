@@ -110,6 +110,11 @@ export class SubscriptionService {
 
     const limitsKey = company.subscriptionPlan === SubscriptionPlan.PLUS ? 'PLUS' : company.subscriptionPlan === SubscriptionPlan.PRO ? 'PRO' : 'TRIAL';
     const limits = PLAN_LIMITS[limitsKey];
+    const graceDays = Number(process.env.SUBSCRIPTION_GRACE_DAYS ?? 3);
+    const graceMs = (Number.isFinite(graceDays) && graceDays >= 0 ? graceDays : 3) * 86400000;
+    const entitled = company.subscriptionStatus === SubscriptionStatus.ACTIVE && !isTrialExpired &&
+      (isTrial || !company.subscriptionEndsAt || company.subscriptionEndsAt.getTime() + graceMs >= now);
+    const allows = (feature: Parameters<typeof planAllowsFeature>[1]) => entitled && planAllowsFeature(company.subscriptionPlan, feature);
 
     return {
       plan: company.subscriptionPlan,
@@ -131,20 +136,20 @@ export class SubscriptionService {
         maxSkus: limits.maxSkus,
       },
       features: {
-        reports: planAllowsFeature(company.subscriptionPlan, 'reports'),
-        purchaseOrders: planAllowsFeature(company.subscriptionPlan, 'purchase_orders'),
-        rfqs: planAllowsFeature(company.subscriptionPlan, 'rfqs'),
-        contracts: planAllowsFeature(company.subscriptionPlan, 'contracts'),
-        salesOrders: planAllowsFeature(company.subscriptionPlan, 'sales_orders'),
-        salesQuotations: planAllowsFeature(company.subscriptionPlan, 'sales_quotations'),
-        invoices: planAllowsFeature(company.subscriptionPlan, 'invoices'),
-        payments: planAllowsFeature(company.subscriptionPlan, 'payments'),
-        supplierPortal: planAllowsFeature(company.subscriptionPlan, 'supplier_portal'),
-        integrations: planAllowsFeature(company.subscriptionPlan, 'integrations'),
-        api: planAllowsFeature(company.subscriptionPlan, 'api'),
-        vendorPortal: planAllowsFeature(company.subscriptionPlan, 'vendor_portal'),
-        auditRbac: planAllowsFeature(company.subscriptionPlan, 'audit_rbac'),
-        backups: planAllowsFeature(company.subscriptionPlan, 'backups'),
+        reports: allows('reports'),
+        purchaseOrders: allows('purchase_orders'),
+        rfqs: allows('rfqs'),
+        contracts: allows('contracts'),
+        salesOrders: allows('sales_orders'),
+        salesQuotations: allows('sales_quotations'),
+        invoices: allows('invoices'),
+        payments: allows('payments'),
+        supplierPortal: allows('supplier_portal'),
+        integrations: allows('integrations'),
+        api: allows('api'),
+        vendorPortal: allows('vendor_portal'),
+        auditRbac: allows('audit_rbac'),
+        backups: allows('backups'),
       },
     };
   }
@@ -225,6 +230,9 @@ export class SubscriptionService {
   async assertActiveSubscription(companyId: string, tx?: Prisma.TransactionClient): Promise<void> {
     const company = await (tx ?? this.prisma).company.findUnique({ where: { id: companyId } });
     if (!company) throw new NotFoundException('Company not found');
+    const blocked = await this.writeBlockReason(companyId);
+    if (blocked) throw new ForbiddenException(blocked);
+    if (company.subscriptionStatus === SubscriptionStatus.SUSPENDED) throw new ForbiddenException('Subscription is suspended. Contact support.');
     const snap = this.toSnapshot(company);
     if (snap.isTrialExpired) {
       throw new ForbiddenException(
@@ -392,6 +400,8 @@ export class SubscriptionService {
    * calls /billing/upgrade. Returns the company id when this call activated it.
    */
   async applyBoundPayment(orderId: string, paymentId: string): Promise<string | null> {
+    // Google onboarding has its own expiry, identity, membership and amount checks.
+    if (await this.prisma.signupIntent.findUnique({ where: { orderId } })) return null;
     const payment = await this.prisma.subscriptionPayment.findUnique({
       where: { razorpayOrderId: orderId },
     });

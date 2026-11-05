@@ -439,6 +439,7 @@ export class SignupService {
 
   async requestSignup(dto: SignupRequestDto, ctx?: { ip?: string | null; userAgent?: string | null }) {
     this.assertSignupEnabled();
+    if (dto.plan === 'pro' || dto.plan === 'plus') throw new BadRequestException('Paid signup requires Google authentication. Select your plan to continue with Google.');
     await this.verifyTurnstile(dto.turnstileToken);
 
     if (dto.agreedToTerms !== true) {
@@ -458,7 +459,7 @@ export class SignupService {
       );
     }
 
-    const plan: PlanId = dto.plan === 'pro' || dto.plan === 'plus' ? dto.plan : 'trial';
+    const plan: PlanId = 'trial';
     const billing: BillingInterval = dto.billing === 'yearly' ? 'yearly' : 'monthly';
 
     const passwordHash = await bcrypt.hash(dto.password, this.bcryptRounds());

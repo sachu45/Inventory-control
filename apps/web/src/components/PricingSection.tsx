@@ -58,7 +58,7 @@ export function PricingSection({ variant = 'landing', currentPlan, onPaidUpgrade
       if (plan !== 'trial') params.set('billing', billing);
       // On the marketing apex, /signup lives on the app subdomain (full nav);
       // elsewhere it's a same-origin SPA route.
-      const target = resolveAuthHref(`/signup?${params.toString()}`);
+      const target = resolveAuthHref(`${plan === 'trial' ? '/signup' : '/signup/google'}?${params.toString()}`);
       if (target.startsWith('/')) nav(target);
       else window.location.href = target;
       return;

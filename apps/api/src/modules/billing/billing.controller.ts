@@ -124,6 +124,11 @@ export class BillingController {
     if (!payment) {
       throw new BadRequestException('Order not found');
     }
+    try {
+      await this.razorpay.fetchCapturedPayment(paymentId, orderId, payment.amountPaise);
+    } catch {
+      throw new BadRequestException('Payment has not been captured for this order and amount.');
+    }
     const now = new Date();
     await this.prisma.subscriptionPayment.update({
       where: { id: payment.id },
@@ -171,6 +176,9 @@ export class BillingController {
     });
     if (!payment || payment.status !== 'paid') {
       throw new BadRequestException('Payment not verified');
+    }
+    if (await this.prisma.signupIntent.findUnique({ where: { orderId } })) {
+      throw new BadRequestException('Complete this payment through its Google onboarding session.');
     }
     if (payment.consumedAt) {
       // A retry after a lost response: this payment already activated this

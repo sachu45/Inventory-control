@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { createHmac, timingSafeEqual } from 'crypto';
 
 type RazorpayClient = {
+  payments: { fetch: (id: string) => Promise<{ id: string; order_id: string; status: string; amount: number; currency: string; refunded?: boolean; amount_refunded?: number; refund_status?: string | null }> };
   orders: {
     create: (args: {
       amount: number;
@@ -87,6 +88,14 @@ export class RazorpayService {
     const body = `${args.orderId}|${args.paymentId}`;
     const expected = createHmac('sha256', secret).update(body).digest('hex');
     return hexDigestEquals(expected, args.signature);
+  }
+
+  async fetchCapturedPayment(paymentId: string, orderId: string, amountPaise: number) {
+    const payment = await this.getClient().payments.fetch(paymentId);
+    if (payment.id !== paymentId || payment.order_id !== orderId || payment.status !== 'captured' || payment.amount !== amountPaise || payment.currency !== 'INR' || payment.refunded || (payment.amount_refunded ?? 0) > 0 || payment.refund_status) {
+      throw new Error('Payment is not captured for the expected order and amount.');
+    }
+    return payment;
   }
 
   verifyWebhookSignature(body: string | Buffer, signature: string): boolean {

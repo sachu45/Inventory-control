@@ -36,7 +36,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       where: { id: payload.sub },
       include: { role: true, shop: { select: { companyId: true } } },
     });
-    if (!user || !user.isActive) {
+    if (!user || !user.isActive || user.onboardingRequired) {
       throw new UnauthorizedException();
     }
 

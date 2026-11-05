@@ -143,6 +143,13 @@ describe('SignupService staged signup flow', () => {
     (bcrypt.compare as Mock).mockImplementation(async (value: string, hash: string) => hash === `hash:${value}`);
   });
 
+  it.each(['pro', 'plus'])('blocks new %s registrations through the legacy wizard endpoint', async plan => {
+    const prisma = makePrisma();
+    const svc = new SignupService(prisma as never, makeConfig(), makeMail() as never, makeAuth() as never, makeRazorpay() as never, makeLifecycle() as never, {} as never);
+    await expect(svc.requestSignup({ plan } as never)).rejects.toThrow('requires Google authentication');
+    expect(prisma.signupVerification.create).not.toHaveBeenCalled();
+  });
+
   it('rejects a signup request that has not accepted the terms', async () => {
     const prisma = makePrisma();
     const svc = new SignupService(

@@ -35,11 +35,12 @@ function makeConfig(overrides: Record<string, unknown> = {}): ConfigService {
 function makePrisma() {
   const tx = {
     user: { update: jest.fn() },
-    authChallenge: { update: jest.fn() },
+    authChallenge: { update: jest.fn(), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
     userBackupCode: {
       deleteMany: jest.fn(),
       createMany: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     trustedMfaDevice: {
       updateMany: jest.fn(),
@@ -445,12 +446,33 @@ describe('MfaService', () => {
     });
 
     expect(result.accessToken).toBe('access-token');
-    expect(prisma.__tx.userBackupCode.update).toHaveBeenCalledWith(
+    expect(prisma.__tx.userBackupCode.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'backup-1' },
+        where: { id: 'backup-1', consumedAt: null },
         data: expect.objectContaining({ consumedAt: expect.any(Date) }),
       }),
     );
+  });
+
+  it('verifies onboarding MFA without issuing a full ERP session', async () => {
+    const prisma = makePrisma();
+    const auth = makeAuth();
+    const svc = new MfaService(prisma as never, makeConfig(), auth as never);
+    prisma.authChallenge.findFirst.mockResolvedValue({ id: 'challenge', userId: 'user-1', purpose: 'LOGIN_MFA_VERIFY', attemptCount: 0, expiresAt: new Date('2026-05-25T10:15:00.000Z'), consumedAt: null, user: { id: 'user-1', email: 'owner@example.com', isActive: true, mfaEnabled: true } });
+    prisma.userBackupCode.findMany.mockResolvedValue([{ id: 'backup', codeHash: 'hash:ABCDEFGH' }]);
+    await expect(svc.verifyOnboardingLogin({ challengeToken: 'token', backupCode: 'ABCD-EFGH' }, 'user-1')).resolves.toEqual({ verified: true });
+    expect(auth.issueSessionForUser).not.toHaveBeenCalled();
+  });
+
+  it('rejects backup-code consumption lost to a concurrent request', async () => {
+    const prisma = makePrisma();
+    const auth = makeAuth();
+    const svc = new MfaService(prisma as never, makeConfig(), auth as never);
+    prisma.authChallenge.findFirst.mockResolvedValue({ id: 'challenge', userId: 'user-1', purpose: 'LOGIN_MFA_VERIFY', attemptCount: 0, expiresAt: new Date('2026-05-25T10:15:00.000Z'), consumedAt: null, user: { id: 'user-1', email: 'owner@example.com', isActive: true, mfaEnabled: true } });
+    prisma.userBackupCode.findMany.mockResolvedValue([{ id: 'backup', codeHash: 'hash:ABCDEFGH' }]);
+    prisma.__tx.userBackupCode.updateMany.mockResolvedValue({ count: 0 });
+    await expect(svc.verifyLogin({ challengeToken: 'token', backupCode: 'ABCD-EFGH' })).rejects.toThrow('already used');
+    expect(auth.issueSessionForUser).not.toHaveBeenCalled();
   });
 
   it('creates and accepts a trusted device token after successful TOTP login verification', async () => {

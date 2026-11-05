@@ -11,12 +11,15 @@ import { InviteService } from './invite.service';
 import { MfaService } from './mfa.service';
 import { PasswordResetService } from './password-reset.service';
 import { SignupService } from './signup.service';
+import { GoogleIdentityService } from './google-identity.service';
+import { GoogleOnboardingService } from './google-onboarding.service';
+import { GoogleOnboardingController } from './google-onboarding.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({
   imports: [PassportModule, BillingModule, SubscriptionLifecycleModule, CacheModule],
-  controllers: [AuthController],
-  providers: [AuthService, SignupService, InviteService, MfaService, PasswordResetService, JwtStrategy, LoginLockoutService, WhatsAppAdapter],
+  controllers: [AuthController, GoogleOnboardingController],
+  providers: [AuthService, SignupService, InviteService, MfaService, PasswordResetService, JwtStrategy, LoginLockoutService, WhatsAppAdapter, GoogleIdentityService, GoogleOnboardingService],
   exports: [AuthService, SignupService, InviteService, MfaService, PasswordResetService],
 })
 export class AuthModule {}

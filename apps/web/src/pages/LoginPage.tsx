@@ -302,6 +302,7 @@ export function LoginPage() {
                 </Button>
               </form>
             )}
+    <Link className="auth-return-link" to="/signup/google?mode=login">Sign in with Google</Link>
     <div className="auth-security-note"><ShieldCheck size={15} /><span>Secure access to your business workspace</span></div>
   </AuthLayout>;
 }

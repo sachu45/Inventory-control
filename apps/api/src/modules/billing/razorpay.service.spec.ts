@@ -41,3 +41,18 @@ describe('RazorpayService signature verification', () => {
     ).toBe(false);
   });
 });
+
+describe('Razorpay server-side payment capture checks', () => {
+  const captured = { id: 'pay1', order_id: 'order1', amount: 39900, currency: 'INR', status: 'captured', refunded: false };
+  function service(payment: Record<string, unknown>) {
+    const result = makeService({ RAZORPAY_KEY_ID: 'test-id', RAZORPAY_KEY_SECRET: 'test-secret' });
+    (result as any).client = { payments: { fetch: jest.fn().mockResolvedValue(payment) } };
+    return result;
+  }
+  it('accepts only a captured payment bound to the expected order, amount and currency', async () => {
+    await expect(service(captured).fetchCapturedPayment('pay1', 'order1', 39900)).resolves.toEqual(captured);
+  });
+  it.each([{ status: 'authorized' }, { status: 'failed' }, { order_id: 'other-order' }, { id: 'other-payment' }, { amount: 1 }, { currency: 'USD' }, { refunded: true }, { amount_refunded: 1 }, { refund_status: 'partial' }])('rejects mismatched provider data %j', async overrides => {
+    await expect(service({ ...captured, ...overrides }).fetchCapturedPayment('pay1', 'order1', 39900)).rejects.toThrow('not captured');
+  });
+});

@@ -373,7 +373,7 @@ export class AuthService {
       where: { id: session.userId },
       include: { role: true, shop: true },
     });
-    if (!user || !user.isActive) {
+    if (!user || !user.isActive || user.onboardingRequired) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
@@ -604,6 +604,7 @@ export class AuthService {
     if (!user || !user.isActive) {
       throw new UnauthorizedException('Account is not active');
     }
+    if (user.onboardingRequired) throw new UnauthorizedException('Complete Google onboarding and verified checkout before opening this workspace.');
 
     const accessToken = await this.signAccessToken({
       userId: user.id,

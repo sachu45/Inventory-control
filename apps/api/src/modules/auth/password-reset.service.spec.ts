@@ -18,6 +18,9 @@ function makeService() {
     session: {
       updateMany: jest.fn(),
     },
+    signupIntent: { updateMany: jest.fn() },
+    authChallenge: { updateMany: jest.fn() },
+    trustedMfaDevice: { updateMany: jest.fn() },
   } as any;
 
   const prisma = {
@@ -242,6 +245,9 @@ describe('PasswordResetService', () => {
       where: { userId: 'user-1', revokedAt: null },
       data: { revokedAt: expect.any(Date) },
     });
+    expect(tx.signupIntent.updateMany).toHaveBeenCalledWith({ where: { userId: 'user-1' }, data: { expiresAt: expect.any(Date), pkceVerifier: null, securityVerifiedAt: null } });
+    expect(tx.authChallenge.updateMany).toHaveBeenCalledWith({ where: { userId: 'user-1', consumedAt: null }, data: { consumedAt: expect.any(Date) } });
+    expect(tx.trustedMfaDevice.updateMany).toHaveBeenCalledWith({ where: { userId: 'user-1', revokedAt: null }, data: { revokedAt: expect.any(Date) } });
     expect(auth.issueSessionForUser).toHaveBeenCalledWith('user-1', {
       ip: '127.0.0.1',
       userAgent: 'Jest',

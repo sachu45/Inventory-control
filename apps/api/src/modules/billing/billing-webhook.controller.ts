@@ -19,6 +19,7 @@ import { DUNNING_CAMPAIGN_KEYS } from '../subscription-lifecycle/lifecycle-rules
 import { notifySubscriptionActivated } from './notify-activation';
 import { RazorpayService } from './razorpay.service';
 import { SubscriptionService } from './subscription.service';
+import { OnboardingBillingService } from './onboarding-billing.service';
 
 type RazorpayWebhookPayload = {
   event?: string;
@@ -37,6 +38,7 @@ type RazorpayWebhookPayload = {
         status?: string;
       };
     };
+    refund?: { entity?: { payment_id?: string } };
   };
 };
 
@@ -51,6 +53,7 @@ export class BillingWebhookController {
     private readonly lifecycle: LifecycleOrchestratorService,
     private readonly platformRevenue: PlatformRevenueService,
     private readonly subscriptions: SubscriptionService,
+    private readonly onboarding: OnboardingBillingService,
   ) {}
 
   @Public()
@@ -61,7 +64,8 @@ export class BillingWebhookController {
     @Req() req: RawBodyRequest<Request>,
     @Headers('x-razorpay-signature') signature: string | undefined,
   ) {
-    const rawBody = req.rawBody ?? Buffer.from(JSON.stringify(req.body ?? {}));
+    if (!req.rawBody) throw new UnauthorizedException('Missing raw webhook body');
+    const rawBody = req.rawBody;
     if (!this.razorpay.verifyWebhookSignature(rawBody, signature ?? '')) {
       throw new UnauthorizedException('Invalid webhook signature');
     }
@@ -73,6 +77,9 @@ export class BillingWebhookController {
       await this.handlePaymentCaptured(payload);
     } else if (event === 'payment.failed') {
       await this.handlePaymentFailed(payload);
+    } else if (event === 'refund.processed') {
+      const paymentId = payload.payload?.refund?.entity?.payment_id;
+      if (paymentId) await this.onboarding.refund(paymentId);
     } else if (event === 'subscription.charged') {
       this.logger.log('subscription.charged received — auto-renewal stub (Phase 4)');
     }
@@ -85,6 +92,7 @@ export class BillingWebhookController {
     const orderId = paymentEntity?.order_id;
     const paymentId = paymentEntity?.id;
     if (!orderId || !paymentId) return;
+    if (await this.onboarding.capture(orderId, paymentId)) return;
 
     const payment = await this.prisma.subscriptionPayment.findUnique({
       where: { razorpayOrderId: orderId },

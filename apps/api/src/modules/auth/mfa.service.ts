@@ -671,7 +671,7 @@ export class MfaService {
     };
   }
 
-  async verifyLogin(dto: MfaLoginVerifyDto, ctx: LoginContext = {}) {
+  private async verifyLoginFactor(dto: MfaLoginVerifyDto) {
     const challenge = await this.findValidChallenge(
       dto.challengeToken,
       AuthChallengePurpose.LOGIN_MFA_VERIFY,
@@ -740,24 +740,37 @@ export class MfaService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.authChallenge.update({
-        where: { id: challenge.id },
+      const claimed = await tx.authChallenge.updateMany({
+        where: { id: challenge.id, consumedAt: null },
         data: { consumedAt: new Date() },
       });
+      if (claimed.count !== 1) throw new BadRequestException('MFA challenge was already used. Sign in again.');
       if (matchedBackupCodeId) {
-        await tx.userBackupCode.update({
-          where: { id: matchedBackupCodeId },
+        const backup = await tx.userBackupCode.updateMany({
+          where: { id: matchedBackupCodeId, consumedAt: null },
           data: { consumedAt: new Date() },
         });
+        if (backup.count !== 1) throw new BadRequestException('Backup code was already used.');
       }
     });
 
-    const authResult = await this.auth.issueSessionForUser(challenge.userId, ctx);
+    return { userId: challenge.userId, usingBackupCode };
+  }
+
+  async verifyOnboardingLogin(dto: MfaLoginVerifyDto, expectedUserId: string) {
+    const result = await this.verifyLoginFactor(dto);
+    if (result.userId !== expectedUserId) throw new UnauthorizedException('MFA challenge does not belong to this account.');
+    return { verified: true };
+  }
+
+  async verifyLogin(dto: MfaLoginVerifyDto, ctx: LoginContext = {}) {
+    const { userId, usingBackupCode } = await this.verifyLoginFactor(dto);
+    const authResult = await this.auth.issueSessionForUser(userId, ctx);
     if (dto.rememberDevice && !usingBackupCode) {
       const rawToken = randomBytes(32).toString('base64url');
       await this.prisma.trustedMfaDevice.create({
         data: {
-          userId: challenge.userId,
+          userId,
           tokenHash: this.hashToken(rawToken),
           ip: ctx.ip ?? null,
           userAgent: ctx.userAgent?.slice(0, 512) ?? null,

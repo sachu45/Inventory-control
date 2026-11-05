@@ -3,13 +3,14 @@ import { BillingController } from './billing.controller';
 import { BillingWebhookController } from './billing-webhook.controller';
 import { RazorpayService } from './razorpay.service';
 import { SubscriptionService } from './subscription.service';
+import { OnboardingBillingService } from './onboarding-billing.service';
 import { SubscriptionLifecycleModule } from '../subscription-lifecycle/subscription-lifecycle.module';
 import { PlatformNotificationsModule } from '../platform-notifications/platform-notifications.module';
 
 @Module({
   imports: [forwardRef(() => SubscriptionLifecycleModule), PlatformNotificationsModule],
   controllers: [BillingController, BillingWebhookController],
-  providers: [RazorpayService, SubscriptionService],
-  exports: [RazorpayService, SubscriptionService],
+  providers: [RazorpayService, SubscriptionService, OnboardingBillingService],
+  exports: [RazorpayService, SubscriptionService, OnboardingBillingService],
 })
 export class BillingModule {}

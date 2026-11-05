@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Building2,
   Eye,
@@ -74,6 +74,12 @@ type MfaVerifyPayload = {
 };
 
 export function SignupPage() {
+  const [params] = useSearchParams();
+  if (params.get('plan') === 'pro' || params.get('plan') === 'plus') return <Navigate to={`/signup/google?${params.toString()}`} replace />;
+  return <LegacySignupPage />;
+}
+
+function LegacySignupPage() {
   const nav = useNavigate();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();

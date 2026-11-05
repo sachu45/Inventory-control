@@ -32,7 +32,7 @@ function loadRazorpayScript(): Promise<void> {
     script.src = SCRIPT_SRC;
     script.async = true;
     script.onload = () => { script.dataset.loaded = '1'; resolve(); };
-    script.onerror = () => reject(new Error('Failed to load Razorpay'));
+    script.onerror = () => { script.remove(); reject(new Error('Failed to load Razorpay. Check your connection and try again.')); };
     document.body.appendChild(script);
   });
 }
@@ -62,6 +62,9 @@ export function useRazorpayCheckout() {
       prefill?: { name?: string; email?: string; contact?: string };
       /** '/billing/upgrade-order' binds the order to the signed-in organisation. */
       orderEndpoint?: string;
+      /** Onboarding derives plan/price from its server-held intent. */
+      serverIntent?: boolean;
+      verifyEndpoint?: string;
       onSuccess: (payload: RazorpaySuccess) => void | Promise<void>;
       onDismiss?: () => void;
     }) => {
@@ -70,7 +73,7 @@ export function useRazorpayCheckout() {
         await loadRazorpayScript();
         let orderRes;
         try {
-          orderRes = await api.post(args.orderEndpoint ?? '/billing/create-order', {
+          orderRes = await api.post(args.orderEndpoint ?? '/billing/create-order', args.serverIntent ? {} : {
             plan: args.plan,
             billing: args.billing,
           });
@@ -99,7 +102,7 @@ export function useRazorpayCheckout() {
             theme: { color: '#4338ca' },
             handler: async (response: RazorpaySuccess) => {
               try {
-                await api.post('/billing/verify-payment', response);
+                await api.post(args.verifyEndpoint ?? '/billing/verify-payment', response);
                 await args.onSuccess(response);
                 resolve();
               } catch (err) {

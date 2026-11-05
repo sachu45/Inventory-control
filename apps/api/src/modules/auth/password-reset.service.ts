@@ -159,6 +159,12 @@ export class PasswordResetService {
         where: { userId, revokedAt: null },
         data: { revokedAt: passwordChangedAt },
       });
+      await tx.signupIntent.updateMany({
+        where: { userId },
+        data: { expiresAt: passwordChangedAt, pkceVerifier: null, securityVerifiedAt: null },
+      });
+      await tx.authChallenge.updateMany({ where: { userId, consumedAt: null }, data: { consumedAt: passwordChangedAt } });
+      await tx.trustedMfaDevice.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: passwordChangedAt } });
     });
   }
 

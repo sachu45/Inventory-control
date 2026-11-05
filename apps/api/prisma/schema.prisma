@@ -345,6 +345,7 @@ enum ResolutionType {
 }
 
 model Company {
+  signupIntents           SignupIntent[]
   id                      String             @id @default(uuid()) @db.Uuid
   companyCode             String             @unique @map("company_code")
   companyName             String             @map("company_name")
@@ -816,6 +817,9 @@ model TrustedMfaDevice {
 }
 
 model User {
+  onboardingRequired Boolean    @default(false) @map("onboarding_required")
+  oauthAccounts      OAuthAccount[]
+  signupIntents      SignupIntent[]
   id                 String     @id @default(uuid()) @db.Uuid
   name               String
   email              String     @unique
@@ -882,6 +886,67 @@ model User {
 
   @@index([deletedAt])
   @@map("users")
+}
+
+enum SignupIntentStatus {
+  OAUTH_PENDING
+  GOOGLE_AUTHENTICATED
+  ACCOUNT_CREATED
+  WORKSPACE_SETUP_PENDING
+  CHECKOUT_PENDING
+  PAYMENT_PENDING
+  PAYMENT_VERIFIED
+  SUBSCRIPTION_ACTIVE
+  CANCELLED
+  EXPIRED
+  FAILED
+}
+
+model OAuthAccount {
+  id              String   @id @default(uuid()) @db.Uuid
+  provider        String
+  providerSubject String   @map("provider_subject")
+  userId          String   @map("user_id") @db.Uuid
+  verifiedEmail   String   @map("verified_email")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerSubject])
+  @@unique([userId, provider])
+  @@map("oauth_accounts")
+}
+
+model SignupIntent {
+  loginOnly         Boolean            @default(false) @map("login_only")
+  id                String             @id @default(uuid()) @db.Uuid
+  plan              SubscriptionPlan
+  billingCycle      BillingCycle       @map("billing_cycle")
+  amountPaise       Int                @map("amount_paise")
+  pricingVersion    String             @map("pricing_version")
+  status            SignupIntentStatus @default(OAUTH_PENDING)
+  sessionHash       String             @unique @map("session_hash")
+  stateHash         String             @unique @map("state_hash")
+  nonceHash         String             @map("nonce_hash")
+  pkceVerifier      String?            @map("pkce_verifier")
+  oauthExpiresAt    DateTime           @map("oauth_expires_at") @db.Timestamptz(6)
+  expiresAt         DateTime           @map("expires_at") @db.Timestamptz(6)
+  userId            String?            @map("user_id") @db.Uuid
+  companyId         String?            @map("company_id") @db.Uuid
+  googleSubject     String?            @map("google_subject")
+  verifiedEmail     String?            @map("verified_email")
+  profileName       String?            @map("profile_name")
+  profilePicture    String?            @map("profile_picture")
+  securityVerifiedAt DateTime?         @map("security_verified_at") @db.Timestamptz(6)
+  linkAttempts      Int                @default(0) @map("link_attempts")
+  orderId           String?            @unique @map("order_id")
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user              User?              @relation(fields: [userId], references: [id])
+  company           Company?           @relation(fields: [companyId], references: [id])
+
+  @@index([expiresAt])
+  @@index([userId])
+  @@map("signup_intents")
 }
 
 /// Record of a user accepting the Terms of Service and Privacy Policy at signup.

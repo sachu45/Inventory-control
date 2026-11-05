@@ -97,6 +97,7 @@ const PlatformSubscriptionsPage = lazyPage(
 const SettingsPage = lazyPage(() => import('@/pages/SettingsPage'), 'SettingsPage');
 const ToolsPage = lazyPage(() => import('@/pages/ToolsPage'), 'ToolsPage');
 const AuthStatusPage = lazyPage(() => import('@/pages/AuthStatusPage'), 'AuthStatusPage');
+const GoogleOnboardingPage = lazyPage(() => import('@/pages/GoogleOnboardingPage'), 'GoogleOnboardingPage');
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
@@ -180,12 +181,14 @@ export function AppRoutes() {
     <AppErrorBoundary>
       <Suspense fallback={<PageFallbackRoute />}>
         <Routes>
-          {/* Root redirects to login */}
-          <Route path="/" element={<Navigate to="/login" replace />} />
+          {/* Preview the existing public landing page during local development. */}
+          <Route path="/" element={import.meta.env.DEV ? <HomePage /> : <Navigate to="/login" replace />} />
           <Route path="/login"          element={<AuthRoute><LoginPage /></AuthRoute>} />
           <Route path="/session-expired" element={<AuthRoute><AuthStatusPage expired /></AuthRoute>} />
           <Route path="/access-denied" element={<AuthRoute><AuthStatusPage /></AuthRoute>} />
           <Route path="/signup"         element={<AuthRoute><SignupPage /></AuthRoute>} />
+          <Route path="/signup/google" element={<GoogleOnboardingPage />} />
+          <Route path="/signup/google/continue" element={<GoogleOnboardingPage />} />
           <Route path="/forgot-password" element={<AuthRoute><ForgotPasswordPage /></AuthRoute>} />
           <Route path="/reset-password"  element={<AuthRoute><ResetPasswordPage /></AuthRoute>} />
           <Route path="/supplier-portal/submit"  element={<AuthRoute><SupplierPortalSubmitPage /></AuthRoute>} />
