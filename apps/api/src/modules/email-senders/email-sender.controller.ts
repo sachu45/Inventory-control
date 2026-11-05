@@ -1,4 +1,7 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put } from '@nestjs/common';
+import { RoleName } from '@prisma/client';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { RequestUser } from '../../common/types/request-user';
@@ -14,6 +17,8 @@ import { RequiresModule } from '../../common/config/requires-module.decorator';
 @ApiTags('settings')
 @ApiBearerAuth()
 @RequiresModule('settings')
+@UseGuards(RolesGuard)
+@Roles(RoleName.OWNER, RoleName.ADMIN)
 @Controller('settings/email-notifications/senders')
 export class EmailSenderController {
   constructor(private readonly emailSenders: EmailSenderService) {}

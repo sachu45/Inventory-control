@@ -16,6 +16,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@/common/guards/roles.guard';
+import { AuthenticatedOnly } from '@/common/decorators/authenticated-only.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { requireCompanyId } from '@/common/utils/shop-scope';
@@ -31,6 +32,8 @@ import {
   NotificationPreferenceResponseDto,
 } from './dto';
 import { RequiresModule } from '../../common/config/requires-module.decorator';
+
+const OWN_NOTIFICATIONS = "The caller's own notifications and preferences";
 
 @ApiTags('Notifications')
 @RequiresModule('notifications')
@@ -67,6 +70,7 @@ export class NotificationController {
     return companyId;
   }
 
+  @AuthenticatedOnly(OWN_NOTIFICATIONS)
   @Get()
   @ApiOperation({ summary: 'Get notifications for current user' })
   @ApiResponse({ status: 200, type: NotificationListResponseDto })
@@ -99,6 +103,7 @@ export class NotificationController {
     };
   }
 
+  @AuthenticatedOnly(OWN_NOTIFICATIONS)
   @Get('/unread/count')
   @ApiOperation({ summary: 'Get unread notification count' })
   @ApiResponse({ status: 200, schema: { properties: { count: { type: 'number' } } } })
@@ -109,6 +114,7 @@ export class NotificationController {
     return { count };
   }
 
+  @AuthenticatedOnly(OWN_NOTIFICATIONS)
   @Get(':id')
   @ApiOperation({ summary: 'Get a single notification' })
   @ApiResponse({ status: 200, type: NotificationResponseDto })
@@ -119,6 +125,7 @@ export class NotificationController {
     return this.notificationService.getNotification(notificationId, user.id);
   }
 
+  @AuthenticatedOnly(OWN_NOTIFICATIONS)
   @Patch(':id/read')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Mark notification as read' })
@@ -130,6 +137,7 @@ export class NotificationController {
     return this.notificationService.markAsRead(notificationId, user.id);
   }
 
+  @AuthenticatedOnly(OWN_NOTIFICATIONS)
   @Patch('/read-all')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Mark all notifications as read' })
@@ -141,6 +149,7 @@ export class NotificationController {
     return result;
   }
 
+  @AuthenticatedOnly(OWN_NOTIFICATIONS)
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete a notification' })
@@ -152,6 +161,8 @@ export class NotificationController {
     return this.notificationService.delete(notificationId, user.id, user.companyId!);
   }
 
+  // Returns every matching notification in the company, not only the caller's.
+  @Roles(RoleName.OWNER, RoleName.ADMIN)
   @Get('/reference/:referenceType/:referenceId')
   @ApiOperation({ summary: 'Get notifications for a specific reference' })
   @ApiResponse({ status: 200, type: [NotificationResponseDto] })
@@ -165,6 +176,7 @@ export class NotificationController {
 
   // ========== PREFERENCES ENDPOINTS ==========
 
+  @AuthenticatedOnly(OWN_NOTIFICATIONS)
   @Get('preferences/my')
   @ApiOperation({ summary: 'Get current user notification preferences' })
   @ApiResponse({ status: 200, type: NotificationPreferenceResponseDto })
@@ -186,6 +198,7 @@ export class NotificationController {
     return this.preferenceService.getPreferences(userId);
   }
 
+  @AuthenticatedOnly(OWN_NOTIFICATIONS)
   @Put('preferences/my')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update current user notification preferences' })

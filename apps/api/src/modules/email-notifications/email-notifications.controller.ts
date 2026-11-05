@@ -1,4 +1,7 @@
-import { Body, Controller, Get, Param, Post, Put, Query, UseInterceptors } from '@nestjs/common';
+import { RoleName } from '@prisma/client';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Body, Controller, Get, Param, Post, Put, Query, UseInterceptors, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { StripReadonlyBodyInterceptor } from '../../common/interceptors/strip-readonly-body.interceptor';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -11,6 +14,8 @@ import { RequiresModule } from '../../common/config/requires-module.decorator';
 @ApiBearerAuth()
 @UseInterceptors(new StripReadonlyBodyInterceptor())
 @RequiresModule('settings')
+@UseGuards(RolesGuard)
+@Roles(RoleName.OWNER, RoleName.ADMIN)
 @Controller('settings/email-notifications')
 export class EmailNotificationsController {
   constructor(private readonly emailNotifications: EmailNotificationsService) {}

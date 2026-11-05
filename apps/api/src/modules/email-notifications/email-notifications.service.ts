@@ -48,12 +48,6 @@ export class EmailNotificationsService {
     private readonly config: ConfigService,
   ) {}
 
-  private assertOrgAdmin(user: RequestUser) {
-    if (user.role !== RoleName.OWNER && user.role !== RoleName.ADMIN) {
-      throw new ForbiddenException('Only organization admins can manage email notifications');
-    }
-  }
-
   /** Per-shop override row. */
   private configKey(shopId: string) {
     return `${EMAIL_NOTIFICATIONS_CONFIG_PREFIX}:${shopId}`;
@@ -142,7 +136,6 @@ export class EmailNotificationsService {
   }
 
   async getEffectiveConfig(user: RequestUser, shopId?: string | null) {
-    this.assertOrgAdmin(user);
     const companyId = this.requireCompany(user);
     if (shopId) await this.assertShopInCompany(shopId, companyId);
     const companyKey = this.companyConfigKey(companyId);
@@ -187,7 +180,6 @@ export class EmailNotificationsService {
   }
 
   async saveCompanyDefaults(user: RequestUser, dto: UpdateEmailNotificationsDto) {
-    this.assertOrgAdmin(user);
     const key = this.companyConfigKey(this.requireCompany(user));
     const value = this.normalizeConfig(dto);
     await this.prisma.systemSetting.upsert({
@@ -204,7 +196,6 @@ export class EmailNotificationsService {
   }
 
   async saveShopOverrides(user: RequestUser, shopId: string, dto: UpdateEmailNotificationsDto) {
-    this.assertOrgAdmin(user);
     await this.assertShopInCompany(shopId, this.requireCompany(user));
     const value = this.normalizeConfig(dto);
     await this.prisma.systemSetting.upsert({

@@ -1,10 +1,9 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DocumentSeriesRestart, Prisma, RoleName } from '@prisma/client';
+import { DocumentSeriesRestart, Prisma } from '@prisma/client';
 import type { RequestUser } from '../../common/types/request-user';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
@@ -36,12 +35,6 @@ export type DocumentSeriesListRow = ResolvedDocumentSeriesConfig & {
 @Injectable()
 export class DocumentSeriesService {
   constructor(private readonly prisma: PrismaService) {}
-
-  private assertOrgAdmin(user: RequestUser) {
-    if (user.role !== RoleName.OWNER && user.role !== RoleName.ADMIN) {
-      throw new ForbiddenException('Only organization admins can manage document series');
-    }
-  }
 
   private requireCompanyId(user: RequestUser): string {
     if (!user.companyId) {
@@ -251,7 +244,6 @@ export class DocumentSeriesService {
   }
 
   async listEffective(user: RequestUser, shopId?: string | null): Promise<DocumentSeriesListRow[]> {
-    this.assertOrgAdmin(user);
     const companyId = this.requireCompanyId(user);
     await this.ensureCompanyDefaults(companyId, user.id);
 
@@ -359,7 +351,6 @@ export class DocumentSeriesService {
   }
 
   async updateCompanyDefaults(user: RequestUser, rows: DocumentSeriesRowDto[]) {
-    this.assertOrgAdmin(user);
     const companyId = this.requireCompanyId(user);
     await this.ensureCompanyDefaults(companyId, user.id);
 
@@ -375,7 +366,6 @@ export class DocumentSeriesService {
   }
 
   async updateShopOverrides(user: RequestUser, shopId: string, rows: DocumentSeriesRowDto[]) {
-    this.assertOrgAdmin(user);
     const companyId = this.requireCompanyId(user);
     const shop = await this.prisma.shop.findFirst({
       where: { id: shopId, companyId },
@@ -421,7 +411,6 @@ export class DocumentSeriesService {
   }
 
   async deleteShopOverride(user: RequestUser, shopId: string, docType: string) {
-    this.assertOrgAdmin(user);
     const companyId = this.requireCompanyId(user);
     const existing = await this.prisma.documentSeriesConfig.findFirst({
       where: { companyId, shopId, docType },

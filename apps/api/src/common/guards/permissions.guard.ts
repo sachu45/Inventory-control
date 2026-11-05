@@ -27,12 +27,13 @@ export class PermissionsGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
-    if ((!required || required.length === 0) && (!requiredAny || requiredAny.length === 0)) {
+    const request = context.switchToHttp().getRequest();
+    const user = request.user as RequestUser | undefined;
+    if (!required?.length && !requiredAny?.length) {
+      if (user) this.assertShopScope(request, user);
       return true;
     }
 
-    const request = context.switchToHttp().getRequest();
-    const user = request.user as RequestUser | undefined;
     if (!user) {
       throw new ForbiddenException('Authentication required');
     }
@@ -56,6 +57,15 @@ export class PermissionsGuard implements CanActivate {
       }
     }
 
+    this.assertShopScope(request, user);
+    return true;
+  }
+
+  /** A shop-scoped role may not name another shop, whatever the route declares. */
+  private assertShopScope(
+    request: { params?: Record<string, unknown>; body?: Record<string, unknown>; query?: Record<string, unknown> },
+    user: RequestUser,
+  ): void {
     const shopIdParam =
       request.params?.shopId ??
       request.params?.shop_id ??
@@ -77,6 +87,5 @@ export class PermissionsGuard implements CanActivate {
     ) {
       throw new ForbiddenException('Shop scope mismatch');
     }
-    return true;
   }
 }

@@ -1,3 +1,4 @@
+import { ModuleAccessService } from '../../common/config/module-access.service';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -135,6 +136,7 @@ export class ReturnsService {
     private readonly returnImages: ReturnImageStorageService,
     private readonly emailNotifications: EmailNotificationsService,
     private readonly documentEmail: DocumentEmailService,
+    private readonly modules: ModuleAccessService,
   ) {}
 
   // -- Customer returns -----------------------------------------------------
@@ -1090,6 +1092,10 @@ export class ReturnsService {
     });
     if (!ret) {
       throw new NotFoundException('This acknowledgement link is invalid or has expired');
+    }
+    // These routes have no user, so ModuleEnabledGuard skips them; the token names the company.
+    if (ret.shop.companyId) {
+      await this.modules.assertEnabled(ret.shop.companyId, ret.shopId, 'returns');
     }
     return ret;
   }

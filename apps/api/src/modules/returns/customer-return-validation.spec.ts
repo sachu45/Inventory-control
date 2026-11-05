@@ -43,7 +43,7 @@ function build(overrides: { soQty?: number; returnedQty?: number; soPrice?: numb
   } as any;
   const numbers = { nextConfiguredNumber: jest.fn().mockResolvedValue('CRT-1') } as any;
   const audit = { logTenant: jest.fn() } as any;
-  const service = new ReturnsService(prisma, {} as any, {} as any, numbers, audit, { get: jest.fn() } as any, {} as any, {} as any, {} as any);
+  const service = new ReturnsService(prisma, {} as any, {} as any, numbers, audit, { get: jest.fn() } as any, {} as any, {} as any, {} as any, {} as any);
   return { service, prisma, tx };
 }
 

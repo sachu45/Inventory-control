@@ -2,7 +2,6 @@
 import { promises as dns } from 'dns';
 import {
   BadRequestException,
-  ForbiddenException,
   Inject,
   Injectable,
   Logger,
@@ -94,18 +93,11 @@ export class EmailSenderService implements OnApplicationBootstrap {
     return migrated;
   }
 
-  private assertOrgAdmin(user: RequestUser) {
-    if (user.role !== RoleName.OWNER && user.role !== RoleName.ADMIN) {
-      throw new ForbiddenException('Only organization admins can manage sender emails');
-    }
+  private companyId(user: RequestUser): string {
     if (!user.companyId) {
       throw new BadRequestException('Company context is required');
     }
-  }
-
-  private companyId(user: RequestUser): string {
-    this.assertOrgAdmin(user);
-    return user.companyId!;
+    return user.companyId;
   }
 
   private hashOtp(code: string): string {

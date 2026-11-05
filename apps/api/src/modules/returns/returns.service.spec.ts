@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma, ReturnStatus, SupplierReturnReasonCode } from '@prisma/client';
 import { ReturnsService } from './returns.service';
@@ -172,6 +172,7 @@ function makeService() {
   const documentEmail = {
     sendGoodsReturnEmail: jest.fn().mockResolvedValue({ sent: true }),
   } as any;
+  const modules = { assertEnabled: jest.fn().mockResolvedValue(undefined) } as any;
 
   const service = new ReturnsService(
     prisma,
@@ -183,9 +184,10 @@ function makeService() {
     returnImages,
     emailNotifications,
     documentEmail,
+    modules,
   );
 
-  return { service, prisma, tx, stock, costing, numbers, audit, returnImages, emailNotifications, documentEmail };
+  return { service, prisma, tx, stock, costing, numbers, audit, returnImages, emailNotifications, documentEmail, modules };
 }
 
 describe('ReturnsService', () => {
@@ -300,5 +302,36 @@ describe('ReturnsService', () => {
 
     expect(stock.postMovementOnce).not.toHaveBeenCalled();
     expect(result.message).toMatch(/already been acknowledged/i);
+  });
+
+  describe('public acknowledgement links when the returns module is disabled', () => {
+    const disabled = () => {
+      const built = makeService();
+      const submitted = makeBaseReturn(ReturnStatus.SUBMITTED);
+      built.prisma.supplierReturn.findFirst.mockResolvedValue(submitted);
+      built.modules.assertEnabled.mockRejectedValue(new ForbiddenException({ code: 'MODULE_DISABLED' }));
+      return { ...built, submitted };
+    };
+
+    it('checks the module of the company the token belongs to', async () => {
+      const { service, prisma, modules } = makeService();
+      const submitted = makeBaseReturn(ReturnStatus.SUBMITTED);
+      prisma.supplierReturn.findFirst.mockResolvedValue(submitted);
+
+      await service.getSupplierReturnPublic('plain-token');
+
+      expect(modules.assertEnabled).toHaveBeenCalledWith(submitted.shop.companyId, submitted.shopId, 'returns');
+    });
+
+    it('refuses the preview', async () => {
+      const { service } = disabled();
+      await expect(service.getSupplierReturnPublic('plain-token')).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('refuses the acknowledgement and posts no stock', async () => {
+      const { service, stock } = disabled();
+      await expect(service.acknowledgeSupplierReturn('plain-token')).rejects.toBeInstanceOf(ForbiddenException);
+      expect(stock.postMovementOnce).not.toHaveBeenCalled();
+    });
   });
 });

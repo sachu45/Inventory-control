@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
+import { AuthenticatedOnly } from '@/common/decorators/authenticated-only.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { requireCompanyId } from '@/common/utils/shop-scope';
 import type { RequestUser } from '@/common/types/request-user';
@@ -30,6 +31,7 @@ import { RequiresModule } from '../../common/config/requires-module.decorator';
 
 @ApiTags('Approvals')
 @RequiresModule('approvals')
+@AuthenticatedOnly('Open to company users; ApprovalService limits approve/reject to the assignee and escalate to the requester, assignee or an admin')
 @Controller('approvals')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
