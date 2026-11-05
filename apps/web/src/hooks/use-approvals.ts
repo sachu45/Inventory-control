@@ -159,5 +159,6 @@ export function approvalDeepLink(a: ApprovalRequest): string | null {
   if (t.includes('SALES_ORDER')) return `/sales/${a.referenceId}`;
   if (t.includes('RFQ')) return `/rfqs/${a.referenceId}`;
   if (t.includes('CONTRACT')) return `/contracts`;
+  if (t.includes('INVOICE')) return `/invoices`;
   return null;
 }

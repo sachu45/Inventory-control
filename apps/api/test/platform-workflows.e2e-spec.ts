@@ -98,8 +98,7 @@ describe('Platform workflow admin (e2e)', () => {
       ...graph,
       key: key(),
       nodes: graph.nodes.map((n) => {
-        if (n.key === 'large') return { ...n, condition: { type: 'approvalReceived' } };
-        if (n.key === 'remind') return { ...n, action: { type: 'approval' } };
+        if (n.key === 'remind') return { ...n, action: { type: 'crm.update' } };
         return n;
       }),
     };
@@ -107,8 +106,7 @@ describe('Platform workflow admin (e2e)', () => {
     expect(warnings).toEqual(
       expect.arrayContaining([
         expect.stringContaining('runs automatically'),
-        expect.stringContaining('nothing sets approvalReceived'),
-        expect.stringContaining('"approval" action is skipped'),
+        expect.stringContaining('"crm.update" action is skipped'),
       ]),
     );
 

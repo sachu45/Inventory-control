@@ -26,6 +26,24 @@ export type CompileResult =
   | { readonly ok: true; readonly workflow: CompiledWorkflow }
   | { readonly ok: false; readonly errors: readonly CompileError[] };
 
+/**
+ * Errors for a graph about to be published: an approval must lead straight to an
+ * approvalReceived condition, or a rejection would carry on as if approved. Kept out of
+ * {@link compileWorkflow} because that also runs on stored versions, which must keep loading.
+ */
+export function approvalGateErrors(def: WorkflowGraphDef): CompileError[] {
+  const nodes = new Map(def.nodes.map((node) => [node.key, node]));
+  return def.nodes
+    .filter((node) => node.kind === 'ACTION' && node.action?.type === 'approval')
+    .flatMap((node) => {
+      const next = def.edges.find((edge) => edge.from === node.key);
+      const target = next ? nodes.get(next.to) : undefined;
+      return target?.kind === 'CONDITION' && target.condition?.type === 'approvalReceived'
+        ? []
+        : [{ code: 'APPROVAL_NEEDS_GATE', nodeKey: node.key, message: `Node "${node.key}" must lead to an approvalReceived condition, so a rejection can't carry on` }];
+    });
+}
+
 /** Most nodes a graph may have; keeps publish and every compile of it cheap. */
 export const MAX_WORKFLOW_NODES = 200;
 

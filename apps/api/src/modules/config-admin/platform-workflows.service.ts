@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import { RoleName, type Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { TenantContext } from '../../common/tenant/tenant-context';
 import type { RequestUser } from '../../common/types/request-user';
@@ -13,7 +13,7 @@ import { PlatformAuditService } from '../platform/platform-audit.service';
 /** The only graph the engine runs on its own today (GraphDunningExecutor). */
 const EXECUTED_KEY = 'invoice-dunning';
 /** The only action type that sweep carries out; others are logged and skipped. */
-const EXECUTED_ACTIONS = new Set(['notify.customer']);
+const EXECUTED_ACTIONS = new Set(['notify.customer', 'approval']);
 const KEY = /^[a-z0-9][a-z0-9-]{1,79}$/;
 const KEY_MESSAGE = 'Must be 2-80 lowercase letters, digits or hyphens';
 
@@ -144,6 +144,10 @@ export class PlatformWorkflowsService {
       if (node?.action?.type && !this.actions.has(node.action.type)) {
         return [{ code: 'UNKNOWN_ACTION', nodeKey: node.key, message: `Unknown action "${node.action.type}"` }];
       }
+      const approverRole = node?.action?.type === 'approval' ? node.action.params?.approverRole : undefined;
+      if (approverRole !== undefined && !(Object.values(RoleName) as unknown[]).includes(approverRole)) {
+        return [{ code: 'UNKNOWN_ROLE', nodeKey: node.key, message: `Unknown approver role "${String(approverRole)}"` }];
+      }
       if (node?.condition?.type && !this.conditions.has(node.condition.type)) {
         return [{ code: 'UNKNOWN_CONDITION', nodeKey: node.key, message: `Unknown condition "${node.condition.type}"` }];
       }
@@ -162,10 +166,7 @@ export class PlatformWorkflowsService {
     }
     for (const node of def.nodes) {
       if (node.action?.type && !EXECUTED_ACTIONS.has(node.action.type)) {
-        warnings.push(`Node "${node.key}": the "${node.action.type}" action is skipped when this runs; only notify.customer is carried out.`);
-      }
-      if (node.condition?.type === 'approvalReceived') {
-        warnings.push(`Node "${node.key}": nothing sets approvalReceived yet, so this always takes the "no" branch. To route to a person, use an ESCALATE node.`);
+        warnings.push(`Node "${node.key}": the "${node.action.type}" action is skipped when this runs; only notify.customer and approval are carried out.`);
       }
     }
     return warnings;

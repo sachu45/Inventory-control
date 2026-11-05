@@ -1,5 +1,5 @@
 import { advanceThread, ThreadFacts } from './workflow-thread-runner';
-import { compileWorkflow } from './workflow-compiler';
+import { approvalGateErrors, compileWorkflow } from './workflow-compiler';
 import { INVOICE_DUNNING_GRAPH } from './default-workflows';
 import { CompiledWorkflow } from './graph-types';
 
@@ -59,5 +59,53 @@ describe('advanceThread', () => {
     expect(fired).toEqual(['pre-due', 'due-notice', 'firm-3', 'final-7']);
     expect(escalated).toBe(true);
     expect(reason).toBe('unresolved');
+  });
+});
+
+describe('advanceThread at an approval', () => {
+  const def = (afterApproval: string) => ({
+    key: 'approval-test',
+    name: 'Approval test',
+    nodes: [
+      { key: 'start', kind: 'ENTRY' as const },
+      { key: 'notice', kind: 'ACTION' as const, action: { type: 'notify.customer' } },
+      { key: 'ask', kind: 'ACTION' as const, action: { type: 'approval', params: { approverRole: 'ADMIN' } } },
+      { key: 'gate', kind: 'CONDITION' as const, condition: { type: 'approvalReceived' } },
+      { key: 'yes', kind: 'TERMINAL' as const, terminalReason: 'yes' },
+      { key: 'no', kind: 'TERMINAL' as const, terminalReason: 'no' },
+    ],
+    edges: [
+      { from: 'start', to: 'notice' },
+      { from: 'notice', to: 'ask' },
+      { from: 'ask', to: afterApproval },
+      { from: 'gate', to: 'yes', when: true },
+      { from: 'gate', to: 'no', when: false },
+    ],
+  });
+  const compiled = () => {
+    const r = compileWorkflow(def('gate'));
+    if (!r.ok) throw new Error('fixture must compile');
+    return r.workflow;
+  };
+
+  it('fires what comes before it, then parks on the next node with its params', () => {
+    const adv = advanceThread(compiled(), null, unpaid, now);
+    expect(adv.effects.map((e) => e.nodeKey)).toEqual(['notice']);
+    expect(adv.park).toEqual({ kind: 'APPROVAL', nodeKey: 'ask', nextNodeId: 'gate', params: { approverRole: 'ADMIN' } });
+  });
+
+  it.each([
+    [true, 'yes'],
+    [false, 'no'],
+  ])('resuming with approvalReceived=%s ends at %s', (approvalReceived, end) => {
+    const adv = advanceThread(compiled(), 'gate', { ...unpaid, flags: { approvalReceived } }, now);
+    expect(adv.effects).toEqual([]);
+    expect(adv.park).toMatchObject({ kind: 'TERMINAL', nodeKey: end });
+  });
+
+  it('a graph must follow an approval with an approvalReceived gate', () => {
+    expect(approvalGateErrors(def('gate'))).toEqual([]);
+    expect(approvalGateErrors(def('yes'))).toEqual([expect.objectContaining({ code: 'APPROVAL_NEEDS_GATE', nodeKey: 'ask' })]);
+    expect(approvalGateErrors(INVOICE_DUNNING_GRAPH)).toEqual([]);
   });
 });

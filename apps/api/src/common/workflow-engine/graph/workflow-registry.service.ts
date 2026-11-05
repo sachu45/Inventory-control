@@ -1,7 +1,7 @@
 import { ConflictException, Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
-import { compileWorkflow } from './workflow-compiler';
+import { approvalGateErrors, compileWorkflow } from './workflow-compiler';
 import { CompiledWorkflow, WorkflowGraphDef } from './graph-types';
 import { SYSTEM_WORKFLOWS } from './default-workflows';
 
@@ -68,6 +68,15 @@ export class WorkflowRegistryService {
         code: 'WORKFLOW_INVALID',
         message: `Cannot publish workflow "${String(def?.key)}": it has ${compiled.errors.length} error(s)`,
         details: compiled.errors,
+      });
+    }
+
+    const gateErrors = approvalGateErrors(def);
+    if (gateErrors.length) {
+      throw new UnprocessableEntityException({
+        code: 'WORKFLOW_INVALID',
+        message: `Cannot publish workflow "${String(def?.key)}": it has ${gateErrors.length} error(s)`,
+        details: gateErrors,
       });
     }
 

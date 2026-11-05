@@ -36,7 +36,11 @@ export type GraphEffect =
   | { readonly kind: 'ACTION'; readonly nodeKey: string; readonly action: ActionSpec }
   | { readonly kind: 'ESCALATE'; readonly nodeKey: string; readonly escalateTo: string };
 
+/** The action type that stops a thread until a person decides. */
+export const APPROVAL_ACTION = 'approval';
+
 export type ParkState =
+  | { readonly kind: 'APPROVAL'; readonly nodeKey: string; readonly nextNodeId: string; readonly params?: Readonly<Record<string, unknown>> }
   | { readonly kind: 'WAIT'; readonly nodeKey: string; readonly resumeAt: Date; readonly nextNodeId: string }
   | { readonly kind: 'TERMINAL'; readonly nodeKey: string; readonly reason: string };
 
@@ -79,6 +83,9 @@ export function advanceThread(
 
   for (let i = 0; i <= maxEffects; i++) {
     const step = stepFrom(workflow, enter, ctx);
+    if (step.kind === 'ACTION' && step.action.type === APPROVAL_ACTION) {
+      return { effects, park: { kind: 'APPROVAL', nodeKey: step.nodeKey, nextNodeId: step.nextKey, params: step.action.params } };
+    }
     if (step.kind === 'ACTION') {
       effects.push({ kind: 'ACTION', nodeKey: step.nodeKey, action: step.action });
       enter = step.nextKey;

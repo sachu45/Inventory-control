@@ -3114,6 +3114,8 @@ enum ApprovalStatus {
 }
 
 enum ApprovalType {
+  /// A workflow waiting on a person; referenceId is the invoice.
+  INVOICE_DUNNING
   GOODS_RECEIPT
   PURCHASE_ORDER
   RFQ

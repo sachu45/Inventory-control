@@ -10,3 +10,7 @@ describe('approval record links', () => {
     expect(approvalDeepLink({ approvalType, referenceId:'doc-1' } as ApprovalRequest)).toBe(destination);
   });
 });
+
+it('links a workflow approval to invoices', () => {
+  expect(approvalDeepLink({ approvalType: 'INVOICE_DUNNING', referenceId: 'i1' } as Parameters<typeof approvalDeepLink>[0])).toBe('/invoices');
+});
