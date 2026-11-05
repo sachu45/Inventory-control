@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { CacheModule } from '../cache/cache.module';
 import { ConfigDraftService } from './config-draft.service';
+import { CustomFieldService } from './custom-field.service';
 import { ConfigPublishService } from './config-publish.service';
 import { ConfigResolverService } from './config-resolver.service';
 import { ModuleAccessService } from './module-access.service';
@@ -10,6 +11,7 @@ import { UserPreferenceService } from './user-preference.service';
 const providers = [
   ConfigResolverService,
   ConfigDraftService,
+  CustomFieldService,
   ConfigPublishService,
   UserPreferenceService,
   ModuleRegistryService,

@@ -1,5 +1,6 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { isDeepStrictEqual } from 'util';
+import { CustomFieldSnapshot, customFieldIssues, toCustomFieldSnapshot } from './custom-fields';
 import { MODULE_KEYS, MODULE_REGISTRY, ModuleKey, ModuleSettings, isModuleKey } from './module-registry';
 
 export const CONFIG_SNAPSHOT_SCHEMA_VERSION = 1;
@@ -12,7 +13,12 @@ export type PublishedSnapshot = {
   version: number;
   company: Record<ModuleKey, ModuleState>;
   shops: Record<string, Partial<Record<ModuleKey, ShopModuleOverride>>>;
+  /** Active custom fields per module. Versions published before Phase 5 have none. */
+  customFields?: Partial<Record<ModuleKey, CustomFieldSnapshot[]>>;
 };
+
+/** A custom field as the compiler needs it: a definition row, or one read back from a snapshot. */
+export type CustomFieldDraft = Parameters<typeof toCustomFieldSnapshot>[0] & { moduleKey: string };
 
 /** A `tenant_module_configs` row as the compiler needs it. */
 export type DraftRow = {
@@ -66,6 +72,7 @@ export function compileSnapshot(
   drafts: readonly DraftRow[],
   companyShopIds: ReadonlySet<string>,
   version: number,
+  customFieldDrafts: readonly CustomFieldDraft[] = [],
 ): { snapshot: PublishedSnapshot; issues: ConfigIssue[] } {
   const issues: ConfigIssue[] = [];
   const companyRows = new Map<ModuleKey, DraftRow>();
@@ -147,8 +154,18 @@ export function compileSnapshot(
     if (Object.keys(overrides).length) shops[shopId] = overrides;
   }
 
+  const customFields: NonNullable<PublishedSnapshot['customFields']> = {};
+  for (const field of [...customFieldDrafts].sort((a, b) => a.sortOrder - b.sortOrder || a.fieldKey.localeCompare(b.fieldKey))) {
+    const fieldIssues = customFieldIssues(field);
+    if (fieldIssues.length) {
+      issues.push(...fieldIssues.map((i) => ({ path: `customFields.${field.moduleKey}.${field.fieldKey}.${i.path}`, message: i.message })));
+      continue;
+    }
+    (customFields[field.moduleKey as ModuleKey] ??= []).push(toCustomFieldSnapshot(field));
+  }
+
   return {
-    snapshot: { schemaVersion: CONFIG_SNAPSHOT_SCHEMA_VERSION, version, company, shops },
+    snapshot: { schemaVersion: CONFIG_SNAPSHOT_SCHEMA_VERSION, version, company, shops, customFields },
     issues,
   };
 }
@@ -212,6 +229,13 @@ export function draftsFromSnapshot(snapshot: PublishedSnapshot): DraftRow[] {
   return rows;
 }
 
+/** Custom fields held in a snapshot, in the form the compiler takes. */
+export function customFieldDraftsFromSnapshot(snapshot: PublishedSnapshot): CustomFieldDraft[] {
+  return Object.entries(snapshot.customFields ?? {}).flatMap(([moduleKey, fields]) =>
+    (fields ?? []).map((field) => ({ ...field, moduleKey })),
+  );
+}
+
 /** Structural diff; arrays are compared as whole values. */
 export function diffJson(before: unknown, after: unknown, path = ''): ConfigChange[] {
   if (isDeepStrictEqual(before, after)) return [];
@@ -223,5 +247,8 @@ export function diffJson(before: unknown, after: unknown, path = ''): ConfigChan
 /** Changes between two snapshots; `null` stands for "nothing published yet" (registry defaults). */
 export function diffSnapshots(before: PublishedSnapshot | null, after: PublishedSnapshot): ConfigChange[] {
   const base = before ?? compileSnapshot([], new Set(), 0).snapshot;
-  return diffJson({ company: base.company, shops: base.shops }, { company: after.company, shops: after.shops });
+  return diffJson(
+    { company: base.company, shops: base.shops, customFields: base.customFields ?? {} },
+    { company: after.company, shops: after.shops, customFields: after.customFields ?? {} },
+  );
 }

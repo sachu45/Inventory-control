@@ -36,7 +36,7 @@ const CONFIG_JSON_SCHEMAS = Object.fromEntries(
   ]),
 ) as unknown as Record<ModuleKey, Record<string, unknown>>;
 
-const CONFIG_AUDIT_ENTITY_TYPES = ['ConfigVersion', 'TenantModuleConfig', 'FeatureFlag'];
+const CONFIG_AUDIT_ENTITY_TYPES = ['ConfigVersion', 'TenantModuleConfig', 'FeatureFlag', 'CustomFieldDefinition'];
 
 const draftView = (row: TenantModuleConfig | null | undefined) =>
   row ? { id: row.id, enabled: row.enabled, config: row.config, revision: row.revision, updatedAt: row.updatedAt, updatedBy: row.updatedBy } : null;

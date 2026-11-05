@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { AuditAction, ConfigVersion, Prisma } from '@prisma/client';
 import type Redis from 'ioredis';
 import { AuditService } from '../../modules/audit/audit.service';
+import { customFieldHasValues } from './custom-field.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { REDIS_CLIENT } from '../cache/redis.provider';
 import { ConfigResolverService } from './config-resolver.service';
@@ -11,8 +12,10 @@ import {
   ConfigValidationException,
   ConfigVersionConflictException,
   DraftRow,
+  CustomFieldDraft,
   PublishedSnapshot,
   compileSnapshot,
+  customFieldDraftsFromSnapshot,
   diffSnapshots,
   draftsFromSnapshot,
   latestVersionCacheKey,
@@ -93,7 +96,9 @@ export class ConfigPublishService {
       if (!target) throw new NotFoundException(`Config version ${args.targetVersion} not found`);
 
       const drafts = draftsFromSnapshot(snapshotOf(target)!);
-      const { snapshot } = await this.compileOrThrow(tx, args.companyId, drafts, active);
+      const fields = customFieldDraftsFromSnapshot(snapshotOf(target)!);
+      await this.assertFieldTypesRestorable(tx, args.companyId, fields);
+      const { snapshot } = await this.compileOrThrow(tx, args.companyId, drafts, active, fields);
       const version = await tx.configVersion.create({
         data: {
           companyId: args.companyId,
@@ -117,6 +122,7 @@ export class ConfigPublishService {
           updatedBy: args.actorId,
         })),
       });
+      await this.restoreCustomFields(tx, args.companyId, fields);
       return { version, changes: diffSnapshots(snapshotOf(active), snapshot) };
     });
     await this.afterCommit(args.companyId, args.actorId, args.expectedBaseVersion, result);
@@ -173,13 +179,62 @@ export class ConfigPublishService {
     });
   }
 
-  private async compile(db: Db, companyId: string, drafts: DraftRow[], active: ConfigVersion | null) {
-    const shops = await db.shop.findMany({ where: { companyId }, select: { id: true } });
-    return compileSnapshot(drafts, new Set(shops.map((s) => s.id)), (active?.version ?? 0) + 1);
+  /** Archived fields stay out of the snapshot: hidden and not validated, with their values kept. */
+  private loadCustomFields(db: Db, companyId: string): Promise<CustomFieldDraft[]> {
+    return db.customFieldDefinition.findMany({ where: { companyId, archivedAt: null } });
   }
 
-  private async compileOrThrow(db: Db, companyId: string, drafts: DraftRow[], active: ConfigVersion | null) {
-    const compiled = await this.compile(db, companyId, drafts, active);
+  /** `customFields` overrides the draft definitions; a rollback compiles the target version's. */
+  private async compile(db: Db, companyId: string, drafts: DraftRow[], active: ConfigVersion | null, customFields?: CustomFieldDraft[]) {
+    const shops = await db.shop.findMany({ where: { companyId }, select: { id: true } });
+    const fields = customFields ?? (await this.loadCustomFields(db, companyId));
+    return compileSnapshot(drafts, new Set(shops.map((s) => s.id)), (active?.version ?? 0) + 1, fields);
+  }
+
+  /** A rollback must not bring back a type that values stored since would no longer fit. */
+  private async assertFieldTypesRestorable(tx: Prisma.TransactionClient, companyId: string, fields: CustomFieldDraft[]) {
+    const current = await tx.customFieldDefinition.findMany({ where: { companyId } });
+    const issues: ConfigIssue[] = [];
+    for (const field of fields) {
+      const row = current.find((r) => r.moduleKey === field.moduleKey && r.fieldKey === field.fieldKey);
+      if (row && row.fieldType !== field.fieldType && (await customFieldHasValues(tx, companyId, row.moduleKey, row.fieldKey))) {
+        issues.push({
+          path: `customFields.${row.moduleKey}.${row.fieldKey}.fieldType`,
+          message: `Records hold ${row.fieldType} values for this field, so it cannot go back to ${field.fieldType}`,
+        });
+      }
+    }
+    if (issues.length) throw new ConfigValidationException(issues);
+  }
+
+  /** Resets draft definitions to a rolled-back version. Fields it lacks are archived, never deleted. */
+  private async restoreCustomFields(tx: Prisma.TransactionClient, companyId: string, fields: CustomFieldDraft[]) {
+    const json = (value: unknown) => (value === undefined || value === null ? Prisma.DbNull : (value as Prisma.InputJsonValue));
+    await tx.customFieldDefinition.updateMany({ where: { companyId, archivedAt: null }, data: { archivedAt: new Date() } });
+    for (const field of fields) {
+      const data = {
+        label: field.label,
+        fieldType: field.fieldType,
+        options: json(field.options),
+        validation: json(field.validation),
+        required: field.required,
+        defaultValue: json(field.defaultValue),
+        searchable: field.searchable,
+        readRoles: field.readRoles,
+        writeRoles: field.writeRoles,
+        sortOrder: field.sortOrder,
+        archivedAt: null,
+      };
+      await tx.customFieldDefinition.upsert({
+        where: { companyId_moduleKey_fieldKey: { companyId, moduleKey: field.moduleKey, fieldKey: field.fieldKey } },
+        create: { companyId, moduleKey: field.moduleKey, fieldKey: field.fieldKey, ...data },
+        update: data,
+      });
+    }
+  }
+
+  private async compileOrThrow(db: Db, companyId: string, drafts: DraftRow[], active: ConfigVersion | null, customFields?: CustomFieldDraft[]) {
+    const compiled = await this.compile(db, companyId, drafts, active, customFields);
     if (compiled.issues.length) throw new ConfigValidationException(compiled.issues);
     return compiled;
   }

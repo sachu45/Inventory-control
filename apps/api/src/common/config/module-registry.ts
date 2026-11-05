@@ -220,7 +220,6 @@ export const MODULE_REGISTRY: Readonly<Record<ModuleKey, ModuleDefinition>> = {
     planGate: 'rfqs',
     requiredPermission: 'rfq:read',
     dependsOn: ['products', 'suppliers'],
-    supportsCustomFields: true,
     supportsWorkflows: true,
   }),
   contracts: defineModule('contracts', {
@@ -232,7 +231,6 @@ export const MODULE_REGISTRY: Readonly<Record<ModuleKey, ModuleDefinition>> = {
     planGate: 'contracts',
     requiredPermission: 'contract:read',
     dependsOn: ['suppliers'],
-    supportsCustomFields: true,
   }),
   'purchase-orders': defineModule('purchase-orders', {
     label: 'Purchase Orders',
@@ -304,7 +302,6 @@ export const MODULE_REGISTRY: Readonly<Record<ModuleKey, ModuleDefinition>> = {
     planGate: 'sales_quotations',
     requiredPermission: 'shop:read',
     dependsOn: ['products', 'customers'],
-    supportsCustomFields: true,
     supportsWorkflows: true,
   }),
   sales: defineModule('sales', {

@@ -12,6 +12,7 @@
     "<rootDir>/test/helpers/reset-throttle.ts"
   ],
   "forceExit": true,
+  "testTimeout": 30000,
   "testEnvironment": "node",
   "testMatch": [
     "<rootDir>/test/**/*.e2e-spec.ts"

@@ -404,9 +404,10 @@ model Company {
   pdfJobs          PdfJob[]
 
   // Enterprise Configuration
-  tenantModuleConfigs TenantModuleConfig[]
-  userPreferences     UserPreference[]
-  configVersions      ConfigVersion[]
+  tenantModuleConfigs    TenantModuleConfig[]
+  customFieldDefinitions CustomFieldDefinition[]
+  userPreferences        UserPreference[]
+  configVersions         ConfigVersion[]
 
   // Agent Platform (WhatsApp assistant)
   channelAccounts    ChannelAccount[]
@@ -934,6 +935,8 @@ model ReportSavedFilter {
 
 model Product {
   id               String         @id @default(uuid()) @db.Uuid
+  /// Values of published custom fields (spec §4.5). Null until a field is set.
+  customFields     Json?          @map("custom_fields")
   productCode      String         @unique @map("product_code")
   description      String
   uom              String
@@ -987,6 +990,7 @@ model Product {
   lowStockAlerts  LowStockAlert[]
 
   @@index([companyId])
+  @@index([customFields(ops: JsonbPathOps)], map: "products_custom_fields_idx", type: Gin)
   @@map("products")
 }
 
@@ -1200,6 +1204,8 @@ model ProductSpecification {
 
 model Supplier {
   id            String   @id @default(uuid()) @db.Uuid
+  /// Values of published custom fields (spec §4.5). Null until a field is set.
+  customFields  Json?    @map("custom_fields")
   supplierCode  String   @map("supplier_code")
   supplierName  String   @map("supplier_name")
   companyId     String?  @map("company_id") @db.Uuid
@@ -1242,6 +1248,7 @@ model Supplier {
   @@index([companyId])
   @@index([supplierName])
   @@index([deletedAt])
+  @@index([customFields(ops: JsonbPathOps)], map: "suppliers_custom_fields_idx", type: Gin)
   @@map("suppliers")
 }
 
@@ -1461,6 +1468,8 @@ model SupplierQuotationItem {
 
 model GoodsReceiptHeader {
   id               String         @id @default(uuid()) @db.Uuid
+  /// Values of published custom fields (spec §4.5). Null until a field is set.
+  customFields     Json?          @map("custom_fields")
   grNumber         String         @map("gr_number")
   grDate           DateTime       @map("gr_date") @db.Date
   shopId           String         @map("shop_id") @db.Uuid
@@ -1492,6 +1501,7 @@ model GoodsReceiptHeader {
   @@index([shopId, grDate])
   @@index([shopId, status, grDate])
   @@index([purchaseOrderId])
+  @@index([customFields(ops: JsonbPathOps)], map: "goods_receipt_header_custom_fields_idx", type: Gin)
   @@map("goods_receipt_header")
 }
 
@@ -1526,6 +1536,8 @@ model GoodsReceiptItem {
 
 model GoodsIssueHeader {
   id               String         @id @default(uuid()) @db.Uuid
+  /// Values of published custom fields (spec §4.5). Null until a field is set.
+  customFields     Json?          @map("custom_fields")
   giNumber         String         @map("gi_number")
   giDate           DateTime       @map("gi_date") @db.Date
   shopId           String         @map("shop_id") @db.Uuid
@@ -1549,6 +1561,7 @@ model GoodsIssueHeader {
   @@unique([shopId, giNumber])
   @@index([shopId, giDate])
   @@index([shopId, status, giDate])
+  @@index([customFields(ops: JsonbPathOps)], map: "goods_issue_header_custom_fields_idx", type: Gin)
   @@map("goods_issue_header")
 }
 
@@ -1601,6 +1614,8 @@ model DamagedStock {
 
 model PurchaseOrderHeader {
   id               String              @id @default(uuid()) @db.Uuid
+  /// Values of published custom fields (spec §4.5). Null until a field is set.
+  customFields     Json?               @map("custom_fields")
   poNumber         String              @map("po_number")
   poDate           DateTime            @map("po_date") @db.Date
   shopId           String              @map("shop_id") @db.Uuid
@@ -1636,6 +1651,7 @@ model PurchaseOrderHeader {
   @@index([shopId, status])
   @@index([rfqId])
   @@index([contractId])
+  @@index([customFields(ops: JsonbPathOps)], map: "purchase_order_header_custom_fields_idx", type: Gin)
   @@map("purchase_order_header")
 }
 
@@ -2088,6 +2104,8 @@ enum AlertType {
 
 model Customer {
   id           String   @id @default(uuid()) @db.Uuid
+  /// Values of published custom fields (spec §4.5). Null until a field is set.
+  customFields Json?    @map("custom_fields")
   customerCode String   @map("customer_code")
   customerName String   @map("customer_name")
   email        String?
@@ -2115,6 +2133,7 @@ model Customer {
 
   @@unique([shopId, customerCode])
   @@index([shopId, customerName])
+  @@index([customFields(ops: JsonbPathOps)], map: "customers_custom_fields_idx", type: Gin)
   @@map("customers")
 }
 
@@ -2177,6 +2196,8 @@ model SalesQuotationItem {
 
 model SalesOrderHeader {
   id                String            @id @default(uuid()) @db.Uuid
+  /// Values of published custom fields (spec §4.5). Null until a field is set.
+  customFields      Json?             @map("custom_fields")
   soNumber          String            @map("so_number")
   orderDate         DateTime          @map("order_date") @db.Date
   expectedDate      DateTime?         @map("expected_date") @db.Date
@@ -2216,6 +2237,7 @@ model SalesOrderHeader {
   @@index([shopId, orderDate])
   @@index([customerId])
   @@index([shopId, fulfillmentStatus])
+  @@index([customFields(ops: JsonbPathOps)], map: "sales_order_header_custom_fields_idx", type: Gin)
   @@map("sales_order_header")
 }
 
@@ -2248,6 +2270,8 @@ model SalesOrderItem {
 
 model InvoiceHeader {
   id               String        @id @default(uuid()) @db.Uuid
+  /// Values of published custom fields (spec §4.5). Null until a field is set.
+  customFields     Json?         @map("custom_fields")
   invoiceNumber    String        @map("invoice_number")
   invoiceDate      DateTime      @map("invoice_date") @db.Date
   salesOrderId     String?       @map("sales_order_id") @db.Uuid
@@ -2285,6 +2309,7 @@ model InvoiceHeader {
   @@index([shopId, status, invoiceDate])
   @@index([customerId])
   @@index([salesOrderId])
+  @@index([customFields(ops: JsonbPathOps)], map: "invoice_header_custom_fields_idx", type: Gin)
   @@map("invoice_header")
 }
 
@@ -4337,6 +4362,38 @@ model InventoryException {
   @@index([companyId, severity, status], map: "inventory_exceptions_severity_idx")
   @@index([companyId, lastDetectedAt], map: "inventory_exceptions_time_idx")
   @@map("inventory_exceptions")
+}
+
+/// A tenant's custom field (spec §4.5). A draft: it takes effect when the config is published.
+model CustomFieldDefinition {
+  id           String    @id @default(uuid()) @db.Uuid
+  companyId    String    @map("company_id") @db.Uuid
+  moduleKey    String    @map("module_key")
+  /// Immutable after creation.
+  fieldKey     String    @map("field_key")
+  label        String
+  /// text | number | date | boolean | select | multiselect
+  fieldType    String    @map("field_type")
+  /// select/multiselect: [{ value, label, archived? }]
+  options      Json?
+  /// { min?, max?, maxLength?, pattern? }
+  validation   Json?
+  required     Boolean   @default(false)
+  defaultValue Json?     @map("default_value")
+  searchable   Boolean   @default(false)
+  /// Empty = everyone with module read permission.
+  readRoles    String[]  @map("read_roles")
+  /// Empty = everyone with module write permission.
+  writeRoles   String[]  @map("write_roles")
+  sortOrder    Int       @default(0) @map("sort_order")
+  archivedAt   DateTime? @map("archived_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, moduleKey, fieldKey])
+  @@map("custom_field_definitions")
 }
 
 model TenantModuleConfig {
