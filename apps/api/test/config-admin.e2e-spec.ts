@@ -50,6 +50,7 @@ describe('Platform config admin API (e2e)', () => {
   let companyId: string;
   let shopId: string;
   let ownerId: string;
+  let outsiderCompanyId: string;
   const created: string[] = [];
   const previousAllowlist = process.env.PLATFORM_ADMIN_EMAILS;
 
@@ -104,6 +105,7 @@ describe('Platform config admin API (e2e)', () => {
     // A regular tenant owner: full rights in their own company, no platform access.
     const outsider = await createTenant('o');
     tenantToken = (await login(app, outsider.email, PASSWORD)).accessToken;
+    outsiderCompanyId = outsider.companyId;
   });
 
   afterAll(async () => {
@@ -246,5 +248,59 @@ describe('Platform config admin API (e2e)', () => {
     );
     expect(audit.items.filter((a) => a.newValues?.platformAction).every((a) => a.ipAddress)).toBe(true);
     await admin().get(`${base}/audit`).query({ type: 'users' }).expect(400);
+  });
+
+  it('sets workflow feature flags per tenant; tenants switch only the tenant-writable ones (#243)', async () => {
+    if (!E2E_DB_ENABLED) return;
+    const flagRows = (company: string, name: string) =>
+      prisma.notificationPolicy.count({ where: { companyId: company, scope: 'feature-flag', name } });
+    const flag = (list: { feature: string; enabled: boolean; source: string }[], name: string) =>
+      list.find((f) => f.feature === name);
+
+    // Platform admin: any known flag, for any company; unknown flag 400, unknown company 404.
+    const base = `/api/v1/platform/tenants/${companyId}/features`;
+    expect(flag(unwrap((await admin().get(base).expect(200)).body), 'ai-advisor')).toMatchObject({ enabled: false, source: 'default' });
+    await admin().put(`${base}/ai-advisor`).send({ enabled: true }).expect(200);
+    expect(flag(unwrap((await admin().get(base).expect(200)).body), 'ai-advisor')).toMatchObject({ enabled: true, source: 'override' });
+    await admin().put(`${base}/made-up`).send({ enabled: true }).expect(400);
+    await admin().put(`${base}/ai-advisor`).send({ enabled: 'yes' }).expect(400);
+    await admin().put(`/api/v1/platform/tenants/${randomUUID()}/features/ai-advisor`).send({ enabled: true }).expect(404);
+
+    // Concurrent writes leave exactly one row.
+    await Promise.all(
+      Array.from({ length: 8 }, (_, i) => admin().put(`${base}/optimizer`).send({ enabled: i % 2 === 0 }).expect(200)),
+    );
+    expect(await flagRows(companyId, 'optimizer')).toBe(1);
+    expect(await flagRows(companyId, 'ai-advisor')).toBe(1);
+
+    const audit = unwrap<{ items: { newValues: { platformAction?: string; feature?: string } | null }[] }>(
+      (await admin().get(`/api/v1/platform/tenants/${companyId}/audit`).query({ type: 'config', take: 100 }).expect(200)).body,
+    );
+    expect(audit.items.some((a) => a.newValues?.platformAction === 'platform_feature_flag_set' && a.newValues.feature === 'ai-advisor')).toBe(true);
+
+    // Tenant owner, own company: dark-launched flags 403, unknown 400, tenant-writable ones allowed.
+    const tenant = () => authed(app, tenantToken);
+    const refused = await tenant().post('/api/v1/workflow-engine/features/ai-advisor').send({ enabled: true });
+    expect(refused.status).toBe(403);
+    expect(JSON.stringify(refused.body)).toContain('FEATURE_FLAG_PLATFORM_ONLY');
+    await tenant().post('/api/v1/workflow-engine/features/graph-execution').send({ enabled: true }).expect(403);
+    await tenant().post('/api/v1/workflow-engine/features/made-up').send({ enabled: true }).expect(400);
+    await tenant().post('/api/v1/workflow-engine/features/channel-routing').send({ enabled: true }).expect(201);
+    expect(await flagRows(outsiderCompanyId, 'ai-advisor')).toBe(0);
+    expect(await flagRows(outsiderCompanyId, 'channel-routing')).toBe(1);
+    const own = unwrap<{ feature: string; enabled: boolean; tenantWritable: boolean }[]>(
+      (await tenant().get('/api/v1/workflow-engine/features').expect(200)).body,
+    );
+    expect(flag(own, 'channel-routing')).toMatchObject({ enabled: true, tenantWritable: true });
+    expect(flag(own, 'ai-advisor')).toMatchObject({ enabled: false, tenantWritable: false });
+
+    // The policy API can't write or see flag rows.
+    await tenant()
+      .post('/api/v1/workflow-engine/policies')
+      .send({ name: 'ai-advisor', scope: 'feature-flag', condition: {}, action: { enabled: true } })
+      .expect(400);
+    const policies = unwrap<{ scope: string }[]>((await tenant().get('/api/v1/workflow-engine/policies').expect(200)).body);
+    expect(policies.filter((p) => p.scope === 'feature-flag')).toEqual([]);
+    expect(await flagRows(outsiderCompanyId, 'ai-advisor')).toBe(0);
   });
 });

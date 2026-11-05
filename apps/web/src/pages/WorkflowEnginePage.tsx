@@ -355,25 +355,35 @@ function PoliciesTab() {
   );
 }
 
-const FEATURES = ['channel-routing', 'graph-execution', 'ai-advisor', 'simulation', 'optimizer', 'predictive-ai'];
-
 function FeaturesTab() {
+  const qc = useQueryClient();
+  const features = useQuery({ queryKey: ['wf', 'features'], queryFn: wf.listFeatures });
   const set = useMutation({
     mutationFn: ({ f, on }: { f: string; on: boolean }) => wf.setFeature(f, on),
-    onSuccess: (_d, v) => toast.success(`${v.f} ${v.on ? 'enabled' : 'disabled'}`),
+    onSuccess: (_d, v) => {
+      toast.success(`${v.f} ${v.on ? 'enabled' : 'disabled'}`);
+      void qc.invalidateQueries({ queryKey: ['wf', 'features'] });
+    },
     onError: () => toast.error('Could not update feature'),
   });
   return (
     <Card>
       <CardHeader><CardTitle>Feature flags (per tenant)</CardTitle></CardHeader>
       <CardContent className="space-y-2">
-        {FEATURES.map((f) => (
-          <div key={f} className="flex items-center justify-between border rounded p-2">
-            <span className="text-sm font-medium">{f}</span>
-            <div className="space-x-2">
-              <Button size="sm" onClick={() => set.mutate({ f, on: true })}>Enable</Button>
-              <Button size="sm" variant="outline" onClick={() => set.mutate({ f, on: false })}>Disable</Button>
-            </div>
+        {features.data?.map((f) => (
+          <div key={f.feature} className="flex items-center justify-between border rounded p-2">
+            <span className="text-sm font-medium">
+              {f.feature}{' '}
+              <span className="text-muted-foreground font-normal">{f.enabled ? 'on' : 'off'}</span>
+            </span>
+            {f.tenantWritable ? (
+              <div className="space-x-2">
+                <Button size="sm" disabled={f.enabled} onClick={() => set.mutate({ f: f.feature, on: true })}>Enable</Button>
+                <Button size="sm" variant="outline" disabled={!f.enabled} onClick={() => set.mutate({ f: f.feature, on: false })}>Disable</Button>
+              </div>
+            ) : (
+              <span className="text-xs text-muted-foreground">Managed by the platform team</span>
+            )}
           </div>
         ))}
       </CardContent>

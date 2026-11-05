@@ -125,6 +125,15 @@ export const simulate = async (body: { workflowKey?: string; paidOnDay?: number 
   unwrap<SimulatedStep[]>(await apiClient.post('/workflow-engine/simulate', body));
 
 // ── Feature flags (§10) ────────────────────────────────────────────────────────
+export interface FeatureFlagState {
+  feature: string;
+  enabled: boolean;
+  source: 'override' | 'env' | 'default';
+  /** False for dark-launched flags, which only the platform team switches. */
+  tenantWritable: boolean;
+}
+export const listFeatures = async () =>
+  unwrap<FeatureFlagState[]>(await apiClient.get('/workflow-engine/features'));
 export const setFeature = async (feature: string, enabled: boolean) =>
   apiClient.post(`/workflow-engine/features/${feature}`, { enabled });
 

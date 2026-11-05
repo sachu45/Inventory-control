@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { RoleName } from '@prisma/client';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
@@ -9,7 +9,8 @@ import type { RequestUser } from '@/common/types/request-user';
 import { AnalyticsRange, AnalyticsService } from './analytics/analytics.service';
 import { TimelineService } from './analytics/timeline.service';
 import { SimulationScenario, SimulationService } from './ops/simulation.service';
-import { FeatureFlagsService, WorkflowFeature } from './ops/feature-flags.service';
+import { FeatureFlagsService, TENANT_WRITABLE_FEATURES, WorkflowFeature } from './ops/feature-flags.service';
+import { parseEnabled, ParseWorkflowFeaturePipe } from './ops/feature-flag.pipe';
 import { WorkflowRegistryService } from './graph/workflow-registry.service';
 import { WorkflowGraphDef } from './graph/graph-types';
 import { PredictiveService } from './predictive/predictive.service';
@@ -111,15 +112,29 @@ export class WorkflowEngineController {
     return this.registry.publish(user.companyId!, { ...def, key });
   }
 
+  @Get('features')
+  @ApiOperation({ summary: "This tenant's workflow feature flags, and which ones it may switch itself" })
+  listFeatures(@CurrentUser() user: RequestUser) {
+    return this.features.list(user.companyId!);
+  }
+
   @Post('features/:feature')
   @Roles(RoleName.OWNER, RoleName.ADMIN)
-  @ApiOperation({ summary: 'Enable/disable a workflow feature for this tenant' })
+  @ApiOperation({ summary: 'Enable/disable a tenant-writable workflow feature for this tenant' })
   setFeature(
     @CurrentUser() user: RequestUser,
-    @Param('feature') feature: WorkflowFeature,
+    @Param('feature', ParseWorkflowFeaturePipe) feature: WorkflowFeature,
     @Body() body: { enabled: boolean },
   ) {
-    return this.features.setEnabled(user.companyId!, feature, body.enabled === true);
+    if (!TENANT_WRITABLE_FEATURES.has(feature)) {
+      // Dark-launched features are rolled out per tenant by the platform team.
+      throw new ForbiddenException({
+        code: 'FEATURE_FLAG_PLATFORM_ONLY',
+        message: `${feature} is enabled by the platform team, not by the organisation`,
+        feature,
+      });
+    }
+    return this.features.setEnabled(user.companyId!, feature, parseEnabled(body));
   }
 
   // ── Predictive AI (Phase 6) ────────────────────────────────────────────────

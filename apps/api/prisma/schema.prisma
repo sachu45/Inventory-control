@@ -4143,6 +4143,8 @@ model NotificationPolicy {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@index([companyId, scope, enabled, priority])
+  /// Also: partial unique index notification_policies_feature_flag_key on
+  /// (company_id, name) WHERE scope = 'feature-flag' (raw SQL; Prisma can't express it).
   @@map("notification_policies")
 }
 

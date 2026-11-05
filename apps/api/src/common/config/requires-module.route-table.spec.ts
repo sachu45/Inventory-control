@@ -19,6 +19,7 @@ const EXEMPT: Record<string, string> = {
   PlatformSubscriptionsController: 'platform admin',
   PlatformNotificationController: 'platform admin',
   ConfigAdminController: 'platform admin (tenant config)',
+  PlatformFeatureFlagsController: 'platform admin (tenant feature flags)',
   MeConfigController: 'the user\'s own resolved config and preferences',
   // Infrastructure.
   HealthController: 'health checks',

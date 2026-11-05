@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import type { Redis } from 'ioredis';
 import { PrismaService } from '@/prisma/prisma.service';
 import { REDIS_CLIENT } from '@/common/cache/redis.provider';
+import { FEATURE_FLAG_SCOPE } from '../ops/feature-flags.service';
 import { evaluatePolicies } from './policy-evaluator';
 import { PolicyCondition, PolicyAction, PolicyDecision, PolicyFacts, PolicyRule } from './policy-types';
 
@@ -63,6 +64,10 @@ function assertValidPolicy(input: Partial<PolicyInput>, creating: boolean): void
   if (creating && (typeof input.name !== 'string' || !input.name.trim())) {
     throw new BadRequestException('Policy name is required');
   }
+  if (input.scope === FEATURE_FLAG_SCOPE) {
+    // Flag rows share this table; they are written only through FeatureFlagsService.
+    throw new BadRequestException(`Policy scope '${FEATURE_FLAG_SCOPE}' is reserved`);
+  }
   if (input.priority !== undefined && !Number.isInteger(input.priority)) {
     throw new BadRequestException('Policy priority must be an integer');
   }
@@ -119,7 +124,7 @@ export class PolicyService {
   // ── CRUD (Plan §7 policy editor) ────────────────────────────────────────────
   list(companyId: string, scope?: string) {
     return this.prisma.notificationPolicy.findMany({
-      where: { companyId, ...(scope ? { scope } : {}) },
+      where: { companyId, AND: [{ scope: { not: FEATURE_FLAG_SCOPE } }, ...(scope ? [{ scope }] : [])] },
       orderBy: [{ scope: 'asc' }, { priority: 'asc' }, { createdAt: 'asc' }],
     });
   }
@@ -142,7 +147,7 @@ export class PolicyService {
   }
 
   async update(companyId: string, id: string, input: Partial<PolicyInput>) {
-    const existing = await this.prisma.notificationPolicy.findFirst({ where: { id, companyId } });
+    const existing = await this.prisma.notificationPolicy.findFirst({ where: { id, companyId, scope: { not: FEATURE_FLAG_SCOPE } } });
     if (!existing) throw new NotFoundException('Policy not found');
     assertValidPolicy(input, false);
     const row = await this.prisma.notificationPolicy.update({
@@ -161,7 +166,7 @@ export class PolicyService {
   }
 
   async remove(companyId: string, id: string) {
-    const existing = await this.prisma.notificationPolicy.findFirst({ where: { id, companyId } });
+    const existing = await this.prisma.notificationPolicy.findFirst({ where: { id, companyId, scope: { not: FEATURE_FLAG_SCOPE } } });
     if (!existing) throw new NotFoundException('Policy not found');
     await this.prisma.notificationPolicy.delete({ where: { id } });
     await this.invalidate(companyId);
