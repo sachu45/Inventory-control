@@ -20,6 +20,11 @@ describe('TENANT_CONTEXT_MODE (e2e)', () => {
   // Awaited inside exit: Prisma queries are lazy and run in the context they are awaited in.
   const none = <T>(fn: () => Promise<T>): Promise<T> => TenantContext.exit(async () => await fn());
 
+  const rawCompanyCount = async (prisma: PrismaService) => {
+    const [row] = await prisma.$queryRaw<{ count: number }[]>`SELECT count(*)::int AS count FROM companies`;
+    return row.count;
+  };
+
   afterAll(async () => {
     if (saved === undefined) delete process.env.TENANT_CONTEXT_MODE;
     else process.env.TENANT_CONTEXT_MODE = saved;
@@ -33,6 +38,8 @@ describe('TENANT_CONTEXT_MODE (e2e)', () => {
     expect(all).toBeGreaterThan(0);
     expect(await none(() => prisma.company.count())).toBe(all);
     expect(await none(() => prisma.$transaction([prisma.company.count()]))).toEqual([all]);
+    // Raw SQL follows the same rules as model calls.
+    expect(await none(() => rawCompanyCount(prisma))).toBe(all);
   });
 
   it('strict mode: no context sees no tenant rows and cannot write them; explicit system access still works', async () => {
@@ -44,6 +51,8 @@ describe('TENANT_CONTEXT_MODE (e2e)', () => {
     expect(await none(() => prisma.company.count())).toBe(0);
     expect(await none(() => prisma.$transaction([prisma.company.count()]))).toEqual([0]);
     expect(await none(() => prisma.$transaction(async (tx) => tx.company.count()))).toBe(0);
+    expect(await none(() => rawCompanyCount(prisma))).toBe(0);
+    expect(await TenantContext.runWithSystemAccess(async () => await rawCompanyCount(prisma))).toBe(all);
     await expect(
       none(() => prisma.company.create({ data: { companyCode: `STRICT-${Date.now()}`, companyName: 'strict probe' } })),
     ).rejects.toThrow(/row-level security/);

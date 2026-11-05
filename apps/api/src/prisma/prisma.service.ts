@@ -114,10 +114,26 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       ).then((results) => (results as unknown[]).slice(1));
     };
 
+    // Raw SQL has no model for the extension above to wrap, so without this it would run
+    // with no tenant settings: RLS tables return no rows and reject writes.
+    const tenantRaw = (method: RawMethod) => (...args: unknown[]) => {
+      if (!TenantContext.get()) reporter.report('$raw', method);
+      const raw = (base[method] as (...a: unknown[]) => Prisma.PrismaPromise<unknown>)(...args);
+      return scopedRawPromise(raw, () => {
+        const { companyId, systemAccess } = tenantAccess(TenantContext.get(), mode);
+        return base.$transaction([setTenantConfig(base, companyId, systemAccess), raw]).then(([, result]) => result);
+      });
+    };
+
     return new Proxy(this, {
       get: (target, prop, receiver) => {
         if (prop === '$transaction') {
           return tenantTransaction;
+        }
+        // Reached only through this service. Inside an interactive transaction callers
+        // use the `tx` client, which already has the tenant set on its connection.
+        if (isRawMethod(prop)) {
+          return tenantRaw(prop);
         }
         // PrismaService's own members, and anything the extended client lacks
         // (e.g. `$on`), come from the base instance. Model delegates must NOT:
@@ -159,6 +175,33 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
 function isObject(value: unknown): value is object {
   return typeof value === 'object' && value !== null;
+}
+
+const RAW_METHODS = ['$queryRaw', '$executeRaw', '$queryRawUnsafe', '$executeRawUnsafe'] as const;
+type RawMethod = (typeof RAW_METHODS)[number];
+
+function isRawMethod(prop: PropertyKey): prop is RawMethod {
+  return (RAW_METHODS as readonly PropertyKey[]).includes(prop);
+}
+
+/**
+ * The raw statement's PrismaPromise, except that awaiting it runs `execute` (once, in the
+ * awaiter's context, like every lazy Prisma query). Prisma's own members stay untouched,
+ * so it still works in a batch `$transaction([...])`, which sets the tenant itself.
+ */
+function scopedRawPromise<T>(raw: Prisma.PrismaPromise<T>, execute: () => Promise<T>): Prisma.PrismaPromise<T> {
+  let execution: Promise<T> | undefined;
+  const run = () => (execution ??= execute());
+  return new Proxy(raw, {
+    get: (target, prop) => {
+      if (prop === 'then' || prop === 'catch' || prop === 'finally') {
+        const started = run() as unknown as Record<PropertyKey, (...a: unknown[]) => unknown>;
+        return started[prop].bind(started);
+      }
+      const member = Reflect.get(target, prop) as unknown;
+      return typeof member === 'function' ? (member as (...a: unknown[]) => unknown).bind(target) : member;
+    },
+  });
 }
 
 /** Wraps a model delegate so each method call made without a TenantContext is reported. */
