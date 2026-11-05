@@ -14,6 +14,7 @@ import { DocumentNumberService } from '../stock/document-number.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { runSerializableTxWithRetry } from '../../common/utils/serializable-tx';
+import { customFieldsInput } from '../../common/config/custom-field-values';
 
 type CustomerDuplicateRow = {
   id: string;
@@ -158,6 +159,7 @@ export class CustomersService {
 
         return tx.customer.create({
           data: {
+            customFields: customFieldsInput(dto.customFields),
             customerCode,
             customerName,
             email: dto.email?.toLowerCase?.() ?? null,
@@ -207,6 +209,7 @@ export class CustomersService {
     return this.prisma.customer.update({
       where: { id },
       data: {
+        customFields: customFieldsInput(dto.customFields),
         customerName: dto.customerName,
         // null clears the field; undefined leaves it unchanged.
         email: dto.email === null ? null : dto.email?.toLowerCase?.(),

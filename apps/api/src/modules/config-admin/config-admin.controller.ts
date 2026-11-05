@@ -13,6 +13,7 @@ import {
   ResetDraftModuleQueryDto,
   SetDraftModuleDto,
 } from './dto/config-admin.dto';
+import { CustomFieldsPassthrough } from '../../common/config/custom-field-values';
 
 /** Requests per minute per client on these routes; the app-wide default is 120. */
 export const PLATFORM_CONFIG_RATE_LIMIT = 60;
@@ -20,6 +21,7 @@ export const PLATFORM_CONFIG_RATE_LIMIT = 60;
 const uuid = new ParseUUIDPipe({ version: '4' });
 
 @ApiTags('platform')
+@CustomFieldsPassthrough()
 @Controller('platform/tenants')
 @UseGuards(PlatformAdminGuard)
 @Throttle({ global: { ttl: 60_000, limit: PLATFORM_CONFIG_RATE_LIMIT } })

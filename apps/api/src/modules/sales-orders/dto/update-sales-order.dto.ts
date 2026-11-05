@@ -12,8 +12,12 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { CreateSalesOrderItemDto } from './create-sales-order.dto';
+import { CustomFieldsProperty } from '../../../common/config/custom-field-values';
 
 export class UpdateSalesOrderDto {
+  @CustomFieldsProperty()
+  customFields?: Record<string, unknown>;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsDateString()

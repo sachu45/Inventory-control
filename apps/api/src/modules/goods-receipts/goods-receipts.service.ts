@@ -30,6 +30,7 @@ import { buildStatusTransitionAudit } from '../../common/state-machines/document
 import { buildReceiveGoodsAudit } from '../../common/state-machines/inventory-audit';
 import { assertGrMutationAllowed } from '../../common/utils/procurement-downstream';
 import { OutboxService } from '../../common/event-platform/outbox.service';
+import { customFieldsInput } from '../../common/config/custom-field-values';
 
 @Injectable()
 export class GoodsReceiptsService {
@@ -319,6 +320,7 @@ export class GoodsReceiptsService {
 
       const header = await tx.goodsReceiptHeader.create({
         data: {
+          customFields: customFieldsInput(dto.customFields),
           grNumber,
           grDate,
           shopId: dto.shopId,
@@ -446,6 +448,7 @@ export class GoodsReceiptsService {
       return tx.goodsReceiptHeader.update({
         where: { id },
         data: {
+          customFields: customFieldsInput(dto.customFields),
           grDate,
           shopId: dto.shopId ?? undefined,
           purchaseOrderId: nextPoId ?? undefined,

@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { ArrayMinSize, IsArray, IsBoolean, IsDateString, IsOptional, IsString, IsUUID, Min, ValidateNested } from 'class-validator';
+import { CustomFieldsProperty } from '../../../common/config/custom-field-values';
 
 class PoLine {
   @ApiPropertyOptional({ description: 'Optional when lineDescription is provided (service line)' })
@@ -35,6 +36,9 @@ class PoLine {
 }
 
 export class CreatePurchaseOrderDto {
+  @CustomFieldsProperty()
+  customFields?: Record<string, unknown>;
+
   @ApiPropertyOptional({ description: 'Optional manual PO number (must be unique)' })
   @IsOptional()
   @IsString()

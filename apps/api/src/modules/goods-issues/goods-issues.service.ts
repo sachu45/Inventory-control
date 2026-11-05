@@ -13,6 +13,7 @@ import { StockService } from '../stock/stock.service';
 import { InventoryLotService } from '../stock/inventory-lot.service';
 import { DocumentAlreadyPostedException, InsufficientStockException } from '../../common/exceptions/domain.exceptions';
 import { AuditService } from '../audit/audit.service';
+import { customFieldsInput } from '../../common/config/custom-field-values';
 
 type Line = { productId: string; quantity: number; uom: string };
 
@@ -97,7 +98,7 @@ export class GoodsIssuesService {
 
   async create(
     user: RequestUser,
-    params: { giDate: string; shopId: string; issueType?: string; issueReason?: string; otherReason?: string; remarks?: string; items: Line[] },
+    params: { customFields?: Record<string, unknown>; giDate: string; shopId: string; issueType?: string; issueReason?: string; otherReason?: string; remarks?: string; items: Line[] },
     idempotencyKey?: string,
   ) {
     assertShopScope(user, params.shopId);
@@ -163,6 +164,7 @@ export class GoodsIssuesService {
 
       const created = await tx.goodsIssueHeader.create({
         data: {
+          customFields: customFieldsInput(params.customFields),
           giNumber,
           giDate,
           shopId: params.shopId,
@@ -191,7 +193,7 @@ export class GoodsIssuesService {
     return gi;
   }
 
-  async update(user: RequestUser, id: string, dto: Partial<{ giDate: string; shopId: string; issueType: string; issueReason: string; otherReason?: string; remarks?: string; items: Line[] }>) {
+  async update(user: RequestUser, id: string, dto: Partial<{ customFields: Record<string, unknown>; giDate: string; shopId: string; issueType: string; issueReason: string; otherReason?: string; remarks?: string; items: Line[] }>) {
     const existing = await this.get(user, id);
     if (existing.status !== DocumentStatus.DRAFT) throw new BadRequestException('Only DRAFT can be edited');
     if (dto.shopId) assertShopScope(user, dto.shopId);
@@ -239,6 +241,7 @@ export class GoodsIssuesService {
       return tx.goodsIssueHeader.update({
         where: { id },
         data: {
+          customFields: customFieldsInput(dto.customFields),
           giDate,
           shopId: dto.shopId ?? undefined,
           issueType: nextIssueType,

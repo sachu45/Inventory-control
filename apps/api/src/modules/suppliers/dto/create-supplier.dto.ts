@@ -1,7 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsArray, IsBoolean, IsEmail, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import { CustomFieldsProperty } from '../../../common/config/custom-field-values';
 
 export class CreateSupplierDto {
+  @CustomFieldsProperty()
+  customFields?: Record<string, unknown>;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

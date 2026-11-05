@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR, Reflector } from '@nestjs/core';
 import { TenantRlsInterceptor } from './common/tenant/tenant-rls.interceptor';
 import { ModuleEnabledGuard } from './common/config/module-enabled.guard';
+import { CustomFieldsInterceptor } from './common/config/custom-fields.interceptor';
 import { ModuleFieldsInterceptor } from './common/config/module-fields.interceptor';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -227,6 +228,7 @@ function routeOptsIntoAuthThrottle(context: ExecutionContext): boolean {
     { provide: APP_INTERCEPTOR, useClass: TenantRlsInterceptor },
     // After TenantRlsInterceptor: applies company field config (mandatory/hidden) to opted-in controllers.
     { provide: APP_INTERCEPTOR, useClass: ModuleFieldsInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: CustomFieldsInterceptor },
   ],
 })
 export class AppModule implements NestModule {

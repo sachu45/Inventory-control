@@ -19,6 +19,7 @@ import { ListSuppliersDto } from './dto/list-suppliers.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
 import { SuppliersService } from './suppliers.service';
 import { RequiresModule } from '../../common/config/requires-module.decorator';
+import { CustomFieldsWrite } from '../../common/config/custom-field-values';
 
 @ApiTags('suppliers')
 @RequiresModule('suppliers')
@@ -43,6 +44,7 @@ export class SuppliersController {
 
   @ApiBearerAuth()
   @RequirePermission('supplier:write')
+  @CustomFieldsWrite('create')
   @Post()
   @ApiOperation({ summary: 'Create a supplier' })
   create(@CurrentUser() user: RequestUser, @Body() dto: CreateSupplierDto) {
@@ -67,6 +69,7 @@ export class SuppliersController {
 
   @ApiBearerAuth()
   @RequirePermission('supplier:write')
+  @CustomFieldsWrite('update')
   @Patch(':id')
   @ApiOperation({ summary: 'Update a supplier' })
   update(

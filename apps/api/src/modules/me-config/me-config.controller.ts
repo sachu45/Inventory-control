@@ -4,8 +4,10 @@ import type { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { MeConfigService } from './me-config.service';
+import { CustomFieldsPassthrough } from '../../common/config/custom-field-values';
 
 @ApiTags('me')
+@CustomFieldsPassthrough()
 @Controller('me')
 export class MeConfigController {
   constructor(private readonly meConfig: MeConfigService) {}

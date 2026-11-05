@@ -8,6 +8,7 @@ import { ListCustomersDto } from './dto/list-customers.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { CustomersService } from './customers.service';
 import { RequiresModule } from '../../common/config/requires-module.decorator';
+import { CustomFieldsWrite } from '../../common/config/custom-field-values';
 
 @ApiTags('customers')
 @ApiBearerAuth()
@@ -24,6 +25,7 @@ export class CustomersController {
   }
 
   @RequirePermission('shop:write')
+  @CustomFieldsWrite('create')
   @Post()
   @ApiOperation({ summary: 'Create a customer' })
   create(@CurrentUser() user: RequestUser, @Body() dto: CreateCustomerDto) {
@@ -38,6 +40,7 @@ export class CustomersController {
   }
 
   @RequirePermission('shop:write')
+  @CustomFieldsWrite('update')
   @Patch(':id')
   @ApiOperation({ summary: 'Update a customer' })
   update(

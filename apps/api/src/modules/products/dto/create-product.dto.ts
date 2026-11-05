@@ -17,6 +17,7 @@ import {
 import { normalizeSpaces } from '../../../common/utils/normalize';
 import { ProductPlantDto } from './product-plant.dto';
 import { ProductSpecificationDto } from './product-specification.dto';
+import { CustomFieldsProperty } from '../../../common/config/custom-field-values';
 
 /**
  * Create-product payload. The product master is plant-agnostic; the per-plant
@@ -24,6 +25,9 @@ import { ProductSpecificationDto } from './product-specification.dto';
  * because a product with no plant cannot be transacted against.
  */
 export class CreateProductDto {
+  @CustomFieldsProperty()
+  customFields?: Record<string, unknown>;
+
   @ApiProperty({ example: 'SKU-001' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim().toUpperCase() : value))
   @IsString()

@@ -15,6 +15,7 @@ import {
 } from '../../common/utils/shop-scope';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
+import { customFieldsInput } from '../../common/config/custom-field-values';
 
 const SUPPLIER_DELETE_TOKEN_TYP = 'supplier-delete-confirm';
 
@@ -136,6 +137,7 @@ export class SuppliersService {
     try {
       return await this.prisma.supplier.create({
       data: {
+        customFields: customFieldsInput(dto.customFields),
         supplierCode: code,
         supplierName: dto.supplierName,
         companyId,
@@ -209,6 +211,7 @@ export class SuppliersService {
     return this.prisma.supplier.update({
       where: { id },
       data: {
+        customFields: customFieldsInput(dto.customFields),
         supplierCode: dto.supplierCode,
         supplierName: dto.supplierName,
         companyId: dto.companyId,

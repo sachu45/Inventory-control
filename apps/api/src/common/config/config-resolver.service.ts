@@ -12,6 +12,7 @@ import {
 } from './config-snapshot';
 import { MODULE_KEYS, MODULE_REGISTRY, ModuleKey, ModuleSettings } from './module-registry';
 import { UserPreferences, applyMandatoryColumns, parseUserPreferences } from './user-preference.schema';
+import type { CustomFieldSnapshot } from './custom-fields';
 
 export const LATEST_TTL_SECONDS = 5;
 export const SNAPSHOT_TTL_SECONDS = 24 * 60 * 60;
@@ -27,6 +28,8 @@ export type ResolvedConfig = {
   version: number;
   shopId: string | null;
   modules: Record<ModuleKey, ResolvedModule>;
+  /** Active custom fields per module. Not limited by role: callers filter by readRoles and writeRoles. */
+  customFields: Partial<Record<ModuleKey, CustomFieldSnapshot[]>>;
   /** Present with `explain: true`: the layer that set each `module.enabled` / `module.config.key`. */
   provenance?: Record<string, ConfigLayer>;
 };
@@ -277,6 +280,7 @@ function materialize(
     version: snapshot.version,
     shopId,
     modules,
+    customFields: snapshot.customFields ?? {},
     ...(explain ? { provenance } : {}),
   };
 }

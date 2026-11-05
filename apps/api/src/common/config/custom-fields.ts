@@ -22,6 +22,8 @@ export type CustomFieldType = (typeof CUSTOM_FIELD_TYPES)[number];
 const FIELD_KEY = /^[a-z][a-z0-9_]{1,39}$/;
 const OPTION_TYPES: readonly CustomFieldType[] = ['select', 'multiselect'];
 const MAX_PATTERN_LENGTH = 200;
+/** A repeated group that itself repeats, such as (a+)+: the shape behind catastrophic backtracking. */
+const NESTED_QUANTIFIER = /\([^()]*[*+{][^()]*\)\s*[*+{]/;
 
 export type CustomFieldOption = { value: string; label: string; archived?: boolean };
 export type CustomFieldValidation = { min?: number; max?: number; maxLength?: number; pattern?: string };
@@ -114,7 +116,7 @@ export type CustomFieldShape = {
 
 type Issue = { path: string; message: string };
 
-function isCalendarDate(value: string): boolean {
+export function isCalendarDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const parsed = new Date(`${value}T00:00:00Z`);
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
@@ -182,6 +184,9 @@ export function customFieldIssues(field: CustomFieldShape): Issue[] {
       new RegExp(rules.pattern);
     } catch {
       issues.push({ path: 'validation.pattern', message: 'Not a valid regular expression' });
+    }
+    if (NESTED_QUANTIFIER.test(rules.pattern)) {
+      issues.push({ path: 'validation.pattern', message: 'Repeated groups inside a repeat are not allowed; they can make checks hang' });
     }
   }
 

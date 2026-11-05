@@ -23,6 +23,7 @@ import {
   buildDeleteProductAudit,
   type ProductChangedFields,
 } from '../../common/state-machines/product-audit';
+import { customFieldsInput } from '../../common/config/custom-field-values';
 
 const PRODUCT_INCLUDE = {
   plants: {
@@ -372,6 +373,7 @@ export class ProductsService {
     return this.prisma.$transaction(async (tx) => {
       const product = await tx.product.create({
         data: {
+          customFields: customFieldsInput(dto.customFields),
           companyId,
           productCode: dto.productCode,
           description: dto.description,
@@ -646,6 +648,7 @@ export class ProductsService {
       const updated = await tx.product.update({
         where: { id },
         data: {
+          customFields: customFieldsInput(dto.customFields),
           productCode: dto.productCode,
           description: dto.description,
           uom: dto.uom,

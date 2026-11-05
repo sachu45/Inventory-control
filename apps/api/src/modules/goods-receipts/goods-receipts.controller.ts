@@ -9,6 +9,7 @@ import { CreateGoodsReceiptDto } from './dto/create-goods-receipt.dto';
 import { UpdateGoodsReceiptDto } from './dto/update-goods-receipt.dto';
 import { GoodsReceiptsService } from './goods-receipts.service';
 import { RequiresModule } from '../../common/config/requires-module.decorator';
+import { CustomFieldsWrite } from '../../common/config/custom-field-values';
 
 @ApiTags('goods-receipts')
 @ApiBearerAuth()
@@ -39,6 +40,7 @@ export class GoodsReceiptsController {
   }
 
   @RequirePermission('goods_receipt:create')
+  @CustomFieldsWrite('create')
   @Post()
   create(
     @CurrentUser() user: RequestUser,
@@ -66,6 +68,7 @@ export class GoodsReceiptsController {
   }
 
   @RequirePermission('goods_receipt:create')
+  @CustomFieldsWrite('update')
   @Patch(':id')
   update(@CurrentUser() user: RequestUser, @Param('id') id: string, @Body() dto: UpdateGoodsReceiptDto) {
     return this.service.update(user, id, dto);

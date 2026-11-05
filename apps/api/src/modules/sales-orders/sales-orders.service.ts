@@ -30,6 +30,7 @@ import { salesOrderCustomerDefaults } from '../email-notifications/email-notific
 import type { SalesOrderCustomerEmailContent } from '../../common/mail/transactional-email.templates';
 import { formatEmailDate, formatEmailMoney } from '../../common/mail/email-formatters';
 import { DocumentEmailService } from '../document-email/document-email.service';
+import { customFieldsInput } from '../../common/config/custom-field-values';
 
 export type SalesOrderListQuery = {
   shop_id?: string;
@@ -227,6 +228,7 @@ export class SalesOrdersService {
 
       const created = await tx.salesOrderHeader.create({
         data: {
+          customFields: customFieldsInput(dto.customFields),
           soNumber,
           orderDate,
           expectedDate: dto.expectedDate ? new Date(dto.expectedDate) : null,
@@ -359,6 +361,7 @@ export class SalesOrdersService {
       const updated = await tx.salesOrderHeader.update({
         where: { id },
         data: {
+          customFields: customFieldsInput(dto.customFields),
           orderDate,
           expectedDate: dto.expectedDate ? new Date(dto.expectedDate) : so.expectedDate,
           customerId: dto.customerId ?? so.customerId,

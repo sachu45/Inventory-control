@@ -1,11 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsEmail, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { CustomFieldsProperty } from '../../../common/config/custom-field-values';
 
 const emptyToUndefined = ({ value }: { value: unknown }) =>
   typeof value === 'string' && value.trim() === '' ? undefined : value;
 
 export class CreateCustomerDto {
+  @CustomFieldsProperty()
+  customFields?: Record<string, unknown>;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

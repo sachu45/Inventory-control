@@ -9,6 +9,7 @@ import { CreateGoodsIssueDto } from './dto/create-goods-issue.dto';
 import { UpdateGoodsIssueDto } from './dto/update-goods-issue.dto';
 import { GoodsIssuesService } from './goods-issues.service';
 import { RequiresModule } from '../../common/config/requires-module.decorator';
+import { CustomFieldsWrite } from '../../common/config/custom-field-values';
 
 @ApiTags('goods-issues')
 @ApiBearerAuth()
@@ -39,6 +40,7 @@ export class GoodsIssuesController {
   }
 
   @RequirePermission('goods_issue:create')
+  @CustomFieldsWrite('create')
   @Post()
   create(
     @CurrentUser() user: RequestUser,
@@ -63,6 +65,7 @@ export class GoodsIssuesController {
   }
 
   @RequirePermission('goods_issue:create')
+  @CustomFieldsWrite('update')
   @Patch(':id')
   update(@CurrentUser() user: RequestUser, @Param('id') id: string, @Body() dto: UpdateGoodsIssueDto) {
     return this.service.update(user, id, dto);

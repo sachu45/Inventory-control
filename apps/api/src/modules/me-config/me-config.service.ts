@@ -10,6 +10,8 @@ import {
   SIDEBAR_SECTIONS,
   SidebarSectionId,
 } from '../../common/config/module-registry';
+import { canReadField, canWriteField } from '../../common/config/custom-field-values';
+import type { CustomFieldSnapshot } from '../../common/config/custom-fields';
 import { ModuleRegistryService } from '../../common/config/module-registry.service';
 import { UserPreferenceService } from '../../common/config/user-preference.service';
 import type { UserPreferences } from '../../common/config/user-preference.schema';
@@ -33,10 +35,13 @@ export type MeSidebarLink = {
  */
 export type ModuleBlock = 'config' | 'plan' | 'role' | 'permission';
 
+/** A published custom field as a form needs it, for this user. Only sent when the module has some. */
+export type MeCustomField = Omit<CustomFieldSnapshot, 'readRoles' | 'writeRoles'> & { writable: boolean };
+
 export type MeConfigResponse = {
   /** Published config version in effect; 0 = registry defaults. */
   version: number;
-  modules: Record<ModuleKey, { usable: boolean; blockedBy: ModuleBlock | null; label: string; config: ModuleSettings }>;
+  modules: Record<ModuleKey, { usable: boolean; blockedBy: ModuleBlock | null; label: string; config: ModuleSettings & { customFields?: MeCustomField[] } }>;
   sidebar: { id: SidebarSectionId; title: string; children: MeSidebarLink[] }[];
   preferences: Record<string, UserPreferences>;
 };
@@ -85,7 +90,18 @@ export class MeConfigService {
             : !roleAllows
               ? 'role'
               : 'permission';
-      modules[key] = { usable, blockedBy, label: resolved.config.label ?? mod.label, config: resolved.config };
+      const customFields = (config.customFields[key] ?? [])
+        .filter((field) => canReadField(field, user.role))
+        .map((field): MeCustomField => {
+          const { readRoles: _read, writeRoles: _write, ...rest } = field;
+          return { ...rest, writable: canWriteField(field, user.role) };
+        });
+      modules[key] = {
+        usable,
+        blockedBy,
+        label: resolved.config.label ?? mod.label,
+        config: customFields.length ? { ...resolved.config, customFields } : resolved.config,
+      };
       // Same visibility rule as the web sidebar: org admins see every permission-gated
       // link, and plan-gated links stay visible but locked.
       const permitted = !mod.requiredPermission || isOrgAdmin || permissions.has(mod.requiredPermission);

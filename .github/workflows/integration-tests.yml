@@ -59,6 +59,9 @@ jobs:
       REDIS_PORT: 6379
       EXPORT_STORAGE_DIR: ./storage/exports
       MAIL_TRANSPORT: json
+      # Every spec boots the whole app in one --runInBand process, so the heap grows about
+      # 65 MB per spec. Node's default limit (about 2 GB) was reached at 31 specs.
+      NODE_OPTIONS: --max-old-space-size=6144
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

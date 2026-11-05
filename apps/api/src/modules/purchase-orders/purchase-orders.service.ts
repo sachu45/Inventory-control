@@ -34,6 +34,7 @@ import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
 import type { PurchaseOrderEmailContent } from '../../common/mail/purchase-order-supplier.template';
 import type { ListPurchaseOrdersDto, PoLifecycle } from './dto/list-purchase-orders.dto';
+import { customFieldsInput } from '../../common/config/custom-field-values';
 
 const RECEIPT_INCLUDE = {
   select: {
@@ -430,6 +431,7 @@ export class PurchaseOrdersService {
       status: base.status,
       lifecycleStatus: (base as { lifecycleStatus?: string }).lifecycleStatus,
       remarks: base.remarks ?? null,
+      customFields: (base as { customFields?: unknown }).customFields ?? null,
       currency: base.currency,
       totalValue: base.totalValue == null ? null : Number(base.totalValue),
       createdAt: base.createdAt instanceof Date ? base.createdAt.toISOString() : base.createdAt,
@@ -667,6 +669,7 @@ export class PurchaseOrdersService {
         try {
           created = await tx.purchaseOrderHeader.create({
             data: {
+              customFields: customFieldsInput(dto.customFields),
               poNumber,
               poDate,
               shopId: dto.shopId,
@@ -824,6 +827,7 @@ export class PurchaseOrdersService {
       const updated = await tx.purchaseOrderHeader.update({
         where: { id },
         data: {
+          customFields: customFieldsInput(dto.customFields),
           poDate,
           shopId: dto.shopId ?? undefined,
           rfqId: nextRfqId ?? undefined,

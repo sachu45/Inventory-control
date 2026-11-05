@@ -12,6 +12,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import { CustomFieldsProperty } from '../../../common/config/custom-field-values';
 
 export class CreateSalesOrderItemDto {
   @ApiProperty()
@@ -65,6 +66,9 @@ export class CreateSalesOrderItemDto {
 }
 
 export class CreateSalesOrderDto {
+  @CustomFieldsProperty()
+  customFields?: Record<string, unknown>;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsUUID()
