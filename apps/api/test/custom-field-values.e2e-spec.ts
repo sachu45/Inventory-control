@@ -132,6 +132,11 @@ describe('Custom field values (e2e)', () => {
       const row = unwrap<Row>(made.body);
       expect({ url, note: row.customFields?.note }).toEqual({ url, note: 'first' });
 
+      // Forms and table columns read from the list, so it must carry the values too.
+      const listed = unwrap<Row[] | { data?: Row[]; items?: Row[] }>((await owner().get(url).expect(200)).body);
+      const listedRows = Array.isArray(listed) ? listed : (listed.data ?? listed.items ?? []);
+      expect({ url, note: listedRows.find((r) => r.id === row.id)?.customFields?.note }).toEqual({ url, note: 'first' });
+
       await owner().post(url).send({ ...doc.create(), customFields: { nope: 1 } }).expect(422);
       await owner().post(url).send({ ...doc.create(), customFields: { note: 'x'.repeat(21) } }).expect(422);
       await owner().post(url).send({ ...doc.create(), customFields: { note: 5 } }).expect(422);

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Download, Plus } from '@/components/ui/icons';
 import { toast } from 'sonner';
@@ -8,6 +8,8 @@ import { CreatePageLayout, DocumentReferenceSelect, PageHeader } from '@/compone
 import { DocumentRowActions } from '@/components/shared/DocumentRowActions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CustomFieldsSection } from '@/components/shared/custom-fields-section';
+import { useCustomFieldForm, withCustomFieldColumns } from '@/hooks/use-custom-fields';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -51,7 +53,9 @@ export function InvoicesPage({ createOnly = false }: { createOnly?: boolean }) {
   const createInvoice = useCreateInvoice();
   const [form, setForm] = useState(emptyForm);
   const fields = useModuleFields('invoices');
-  const columns = useTableColumns('invoices', INVOICE_COLUMNS);
+  const customFieldForm = useCustomFieldForm('invoices');
+  const invoiceColumns = useMemo(() => withCustomFieldColumns(INVOICE_COLUMNS, customFieldForm.fields), [customFieldForm.fields]);
+  const columns = useTableColumns('invoices', invoiceColumns);
 
   const onCreate = async () => {
     if (!form.customerId) {
@@ -63,6 +67,7 @@ export function InvoicesPage({ createOnly = false }: { createOnly?: boolean }) {
       toast.error(missing);
       return;
     }
+    if (!customFieldForm.validate()) return;
     // The invoice belongs to the order's (or customer's) plant, not the user's home plant.
     const linkedOrder = salesOrders.find((so) => so.id === form.salesOrderId);
     const shopId = linkedOrder?.shopId ?? customers.find((c) => c.id === form.customerId)?.shopId;
@@ -74,14 +79,17 @@ export function InvoicesPage({ createOnly = false }: { createOnly?: boolean }) {
         totalValue: Number(form.totalValue),
         dueDate: fields.isHidden('dueDate') ? undefined : form.dueDate || undefined,
         remarks: fields.isHidden('remarks') ? undefined : form.remarks || undefined,
+        ...customFieldForm.payload(),
       });
       toast.success('Invoice created');
       if (createOnly) {
         navigate('/invoices');
       } else {
         setForm(emptyForm());
+        customFieldForm.reset();
       }
     } catch (err: unknown) {
+      if (customFieldForm.showApiErrors(err)) return;
       toast.error(getApiErrorMessage(err, 'Failed to create invoice'));
     }
   };
@@ -173,6 +181,9 @@ export function InvoicesPage({ createOnly = false }: { createOnly?: boolean }) {
           </div>
         )}
         <div className="md:col-span-2">
+          <div className="mb-3 w-full text-left">
+            <CustomFieldsSection form={customFieldForm} />
+          </div>
           <Button onClick={onCreate} disabled={createInvoice.isPending}>
             {createInvoice.isPending ? 'Creating…' : 'Create Invoice'}
           </Button>

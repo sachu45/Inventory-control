@@ -3,6 +3,7 @@ import { api } from '@/api/client';
 import { fetchAllCursorPages } from '@/lib/fetch-cursor-pages';
 
 export type Customer = {
+  customFields?: Record<string, unknown> | null;
   id: string;
   customerCode: string;
   customerName: string;

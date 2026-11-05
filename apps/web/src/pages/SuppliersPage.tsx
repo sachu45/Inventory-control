@@ -23,6 +23,8 @@ import { showActionSuccess } from '@/lib/action-feedback';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CustomFieldsSection } from '@/components/shared/custom-fields-section';
+import { useCustomFieldForm } from '@/hooks/use-custom-fields';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -493,6 +495,7 @@ function SuppliersCreateView() {
   const createSupplier = useCreateSupplier();
   const { pulseClass, triggerPulse } = useSuccessPulse();
   const [createForm, setCreateForm] = useState(emptyForm);
+  const customFieldForm = useCustomFieldForm('suppliers');
 
   const validateForm = (form: SupplierFormState) => {
     if (!form.supplierName.trim()) {
@@ -507,13 +510,14 @@ function SuppliersCreateView() {
   };
 
   const onCreate = async () => {
-    if (!validateForm(createForm)) return;
+    if (!validateForm(createForm) || !customFieldForm.validate()) return;
     try {
-      await createSupplier.mutateAsync({ ...formToPayload(createForm), isActive: true });
+      await createSupplier.mutateAsync({ ...formToPayload(createForm), isActive: true, ...customFieldForm.payload() });
       triggerPulse();
       showActionSuccess({ message: 'Supplier created successfully' });
       navigate('/suppliers');
     } catch (err: unknown) {
+      if (customFieldForm.showApiErrors(err)) return;
       const msg =
         (err as { response?: { data?: { error?: { message?: string } } } }).response?.data?.error
           ?.message ?? 'Failed to create supplier';
@@ -538,6 +542,7 @@ function SuppliersCreateView() {
             companies={companies}
             codeHint="Leave blank to auto-generate (e.g. SUP-0001)"
           />
+          <CustomFieldsSection form={customFieldForm} />
           <Button
             onClick={onCreate}
             loading={createSupplier.isPending}
@@ -564,6 +569,7 @@ function SuppliersListView() {
   const debouncedSearch = useDebouncedValue(search, 300);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const customFieldForm = useCustomFieldForm('suppliers');
   const [viewSupplier, setViewSupplier] = useState<Supplier | null>(null);
   const [editForm, setEditForm] = useState(emptyForm);
   const [editSheetOpen, setEditSheetOpen] = useState(false);
@@ -621,6 +627,7 @@ function SuppliersListView() {
   const openEdit = (supplier: Supplier) => {
     setEditingSupplier(supplier);
     setEditForm(formFromSupplier(supplier));
+    customFieldForm.reset(supplier);
     setEditSheetOpen(true);
   };
 
@@ -631,16 +638,18 @@ function SuppliersListView() {
 
   const onUpdate = async () => {
     if (!editingSupplier) return;
-    if (!validateForm(editForm)) return;
+    if (!validateForm(editForm) || !customFieldForm.validate()) return;
     try {
       await updateSupplier.mutateAsync({
         id: editingSupplier.id,
         ...formToUpdatePayload(editForm),
+        ...customFieldForm.payload(),
       });
       setEditSheetOpen(false);
       setEditingSupplier(null);
       toast.success('Supplier updated successfully');
     } catch (err: unknown) {
+      if (customFieldForm.showApiErrors(err)) return;
       const msg =
         (err as { response?: { data?: { error?: { message?: string } } } }).response?.data?.error
           ?.message ?? 'Failed to update supplier';
@@ -915,6 +924,7 @@ function SuppliersListView() {
           </SheetHeader>
           <div className="mt-6 space-y-5">
             <SupplierFormFields form={editForm} setForm={setEditForm} companies={companies} />
+            <CustomFieldsSection form={customFieldForm} />
             <div className="flex gap-3 border-t pt-4">
               <Button variant="outline" className="flex-1" onClick={() => setEditSheetOpen(false)}>
                 Cancel

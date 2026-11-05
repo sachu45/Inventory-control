@@ -38,6 +38,7 @@ export class GoodsIssuesService {
   private serializeListRow(row: GoodsIssueListRow) {
     return {
       id: row.id,
+      customFields: row.customFields,
       giNumber: row.giNumber,
       giDate: row.giDate.toISOString().slice(0, 10),
       shopId: row.shopId,

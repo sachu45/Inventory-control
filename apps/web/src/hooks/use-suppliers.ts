@@ -3,6 +3,7 @@ import { api } from '@/api/client';
 import { useAuthStore } from '@/store/authStore';
 
 export type Supplier = {
+  customFields?: Record<string, unknown> | null;
   id: string;
   supplierCode: string;
   supplierName: string;
@@ -66,6 +67,7 @@ function normalizeSupplier(raw: unknown): Supplier {
   const row = raw as Partial<Supplier> & { rating?: unknown; categories?: unknown };
   return {
     id: String(row.id ?? ''),
+    customFields: row.customFields ?? null,
     supplierCode: String(row.supplierCode ?? ''),
     supplierName: String(row.supplierName ?? ''),
     companyId: row.companyId ?? null,

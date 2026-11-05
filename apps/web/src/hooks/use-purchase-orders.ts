@@ -25,6 +25,7 @@ export type PurchaseOrderItem = {
 };
 
 export type PurchaseOrder = {
+  customFields?: Record<string, unknown> | null;
   id: string;
   poNumber: string;
   poDate: string;

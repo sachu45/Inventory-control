@@ -1,3 +1,4 @@
+import type { CustomField } from '@/lib/custom-fields';
 import { api } from '@/api/client';
 
 /** One sidebar entry from `GET /me/config`; already filtered by plan, permission and config. */
@@ -33,7 +34,7 @@ export type MeConfig = {
       /** Why it is not usable; only `plan` warrants an upgrade prompt. Absent from older APIs. */
       blockedBy?: ModuleBlock | null;
       label: string;
-      config: { mandatoryFields: string[]; hiddenFields: string[]; label?: string };
+      config: { mandatoryFields: string[]; hiddenFields: string[]; label?: string; customFields?: CustomField[] };
     }
   >;
   sidebar: MeSidebarSection[];

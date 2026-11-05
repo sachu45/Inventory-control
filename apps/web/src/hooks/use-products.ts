@@ -39,6 +39,7 @@ export type ProductSpec = {
  * the list call, otherwise the sum across all assignments.
  */
 export type Product = {
+  customFields?: Record<string, unknown> | null;
   id: string;
   productCode: string;
   description: string;
@@ -184,6 +185,7 @@ export function normalizeProduct(payload: unknown): Product {
     : undefined;
 
   return {
+    customFields: (product.customFields as Product['customFields']) ?? null,
     id: String(product.id ?? ''),
     productCode: String(product.productCode ?? ''),
     description: String(product.description ?? ''),

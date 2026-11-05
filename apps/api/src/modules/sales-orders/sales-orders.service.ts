@@ -77,6 +77,7 @@ export class SalesOrdersService {
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       orderBy: [{ orderDate: 'desc' }, { createdAt: 'desc' }],
       select: {
+        customFields: true,
         id: true,
         soNumber: true,
         orderDate: true,

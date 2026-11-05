@@ -23,6 +23,7 @@ export type GoodsReceiptItem = {
 };
 
 export type GoodsReceipt = {
+  customFields?: Record<string, unknown> | null;
   id: string;
   grNumber: string;
   grDate: string;

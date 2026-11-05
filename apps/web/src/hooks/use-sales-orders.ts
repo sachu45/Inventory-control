@@ -20,6 +20,7 @@ export type SalesOrderItem = {
 };
 
 export type SalesOrder = {
+  customFields?: Record<string, unknown> | null;
   id: string;
   soNumber: string;
   orderDate: string;

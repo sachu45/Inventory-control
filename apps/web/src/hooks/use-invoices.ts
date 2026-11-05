@@ -3,6 +3,7 @@ import { api } from '@/api/client';
 import { fetchAllCursorPages } from '@/lib/fetch-cursor-pages';
 
 export type Invoice = {
+  customFields?: Record<string, unknown> | null;
   id: string;
   invoiceNumber: string;
   invoiceDate: string;

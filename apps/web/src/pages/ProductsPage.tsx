@@ -117,6 +117,8 @@ import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useSuccessPulse } from '@/hooks/use-success-pulse';
 import { showActionSuccess } from '@/lib/action-feedback';
 import { Card, CardContent } from '@/components/ui/card';
+import { CustomFieldsSection } from '@/components/shared/custom-fields-section';
+import { useCustomFieldForm, withCustomFieldColumns } from '@/hooks/use-custom-fields';
 import { downloadCsv, toCsv, type CsvColumn } from '@/lib/csv';
 
 /** Lets users clear a numeric field while typing; commits 0 on blur if left empty. */
@@ -880,6 +882,7 @@ export function ProductsPage({ createOnly = false }: { createOnly?: boolean }) {
   }
 
   const productFields = useModuleFields('products');
+  const customFieldForm = useCustomFieldForm('products');
   const form = useForm<FormShape>({
     resolver: formResolver(productSchema),
     defaultValues,
@@ -1028,6 +1031,7 @@ export function ProductsPage({ createOnly = false }: { createOnly?: boolean }) {
     // Admins must explicitly pick a plant; auto-selecting the first shop often
     // assigns the wrong plant so the product never appears under the intended filter.
     const defaultPlantShopId = isShopOnlyUser(user) ? user!.shopId! : '';
+    customFieldForm.reset();
     form.reset({
       ...defaultValues,
       plants: [
@@ -1057,6 +1061,7 @@ export function ProductsPage({ createOnly = false }: { createOnly?: boolean }) {
 
   const openEdit = (product: Product) => {
     setEditingProduct(product);
+    customFieldForm.reset(product);
     form.reset({
       productCode: product.productCode,
       description: product.description,
@@ -1097,6 +1102,7 @@ export function ProductsPage({ createOnly = false }: { createOnly?: boolean }) {
   };
 
   const onSubmit = async (rawValues: FormShape) => {
+    if (!customFieldForm.validate()) return;
     try {
       const enteredSkuNumber = skuNumber.trim();
       const finalProductCode = editingProduct
@@ -1152,6 +1158,7 @@ export function ProductsPage({ createOnly = false }: { createOnly?: boolean }) {
         await updateProduct.mutateAsync({
           id: editingProduct.id,
           ...payload,
+          ...customFieldForm.payload(),
         });
         toast.success('Product updated successfully');
         setSheetOpen(false);
@@ -1164,6 +1171,7 @@ export function ProductsPage({ createOnly = false }: { createOnly?: boolean }) {
         const created = await createProductWithResolvedCode(
           {
             ...payload,
+            ...customFieldForm.payload(),
             productCode: enteredSkuNumber ? finalProductCode : undefined,
           },
           rawValues.category,
@@ -1189,8 +1197,10 @@ export function ProductsPage({ createOnly = false }: { createOnly?: boolean }) {
         }
       }
       form.reset(defaultValues);
+      customFieldForm.reset();
       setEditingProduct(null);
     } catch (err: unknown) {
+      if (customFieldForm.showApiErrors(err)) return;
       const msg =
         (err as { response?: { data?: { error?: { message?: string } } } })
           .response?.data?.error?.message ?? 'Something went wrong';
@@ -1983,6 +1993,8 @@ export function ProductsPage({ createOnly = false }: { createOnly?: boolean }) {
     )}
   </section>
 
+  <CustomFieldsSection form={customFieldForm} />
+
   <div className="flex flex-col gap-3 pt-2 sm:flex-row">
     <Button
       type="button"
@@ -2181,7 +2193,7 @@ export function ProductsPage({ createOnly = false }: { createOnly?: boolean }) {
       ),
     },
   ];
-  const columns = useTableColumns('products', productColumns);
+  const columns = useTableColumns('products', withCustomFieldColumns(productColumns, customFieldForm.fields));
 
   if (createOnly) {
     return (

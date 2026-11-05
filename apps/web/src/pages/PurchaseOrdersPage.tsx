@@ -34,6 +34,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
+import { CustomFieldsSection } from '@/components/shared/custom-fields-section';
+import { useCustomFieldForm, withCustomFieldColumns } from '@/hooks/use-custom-fields';
 import {
   Table,
   TableHeader,
@@ -477,6 +479,8 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
   const sendMut = useSendPurchaseOrder();
 
   // ---- form ----
+  const customFieldForm = useCustomFieldForm('purchase-orders');
+  const { reset: resetCustomFields } = customFieldForm;
   const form = useForm<POFormValues>({
     resolver: formResolver(poFormSchema),
     defaultValues: {
@@ -703,6 +707,7 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
 
   const openCreate = useCallback(() => {
     setEditingPO(null);
+    resetCustomFields();
     form.reset({
       poDate: todayDateString(),
         priority: 'Medium',
@@ -720,7 +725,7 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
     setSourceType('DIRECT');
     setSourceRfqId('');
     setSourceContractId('');
-  }, [form, shopId, shops, user?.name]);
+  }, [form, resetCustomFields, shopId, shops, user?.name]);
 
   useEffect(() => {
     const rfqPrefill = (location.state as PoPrefillState | null)?.rfqPrefill;
@@ -868,6 +873,7 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
       } else {
         setSourceType('DIRECT');
       }
+      resetCustomFields(po);
       form.reset({
         poDate: po.poDate.slice(0, 10),
         priority: 'Medium',
@@ -907,7 +913,7 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
       });
       setSheetOpen(true);
     },
-    [form, productMap, shops],
+    [form, productMap, resetCustomFields, shops],
   );
 
   async function handleDownloadPoPdf(po: PurchaseOrder) {
@@ -984,6 +990,7 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
   }
 
   async function handleSubmit(values: POFormValues, sendNow = false) {
+    if (!customFieldForm.validate()) return;
     try {
       const resolvedShopId = values.deliveryPlantId || shopId;
       if (!resolvedShopId) {
@@ -1073,6 +1080,7 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
         const updatePayload = {
           id: editingPO.id,
           ...payload,
+          ...customFieldForm.payload(),
         };
         result = await updateMut.mutateAsync(updatePayload);
 
@@ -1093,6 +1101,7 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
         const idempotencyKey = submitIdempotencyKeyRef.current;
         const createPayload = {
           ...payload,
+          ...customFieldForm.payload(),
           idempotencyKey,
           confirmOnSend: sendNow,
           ...(sendNow ? { sendToSupplier: true } : {}),
@@ -1141,6 +1150,7 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
       form.reset();
       setDetailId(result.id);
     } catch (e: unknown) {
+      if (customFieldForm.showApiErrors(e)) return;
       toast.error(apiErrorMessage(e) ?? (editingPO ? 'Failed to update purchase order' : 'Failed to create purchase order'));
     }
   }
@@ -2019,6 +2029,8 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
         </div>
       </FormSection>
 
+      <CustomFieldsSection form={customFieldForm} />
+
       {!createOnly && (
         <div className="flex items-center gap-3 border-t border-border pt-4">
           {poActionButtons}
@@ -2193,7 +2205,7 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
       ),
     },
   ];
-  const columns = useTableColumns('purchase-orders', poColumns);
+  const columns = useTableColumns('purchase-orders', withCustomFieldColumns(poColumns, customFieldForm.fields));
 
   if (createOnly) {
     return (

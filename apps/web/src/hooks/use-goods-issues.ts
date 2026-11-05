@@ -18,6 +18,7 @@ export type GoodsIssueItem = {
 };
 
 export type GoodsIssue = {
+  customFields?: Record<string, unknown> | null;
   id: string;
   giNumber: string;
   giDate: string;

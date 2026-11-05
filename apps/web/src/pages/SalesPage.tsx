@@ -17,6 +17,8 @@ import { EmptyState, LoadingSkeleton, SearchInput, CreatePageLayout } from '@/co
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { CustomFieldsSection } from '@/components/shared/custom-fields-section';
+import { useCustomFieldForm, withCustomFieldColumns } from '@/hooks/use-custom-fields';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -343,7 +345,10 @@ export function SalesPage({ createOnly = false }: { createOnly?: boolean }) {
 
   const isSearchPending = search !== debouncedSearch || (isLoading && search.trim().length > 0);
 
+  const customFieldForm = useCustomFieldForm('sales');
+  const { reset: resetCustomFields } = customFieldForm;
   const resetForm = () => {
+    customFieldForm.reset();
     setForm(emptyForm());
     setUseMasterAddress(true);
     setSelectedCustomer(null);
@@ -406,12 +411,13 @@ export function SalesPage({ createOnly = false }: { createOnly?: boolean }) {
   useEffect(() => {
     if (editingOrder && editingId) {
       setForm(orderToForm(editingOrder));
+      resetCustomFields(editingOrder);
       if (editingOrder.customer) {
         setSelectedCustomer(editingOrder.customer as Customer);
       }
       setUseMasterAddress(false);
     }
-  }, [editingOrder, editingId]);
+  }, [editingOrder, editingId, resetCustomFields]);
 
   const openView = (order: SalesOrder) => {
     navigate(`/sales/${order.id}`);
@@ -541,8 +547,9 @@ export function SalesPage({ createOnly = false }: { createOnly?: boolean }) {
   };
 
   const onSave = async () => {
-    const payload = validateAndBuildPayload(editingId ? 'update' : 'create');
-    if (!payload) return;
+    const built = validateAndBuildPayload(editingId ? 'update' : 'create');
+    if (!built || !customFieldForm.validate()) return;
+    const payload = { ...built, ...customFieldForm.payload() };
 
     try {
       if (editingId) {
@@ -563,6 +570,7 @@ export function SalesPage({ createOnly = false }: { createOnly?: boolean }) {
         }
       }
     } catch (err: unknown) {
+      if (customFieldForm.showApiErrors(err)) return;
       toast.error(
         getApiErrorMessage(err, editingId ? 'Failed to update sales order' : 'Failed to create sales order'),
       );
@@ -720,6 +728,7 @@ export function SalesPage({ createOnly = false }: { createOnly?: boolean }) {
       />
 
       <div className="flex flex-col gap-2 pt-1">
+<CustomFieldsSection form={customFieldForm} />
         <Button
           className="w-full"
           disabled={createOrder.isPending || updateOrder.isPending}
@@ -784,7 +793,7 @@ export function SalesPage({ createOnly = false }: { createOnly?: boolean }) {
       ),
     },
   ];
-  const columns = useTableColumns('sales', salesColumns);
+  const columns = useTableColumns('sales', withCustomFieldColumns(salesColumns, customFieldForm.fields));
 
   if (createOnly) {
     return (
@@ -1072,6 +1081,7 @@ export function SalesPage({ createOnly = false }: { createOnly?: boolean }) {
               <Button variant="outline" className="flex-1" onClick={closeCreateSheet}>
                 Cancel
               </Button>
+<CustomFieldsSection form={customFieldForm} />
               <Button
                 className="flex-1"
                 disabled={createOrder.isPending || updateOrder.isPending}

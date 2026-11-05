@@ -5,6 +5,8 @@ import { toast } from 'sonner';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CustomFieldsSection } from '@/components/shared/custom-fields-section';
+import { useCustomFieldForm } from '@/hooks/use-custom-fields';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -202,7 +204,10 @@ export function GoodsIssueCreatePage() {
     setLines((prev) => prev.filter((_, i) => i !== index));
   }
 
+  const customFieldForm = useCustomFieldForm('goods-issues');
+
   async function submitGoodsIssue(mode: 'draft' | 'post') {
+    if (!customFieldForm.validate()) return;
     if (!shopId) {
       toast.error('Select a plant before saving');
       return;
@@ -252,6 +257,7 @@ export function GoodsIssueCreatePage() {
         otherReason: issueType === 'Others' ? otherReason.trim() : undefined,
         remarks: remarks || undefined,
         items: payloadItems,
+        ...customFieldForm.payload(),
       });
 
       if (mode === 'post') {
@@ -273,6 +279,7 @@ export function GoodsIssueCreatePage() {
 
       navigate(`/goods-issues?detail=${created.id}`);
     } catch (err: unknown) {
+      if (customFieldForm.showApiErrors(err)) return;
       toast.error(
         getApiErrorMessage(
           err,
@@ -424,6 +431,9 @@ export function GoodsIssueCreatePage() {
               {!shopId && (
                 <p className="text-xs text-muted-foreground">Select a plant first</p>
               )}
+            </div>
+            <div className="sm:col-span-2">
+              <CustomFieldsSection form={customFieldForm} />
             </div>
           </CardContent>
         </Card>

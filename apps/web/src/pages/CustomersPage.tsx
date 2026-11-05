@@ -17,6 +17,8 @@ import { useSuccessPulse } from '@/hooks/use-success-pulse';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CustomFieldsSection } from '@/components/shared/custom-fields-section';
+import { useCustomFieldForm } from '@/hooks/use-custom-fields';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -346,6 +348,8 @@ function CustomersCreateView() {
     syncPreferredOrgId(user?.shopId ? null : resolvedShopId, functionalCookiesEnabled);
   }, [functionalCookiesEnabled, resolvedShopId, user?.shopId]);
 
+  const customFieldForm = useCustomFieldForm('customers');
+
   const submitCreate = async () => {
     if (!form.customerName.trim()) {
       toast.error('Customer name is required');
@@ -356,15 +360,18 @@ function CustomersCreateView() {
       return;
     }
 
+    if (!customFieldForm.validate()) return;
+
     setIsSubmitting(true);
     setFieldErrors({});
     setFormError('');
     try {
-      await createCustomer.mutateAsync(buildCustomerPayload(form, resolvedShopId));
+      await createCustomer.mutateAsync({ ...buildCustomerPayload(form, resolvedShopId), ...customFieldForm.payload() });
       triggerPulse();
       showActionSuccess({ message: 'Customer created' });
       navigate('/customers');
     } catch (err: unknown) {
+      if (customFieldForm.showApiErrors(err)) return;
       const duplicate = getDuplicateRecordDetails(err);
       if (duplicate) {
         toastDuplicateRecordError(err, {
@@ -416,6 +423,7 @@ function CustomersCreateView() {
             functionalCookiesEnabled={functionalCookiesEnabled}
             fieldErrors={fieldErrors}
           />
+          <CustomFieldsSection form={customFieldForm} />
           <Button
             onClick={onCreate}
             loading={isSubmitting}
@@ -478,8 +486,11 @@ function CustomersListView() {
     syncPreferredOrgId(user?.shopId ? null : resolvedShopId, functionalCookiesEnabled);
   }, [functionalCookiesEnabled, resolvedShopId, user?.shopId]);
 
+  const customFieldForm = useCustomFieldForm('customers');
+
   function openEdit(c: Customer) {
     setEditing(c);
+    customFieldForm.reset(c);
     setForm({
       shopId: '',
       customerName: c.customerName,
@@ -512,7 +523,9 @@ function CustomersListView() {
       city: clearable(form.city),
       state: clearable(form.state),
       postalCode: clearable(form.postalCode),
+      ...customFieldForm.payload(),
     };
+    if (!customFieldForm.validate()) return;
 
     try {
       await updateCustomer.mutateAsync({ id: editing.id, payload });
@@ -521,6 +534,7 @@ function CustomersListView() {
       setEditing(null);
       setForm(emptyForm());
     } catch (err: unknown) {
+      if (customFieldForm.showApiErrors(err)) return;
       toast.error(getApiErrorMessage(err, 'Failed to save customer'));
     }
   }
@@ -771,6 +785,7 @@ function CustomersListView() {
               resolvedShopId={resolvedShopId}
               functionalCookiesEnabled={functionalCookiesEnabled}
             />
+            <CustomFieldsSection form={customFieldForm} />
             <Button
               className="w-full"
               disabled={updateCustomer.isPending}

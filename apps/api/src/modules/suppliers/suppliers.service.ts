@@ -51,6 +51,7 @@ export class SuppliersService {
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       orderBy: { createdAt: 'desc' },
       select: {
+        customFields: true,
         id: true,
         supplierCode: true,
         supplierName: true,

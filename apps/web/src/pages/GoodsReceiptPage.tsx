@@ -2,6 +2,8 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { formResolver } from '@/lib/form-resolver';
+import { CustomFieldsSection } from '@/components/shared/custom-fields-section';
+import { useCustomFieldForm } from '@/hooks/use-custom-fields';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import {
@@ -275,6 +277,7 @@ export function GoodsReceiptPage({ createOnly = false }: { createOnly?: boolean 
     [],
   );
 
+  const customFieldForm = useCustomFieldForm('goods-receipts');
   const form = useForm<GRFormValues>({
     resolver: formResolver(grFormSchema),
     defaultValues: {
@@ -342,6 +345,7 @@ export function GoodsReceiptPage({ createOnly = false }: { createOnly?: boolean 
 
   const openCreate = () => {
     setEditingGR(null);
+    customFieldForm.reset();
     const po = poQuery.data;
     setReceivingPlantId(po?.shopId ?? user?.shopId ?? '');
     form.reset({
@@ -479,6 +483,7 @@ export function GoodsReceiptPage({ createOnly = false }: { createOnly?: boolean 
 
   const openEdit = (gr: GoodsReceipt) => {
     setEditingGR(gr);
+    customFieldForm.reset(gr);
     setReceivingPlantId(gr.shopId ?? '');
     const existingItems = (gr.items ?? []).map((item) => ({
       productId: item.productId,
@@ -578,6 +583,7 @@ export function GoodsReceiptPage({ createOnly = false }: { createOnly?: boolean 
         return;
       }
 
+      if (!customFieldForm.validate()) return;
       setSubmitMode(postAfter ? 'post' : 'draft');
 
       const payloadItems = values.items.map((item) => ({
@@ -608,6 +614,7 @@ export function GoodsReceiptPage({ createOnly = false }: { createOnly?: boolean 
           supplierRef: values.supplierRef,
           remarks: values.remarks,
           items: payloadItems,
+          ...customFieldForm.payload(),
         });
       } else {
         const created = await createGR.mutateAsync({
@@ -624,6 +631,7 @@ export function GoodsReceiptPage({ createOnly = false }: { createOnly?: boolean 
           supplierRef: values.supplierRef,
           remarks: values.remarks,
           items: payloadItems,
+          ...customFieldForm.payload(),
         });
         receiptId = created.id;
         // From here on this form edits the saved draft: if posting fails, a
@@ -655,6 +663,7 @@ export function GoodsReceiptPage({ createOnly = false }: { createOnly?: boolean 
         setEditingGR(null);
       }
     } catch (err: unknown) {
+      if (customFieldForm.showApiErrors(err)) return;
       toast.error(getApiErrorMessage(err, 'Failed to save goods receipt'));
     } finally {
       setSubmitMode(null);
@@ -1286,6 +1295,8 @@ export function GoodsReceiptPage({ createOnly = false }: { createOnly?: boolean 
                 />
               </div>
             </div>
+
+            <CustomFieldsSection form={customFieldForm} />
 
             {/* Items table */}
             <div className="space-y-3">

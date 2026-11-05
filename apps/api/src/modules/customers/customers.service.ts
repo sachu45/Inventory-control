@@ -54,6 +54,7 @@ export class CustomersService {
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       orderBy: { id: 'asc' },
       select: {
+        customFields: true,
         id: true,
         customerCode: true,
         customerName: true,
