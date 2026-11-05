@@ -8,7 +8,7 @@ import { DocumentPdfService } from '../../common/pdf/document-pdf.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JobFailureService } from '../../common/queues/job-failure.service';
 import { MetricsService } from '../../common/observability/metrics.service';
-import { TenantContext } from '../../common/tenant/tenant-context';
+import { runJobAsCompany } from '../../common/tenant/job-tenant';
 
 type ExportJob = { type: 'po-pdf'; purchaseOrderId: string };
 
@@ -43,12 +43,20 @@ export class ExportProcessor extends WorkerHost {
     await this.failures.record(job, err);
   }
 
-  /**
-   * Background job with no request: system access is explicit rather than the
-   * implicit no-context fallback (#239).
-   */
+  /** Runs as the company that owns the purchase order (#239). */
   process(job: Job<ExportJob>) {
-    return TenantContext.runWithSystemAccess(() => this.handle(job));
+    return runJobAsCompany(
+      `export ${job.data?.type}`,
+      async () =>
+        (
+          await this.prisma.purchaseOrderHeader.findUnique({
+            where: { id: job.data.purchaseOrderId },
+            select: { shop: { select: { companyId: true } } },
+          })
+        )?.shop.companyId,
+      () => this.handle(job),
+      this.logger,
+    );
   }
 
   private async handle(job: Job<ExportJob>): Promise<{ downloadUrl: string; fileName: string }> {

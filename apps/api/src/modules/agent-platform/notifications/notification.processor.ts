@@ -23,7 +23,7 @@ import {
 } from './notification-jobs';
 import { NotificationPrefsService } from './notification-prefs.service';
 import { businessDate } from '../ai/tools/business-date';
-import { TenantContext } from '../../../common/tenant/tenant-context';
+import { runJobAsCompany } from '../../../common/tenant/job-tenant';
 
 type AnalyticsResult = {
   totalRevenue?: unknown;
@@ -82,12 +82,9 @@ export class NotificationProcessor extends WorkerHost {
     super();
   }
 
-  /**
-   * Background job with no request: system access is explicit rather than the
-   * implicit no-context fallback (#239).
-   */
+  /** Runs as the company the notification is for (#239); every job kind carries it. */
   process(job: Job<NotificationJob>) {
-    return TenantContext.runWithSystemAccess(() => this.handle(job));
+    return runJobAsCompany(`notification ${job.name}`, () => job.data?.companyId, () => this.handle(job), this.logger);
   }
 
   private async handle(job: Job<NotificationJob>): Promise<{ sent: number }> {

@@ -15,7 +15,7 @@ import {
   backupDeliverySubject,
   backupDeliveryText,
 } from '../../common/mail/backup-delivery.template';
-import { TenantContext } from '../../common/tenant/tenant-context';
+import { runJobAsCompany } from '../../common/tenant/job-tenant';
 
 type BackupJobPayload = { backupJobId: string };
 
@@ -50,11 +50,18 @@ export class BackupProcessor extends WorkerHost {
   }
 
   /**
-   * Background job with no request: system access is explicit rather than the
-   * implicit no-context fallback (#239).
+   * Runs as the company being backed up (#239), so the export can only ever
+   * contain that company's rows, whatever a query's own filter says.
    */
   process(job: Job<BackupJobPayload>) {
-    return TenantContext.runWithSystemAccess(() => this.handle(job));
+    return runJobAsCompany(
+      'backup',
+      async () =>
+        (await this.prisma.backupJob.findUnique({ where: { id: job.data.backupJobId }, select: { companyId: true } }))
+          ?.companyId,
+      () => this.handle(job),
+      this.logger,
+    );
   }
 
   private async handle(job: Job<BackupJobPayload>) {

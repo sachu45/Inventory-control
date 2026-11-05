@@ -3,8 +3,8 @@ import { join, relative } from 'path';
 
 /**
  * Every BullMQ processor runs outside a request, so it must set its tenant
- * context explicitly (#239): `TenantContext.run` for one company, or
- * `TenantContext.runWithSystemAccess` for work across tenants. Without it, the
+ * context explicitly (#239): `runJobAsCompany` or `TenantContext.run` for one
+ * company, or `TenantContext.runWithSystemAccess` for work across tenants. Without it, the
  * query falls back to implicit system access, which strict mode removes.
  */
 
@@ -30,7 +30,7 @@ describe('background entry points set a TenantContext', () => {
     const missing = processors
       .filter(({ text }) => {
         const body = text.slice(text.indexOf('process('), text.indexOf('process(') + 400);
-        return !/TenantContext\.(runWithSystemAccess|run)\(/.test(body);
+        return !/TenantContext\.(runWithSystemAccess|run)\(|runJobAsCompany\(/.test(body);
       })
       .map(({ file }) => file);
     expect(missing).toEqual([]);

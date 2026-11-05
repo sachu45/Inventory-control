@@ -5,7 +5,7 @@ import { DISPATCH_JOB, NOTIFICATION_DISPATCH_QUEUE } from './dispatch.constants'
 import { DispatchJobData } from './dispatch-job';
 import { DispatchBatchService } from './dispatch-batch.service';
 import { CustomerDispatchService } from './customer-dispatch.service';
-import { TenantContext } from '../../tenant/tenant-context';
+import { runJobAsCompany } from '../../tenant/job-tenant';
 
 /**
  * Worker for the dispatch queue (Plan §11). Performs deferred sends when their
@@ -23,12 +23,10 @@ export class DispatchProcessor extends WorkerHost {
     super();
   }
 
-  /**
-   * Background job with no request: system access is explicit rather than the
-   * implicit no-context fallback (#239).
-   */
+  /** Runs as the company the job is for (#239); both job kinds carry it. */
   process(job: Job) {
-    return TenantContext.runWithSystemAccess(() => this.handle(job));
+    const companyId = (job.data as { companyId?: string } | undefined)?.companyId;
+    return runJobAsCompany(`dispatch ${job.name}`, () => companyId, () => this.handle(job), this.logger);
   }
 
   private async handle(job: Job): Promise<void> {

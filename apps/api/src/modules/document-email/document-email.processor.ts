@@ -3,7 +3,8 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { DOCUMENT_EMAIL_QUEUE } from './document-email.constants';
 import { DocumentEmailService } from './document-email.service';
-import { TenantContext } from '../../common/tenant/tenant-context';
+import { runJobAsCompany } from '../../common/tenant/job-tenant';
+import { PrismaService } from '../../prisma/prisma.service';
 
 type OutboxJobData = { outboxId: string };
 
@@ -11,16 +12,23 @@ type OutboxJobData = { outboxId: string };
 export class DocumentEmailProcessor extends WorkerHost {
   private readonly logger = new Logger(DocumentEmailProcessor.name);
 
-  constructor(private readonly documentEmail: DocumentEmailService) {
+  constructor(
+    private readonly documentEmail: DocumentEmailService,
+    private readonly prisma: PrismaService,
+  ) {
     super();
   }
 
-  /**
-   * Background job with no request: system access is explicit rather than the
-   * implicit no-context fallback (#239).
-   */
+  /** Runs as the company whose document is being emailed (#239). */
   process(job: Job<OutboxJobData>) {
-    return TenantContext.runWithSystemAccess(() => this.handle(job));
+    return runJobAsCompany(
+      'document email',
+      async () =>
+        (await this.prisma.documentEmailOutbox.findUnique({ where: { id: job.data.outboxId }, select: { companyId: true } }))
+          ?.companyId,
+      () => this.handle(job),
+      this.logger,
+    );
   }
 
   private async handle(job: Job<OutboxJobData>) {
