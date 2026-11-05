@@ -23,8 +23,9 @@ import { showActionSuccess } from '@/lib/action-feedback';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CustomFieldsSection } from '@/components/shared/custom-fields-section';
-import { useCustomFieldForm } from '@/hooks/use-custom-fields';
+import { CustomFieldFilters } from '@/components/shared/custom-field-filters';
+import { CustomFieldCells, CustomFieldHeads, CustomFieldsSection, CustomFieldValuesList } from '@/components/shared/custom-fields-section';
+import { useCustomFieldFilters, useCustomFieldForm } from '@/hooks/use-custom-fields';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -559,7 +560,8 @@ function SuppliersCreateView() {
 function SuppliersListView() {
   const navigate = useNavigate();
   const [recordParams, setRecordParams] = useSearchParams();
-  const { data: allSuppliers = [], isLoading } = useSuppliers();
+  const customFieldFilters = useCustomFieldFilters('suppliers');
+  const { data: allSuppliers = [], isLoading } = useSuppliers(undefined, customFieldFilters.param);
   const { data: companies = [] } = useCompanies();
   const updateSupplier = useUpdateSupplier();
   const requestDeletion = useRequestSupplierDeletion();
@@ -735,6 +737,7 @@ function SuppliersListView() {
                 noResultsMessage="No suppliers match your search."
                 className="max-w-md flex-1"
               />
+              <CustomFieldFilters fields={customFieldFilters.fields} values={customFieldFilters.values} onChange={customFieldFilters.change} />
               <div className="flex items-center gap-2 sm:w-44">
                 <Label className="shrink-0 text-xs text-muted-foreground">Status</Label>
                 <Select
@@ -807,6 +810,7 @@ function SuppliersListView() {
                     <TableHead className="text-xs font-semibold uppercase tracking-wide">
                       Status
                     </TableHead>
+                    <CustomFieldHeads fields={customFieldFilters.fields} />
                     <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">
                       Actions
                     </TableHead>
@@ -873,6 +877,7 @@ function SuppliersListView() {
                             {s.isActive ? 'Active' : 'Inactive'}
                           </span>
                         </TableCell>
+                        <CustomFieldCells fields={customFieldFilters.fields} values={s.customFields} />
                         <TableCell>
                           <div className="flex justify-end gap-0.5">
                             <Button
@@ -985,6 +990,7 @@ function SuppliersListView() {
                   </div>
                 ))}
               </dl>
+              <CustomFieldValuesList fields={customFieldFilters.fields} values={viewSupplier.customFields} />
               <Button variant="outline" className="w-full" onClick={() => {
                 setViewSheetOpen(false);
                 openEdit(viewSupplier);

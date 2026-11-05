@@ -32,15 +32,17 @@ const keys = {
   search: (search?: string) => [...keys.all, 'search', search ?? ''] as const,
 };
 
-export function useCustomers(search?: string, options?: { fetchAll?: boolean }) {
+export function useCustomers(search?: string, options?: { fetchAll?: boolean; customFieldFilter?: string }) {
+  const cf = options?.customFieldFilter;
   const infinite = useInfiniteQuery({
-    queryKey: keys.list(search),
+    queryKey: [...keys.list(search), cf ?? ''],
     queryFn: async ({ pageParam }) => {
       const res = await api.get('/customers', {
         params: {
           search: search || undefined,
           take: 100,
           cursor: pageParam || undefined,
+          cf,
         },
       });
       return {
@@ -54,11 +56,12 @@ export function useCustomers(search?: string, options?: { fetchAll?: boolean }) 
   });
 
   const allPages = useQuery({
-    queryKey: [...keys.list(search), 'all-pages'],
+    queryKey: [...keys.list(search), cf ?? '', 'all-pages'],
     queryFn: () =>
       fetchAllCursorPages<Customer>('/customers', {
         search: search || undefined,
         take: 100,
+        cf,
       }),
     enabled: options?.fetchAll === true,
   });

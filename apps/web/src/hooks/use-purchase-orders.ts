@@ -58,6 +58,8 @@ export type PurchaseOrderLifecycle =
   | 'CANCELLED';
 
 export type PurchaseOrderFilters = {
+  /** JSON filter on searchable custom fields. */
+  customFieldFilter?: string;
   search?: string;
   /** Supplier name contains (server-side). */
   supplier?: string;
@@ -139,6 +141,7 @@ async function fetchPurchaseOrderPage(filters: PurchaseOrderFilters) {
   if (filters.shopId) params.set('shop_id', filters.shopId);
   if (filters.supplier) params.set('supplier', filters.supplier);
   if (filters.lifecycle) params.set('lifecycle', filters.lifecycle);
+  if (filters.customFieldFilter) params.set('cf', filters.customFieldFilter);
   const res = await api.get(`/purchase-orders?${params}`);
   return {
     data: (res.data.data ?? []) as PurchaseOrder[],

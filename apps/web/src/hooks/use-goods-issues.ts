@@ -39,6 +39,8 @@ export type GoodsIssue = {
 };
 
 export type GoodsIssueFilters = {
+  /** JSON filter on searchable custom fields. */
+  customFieldFilter?: string;
   shopId?: string;
   status?: GoodsIssueStatus;
   take?: number;
@@ -97,6 +99,7 @@ export function useGoodsIssues(filters: GoodsIssueFilters = {}) {
         take: Math.min(filters.take ?? 100, 100),
         shop_id: filters.shopId,
         status: filters.status,
+        cf: filters.customFieldFilter,
       });
       return extractGiRows(rows);
     },

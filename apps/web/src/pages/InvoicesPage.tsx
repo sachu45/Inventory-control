@@ -8,6 +8,8 @@ import { CreatePageLayout, DocumentReferenceSelect, PageHeader } from '@/compone
 import { DocumentRowActions } from '@/components/shared/DocumentRowActions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CustomFieldFilters } from '@/components/shared/custom-field-filters';
+import { useCustomFieldFilters } from '@/hooks/use-custom-fields';
 import { CustomFieldsSection } from '@/components/shared/custom-fields-section';
 import { useCustomFieldForm, withCustomFieldColumns } from '@/hooks/use-custom-fields';
 import { Input } from '@/components/ui/input';
@@ -47,7 +49,8 @@ const emptyForm = () => ({
 
 export function InvoicesPage({ createOnly = false }: { createOnly?: boolean }) {
   const navigate = useNavigate();
-  const { data: invoices = [] } = useInvoices();
+  const customFieldFilters = useCustomFieldFilters('invoices');
+  const { data: invoices = [] } = useInvoices(customFieldFilters.param);
   const { data: customers = [] } = useCustomers();
   const { data: salesOrders = [] } = useSalesOrders();
   const createInvoice = useCreateInvoice();
@@ -224,6 +227,7 @@ export function InvoicesPage({ createOnly = false }: { createOnly?: boolean }) {
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle>Invoices</CardTitle>
             <ColumnPicker columns={columns} tableLabel="invoice" />
+            <CustomFieldFilters fields={customFieldFilters.fields} values={customFieldFilters.values} onChange={customFieldFilters.change} />
           </CardHeader>
           <CardContent>
             <Table>

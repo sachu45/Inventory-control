@@ -80,15 +80,16 @@ const keys = {
   detail: (id: string) => [...keys.all, 'detail', id] as const,
 };
 
-export function useSalesOrders(filters?: { customerId?: string; status?: string }) {
+export function useSalesOrders(filters?: { customerId?: string; status?: string; customFieldFilter?: string }) {
   return useQuery({
-    queryKey: [...keys.list(), filters?.customerId ?? 'all', filters?.status ?? 'all'],
+    queryKey: [...keys.list(), filters?.customerId ?? 'all', filters?.status ?? 'all', filters?.customFieldFilter ?? ''],
     queryFn: async () => {
       // The page filters and searches client-side, so load every page.
       return fetchAllCursorPages<SalesOrder>('/sales-orders', {
         take: 100,
         customer_id: filters?.customerId,
         status: filters?.status,
+        cf: filters?.customFieldFilter,
       });
     },
   });

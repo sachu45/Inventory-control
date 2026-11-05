@@ -17,8 +17,9 @@ import { useSuccessPulse } from '@/hooks/use-success-pulse';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CustomFieldsSection } from '@/components/shared/custom-fields-section';
-import { useCustomFieldForm } from '@/hooks/use-custom-fields';
+import { CustomFieldFilters } from '@/components/shared/custom-field-filters';
+import { CustomFieldCells, CustomFieldHeads, CustomFieldsSection, CustomFieldValuesList } from '@/components/shared/custom-fields-section';
+import { useCustomFieldFilters, useCustomFieldForm } from '@/hooks/use-custom-fields';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -456,7 +457,9 @@ function CustomersListView() {
   const [deactivateTarget, setDeactivateTarget] = useState<Customer | null>(null);
   const [form, setForm] = useState(emptyForm());
 
+  const customFieldFilters = useCustomFieldFilters('customers');
   const { data: customers = [], isLoading } = useCustomers(debouncedSearch, {
+    customFieldFilter: customFieldFilters.param,
     fetchAll: !debouncedSearch.trim(),
   });
   const isSearchPending = search !== debouncedSearch || (isLoading && search.trim().length > 0);
@@ -611,6 +614,7 @@ function CustomersListView() {
               noResultsMessage="No customers match your search."
               className="max-w-md"
             />
+            <CustomFieldFilters fields={customFieldFilters.fields} values={customFieldFilters.values} onChange={customFieldFilters.change} />
             <Select
               value={statusFilter}
               onValueChange={(v) => setStatusFilter(v as StatusFilter)}
@@ -677,6 +681,7 @@ function CustomersListView() {
                   <TableHead className="text-xs font-semibold uppercase tracking-wide">
                     Status
                   </TableHead>
+                  <CustomFieldHeads fields={customFieldFilters.fields} />
                   <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">
                     Actions
                   </TableHead>
@@ -720,6 +725,7 @@ function CustomersListView() {
                           {c.isActive ? 'Active' : 'Inactive'}
                         </span>
                       </TableCell>
+                      <CustomFieldCells fields={customFieldFilters.fields} values={c.customFields} />
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
                           <Button
@@ -836,6 +842,11 @@ function CustomersListView() {
                 <dd>{viewing.isActive ? 'Active' : 'Inactive'}</dd>
               </div>
             </dl>
+          )}
+          {viewing && (
+            <div className="mt-6">
+              <CustomFieldValuesList fields={customFieldFilters.fields} values={viewing.customFields} />
+            </div>
           )}
         </SheetContent>
       </Sheet>

@@ -2,8 +2,9 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { formResolver } from '@/lib/form-resolver';
-import { CustomFieldsSection } from '@/components/shared/custom-fields-section';
-import { useCustomFieldForm } from '@/hooks/use-custom-fields';
+import { CustomFieldFilters } from '@/components/shared/custom-field-filters';
+import { CustomFieldCells, CustomFieldHeads, CustomFieldsSection, CustomFieldValuesList } from '@/components/shared/custom-fields-section';
+import { useCustomFieldFilters, useCustomFieldForm } from '@/hooks/use-custom-fields';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import {
@@ -232,7 +233,10 @@ export function GoodsReceiptPage({ createOnly = false }: { createOnly?: boolean 
   const [unknownBarcode, setUnknownBarcode] = useState<string | null>(null);
   const [unknownBarcodePolicy, setUnknownBarcodePolicy] = useState<'AUTO_CREATE' | 'ASK' | 'REJECT' | null>(null);
 
+  const backToFirstPage = useCallback(() => setPage(1), []);
+  const customFieldFilters = useCustomFieldFilters('goods-receipts', backToFirstPage);
   const filters: GoodsReceiptFilters = {
+    customFieldFilter: customFieldFilters.param,
     page,
     limit: PAGE_SIZE,
     search: debouncedSearch || undefined,
@@ -749,6 +753,7 @@ export function GoodsReceiptPage({ createOnly = false }: { createOnly?: boolean 
               </button>
             )}
           </div>
+          <CustomFieldFilters fields={customFieldFilters.fields} values={customFieldFilters.values} onChange={customFieldFilters.change} />
           <Select
             value={statusFilter}
             onValueChange={(v) => {
@@ -824,6 +829,7 @@ export function GoodsReceiptPage({ createOnly = false }: { createOnly?: boolean 
                     <TableHead className="font-semibold text-center">Items</TableHead>
                     <TableHead className="font-semibold text-right">Total Value</TableHead>
                     <TableHead className="font-semibold">Status</TableHead>
+                    <CustomFieldHeads fields={customFieldFilters.fields} />
                     <TableHead className="font-semibold text-center">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -861,6 +867,7 @@ export function GoodsReceiptPage({ createOnly = false }: { createOnly?: boolean 
                       <TableCell>
                         <StatusBadge status={gr.status} />
                       </TableCell>
+                      <CustomFieldCells fields={customFieldFilters.fields} values={gr.customFields} />
                       <TableCell>
                         <div
                           className="flex items-center justify-center gap-1"
@@ -1022,6 +1029,9 @@ export function GoodsReceiptPage({ createOnly = false }: { createOnly?: boolean 
                   <p className="font-medium tabular-nums">
                     {Number(viewingGR.totalValue ?? 0).toFixed(2)}
                   </p>
+                </div>
+                <div className="col-span-full">
+                  <CustomFieldValuesList fields={customFieldFilters.fields} values={viewingGR.customFields} />
                 </div>
                 {viewingGR.remarks && (
                   <div className="sm:col-span-2">

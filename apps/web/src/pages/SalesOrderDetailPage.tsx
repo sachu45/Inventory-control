@@ -11,6 +11,8 @@ import { toast } from 'sonner';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CustomFieldValuesList } from '@/components/shared/custom-fields-section';
+import { useCustomFields } from '@/hooks/use-custom-fields';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -83,6 +85,7 @@ export function SalesOrderDetailPage() {
   const orderId = id ?? '';
 
   const { data: order, isLoading, isError } = useSalesOrder(orderId);
+  const customFields = useCustomFields('sales');
   useDocumentTitleOverride(order?.soNumber);
   const confirmOrder = useConfirmSalesOrder();
   const fulfillOrder = useFulfillSalesOrder();
@@ -370,6 +373,8 @@ export function SalesOrderDetailPage() {
             </div>
           </CardContent>
         </Card>
+
+        <CustomFieldValuesList fields={customFields} values={order.customFields} />
 
         {notesDisplay ? (
           <Card className="border-border/90 shadow-xs">

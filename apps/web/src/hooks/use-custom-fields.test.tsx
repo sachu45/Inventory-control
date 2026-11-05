@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MeConfig } from '@/api/me-config';
 import { CustomFieldFilters, customFieldFilterParam } from '@/components/shared/custom-field-filters';
-import { CustomFieldsSection, CustomFieldValuesList } from '@/components/shared/custom-fields-section';
+import { CustomFieldCells, CustomFieldHeads, CustomFieldsSection, CustomFieldValuesList } from '@/components/shared/custom-fields-section';
 import {
   customFieldErrorsFromApi,
   formatCustomFieldValue,
@@ -11,7 +11,7 @@ import {
   type CustomField,
 } from '@/lib/custom-fields';
 import { useAuthStore, type AuthUser } from '@/store/authStore';
-import { useCustomFieldForm, withCustomFieldColumns } from './use-custom-fields';
+import { useCustomFieldFilters, useCustomFieldForm, withCustomFieldColumns } from './use-custom-fields';
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
@@ -275,5 +275,38 @@ describe('CustomFieldFilters', () => {
     await u.type(screen.getByLabelText('Filter by N'), '42');
     expect(onChange).not.toHaveBeenCalledWith('n', 4);
     await waitFor(() => expect(onChange).toHaveBeenCalledWith('n', 42));
+  });
+});
+
+describe('tables without the shared column system', () => {
+  it('heads and cells line up, showing a dash for empty values', () => {
+    const fields = [field({ fieldKey: 'grade', label: 'Grade', fieldType: 'select', options: [{ value: 'a', label: 'Grade A' }] }), field({ fieldKey: 'note', label: 'Note' })];
+    render(
+      <table>
+        <thead><tr><CustomFieldHeads fields={fields} /></tr></thead>
+        <tbody><tr><CustomFieldCells fields={fields} values={{ grade: 'a' }} /></tr></tbody>
+      </table>,
+    );
+    expect(screen.getAllByRole('columnheader').map((c) => c.textContent)).toEqual(['Grade', 'Note']);
+    expect(screen.getAllByRole('cell').map((c) => c.textContent)).toEqual(['Grade A', '—']);
+  });
+
+  it('adds nothing with no fields, so existing tables are unchanged', () => {
+    render(<table><thead><tr><CustomFieldHeads fields={[]} /></tr></thead></table>);
+    expect(screen.queryByRole('columnheader')).not.toBeInTheDocument();
+  });
+});
+
+describe('useCustomFieldFilters', () => {
+  it('builds the list parameter as filters change, and tells the page to go back to page one', () => {
+    publish([field({ fieldKey: 'a', searchable: true })]);
+    const onChanged = vi.fn();
+    const { result } = renderHook(() => useCustomFieldFilters('products', onChanged));
+    expect(result.current.param).toBeUndefined();
+    act(() => result.current.change('a', 'x'));
+    expect(result.current.param).toBe('{"a":"x"}');
+    expect(onChanged).toHaveBeenCalledTimes(1);
+    act(() => result.current.change('a', null));
+    expect(result.current.param).toBeUndefined();
   });
 });

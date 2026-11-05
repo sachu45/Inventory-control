@@ -42,6 +42,8 @@ export type GoodsReceipt = {
 };
 
 export type GoodsReceiptFilters = {
+  /** JSON filter on searchable custom fields. */
+  customFieldFilter?: string;
   page?: number;
   limit?: number;
   search?: string;
@@ -76,7 +78,7 @@ export function useGoodsReceipts(filters: GoodsReceiptFilters = {}) {
       // these filters, then search and paginate here with real totals.
       const rows = await fetchAllCursorPages<GoodsReceipt>(
         '/goods-receipts',
-        { take: 100, status: filters.status, shop_id: filters.shopId },
+        { take: 100, status: filters.status, shop_id: filters.shopId, cf: filters.customFieldFilter },
         10,
       );
       const all = rows.map((gr) => {

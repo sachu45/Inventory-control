@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowDownToLine,
@@ -17,6 +17,9 @@ import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { DocumentDetailActions } from '@/components/shared/DocumentDetailActions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { CustomFieldFilters } from '@/components/shared/custom-field-filters';
+import { CustomFieldCells, CustomFieldHeads, CustomFieldValuesList } from '@/components/shared/custom-fields-section';
+import { useCustomFieldFilters } from '@/hooks/use-custom-fields';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -145,7 +148,10 @@ export function GoodsIssuePage() {
     }
   }, [searchParams, setSearchParams]);
 
+  const backToFirstPage = useCallback(() => setPage(1), []);
+  const customFieldFilters = useCustomFieldFilters('goods-issues', backToFirstPage);
   const giQuery = useGoodsIssues({
+    customFieldFilter: customFieldFilters.param,
     shopId: listShopId,
     status: statusFilter !== 'all' ? (statusFilter as GoodsIssueStatus) : undefined,
     take: 300,
@@ -303,6 +309,7 @@ export function GoodsIssuePage() {
           {isAdmin && shops.length > 0 ? (
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Plant</Label>
+              <CustomFieldFilters fields={customFieldFilters.fields} values={customFieldFilters.values} onChange={customFieldFilters.change} />
               <Select
                 value={plantFilter}
                 onValueChange={(value) => {
@@ -434,6 +441,7 @@ export function GoodsIssuePage() {
                     <TableHead>Status</TableHead>
                     <TableHead className="text-center">Items</TableHead>
                     <TableHead>Date</TableHead>
+                    <CustomFieldHeads fields={customFieldFilters.fields} />
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -468,6 +476,7 @@ export function GoodsIssuePage() {
                         </span>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{formatGiDate(gi.giDate)}</TableCell>
+                      <CustomFieldCells fields={customFieldFilters.fields} values={gi.customFields} />
                       <TableCell className="text-right">
                         <Button
                           type="button"
@@ -566,6 +575,7 @@ export function GoodsIssuePage() {
                   <p className="font-medium">{formatGiDate(detailGI.giDate)}</p>
                 </div>
               </div>
+              <CustomFieldValuesList fields={customFieldFilters.fields} values={detailGI.customFields} />
               {detailGI.remarks && (
                 <div>
                   <p className="text-xs text-muted-foreground">Notes</p>

@@ -34,6 +34,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
+import { CustomFieldFilters } from '@/components/shared/custom-field-filters';
+import { CustomFieldValuesList } from '@/components/shared/custom-fields-section';
+import { useCustomFieldFilters } from '@/hooks/use-custom-fields';
 import { CustomFieldsSection } from '@/components/shared/custom-fields-section';
 import { useCustomFieldForm, withCustomFieldColumns } from '@/hooks/use-custom-fields';
 import {
@@ -406,7 +409,10 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
   // Supplier and lifecycle filters run on the server so they cover every
   // page, not just the 10 rows already loaded.
   const debouncedSupplier = useDebouncedValue(supplierSearch.trim(), 300);
+  const backToFirstPage = useCallback(() => setPage(1), []);
+  const customFieldFilters = useCustomFieldFilters('purchase-orders', backToFirstPage);
   const poQuery = usePurchaseOrders({
+    customFieldFilter: customFieldFilters.param,
     page,
     limit: PAGE_SIZE,
     search: search || undefined,
@@ -2352,6 +2358,7 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
             </Select>
           )}
           <ColumnPicker columns={columns} tableLabel="purchase order" />
+          <CustomFieldFilters fields={customFieldFilters.fields} values={customFieldFilters.values} onChange={customFieldFilters.change} />
         </div>
           </Card>
 
@@ -2512,6 +2519,8 @@ export function PurchaseOrdersPage({ createOnly = false }: { createOnly?: boolea
                   <p className="font-bold">{formatCurrency(detailTotals?.grossTotal ?? detailPO.totalValue)}</p>
                 </div>
               </div>
+
+              <CustomFieldValuesList fields={customFieldFilters.fields} values={detailPO.customFields} />
 
               {detailRemarks && !poFields.isHidden('remarks') && (
                 <div>

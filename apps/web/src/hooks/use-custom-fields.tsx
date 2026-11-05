@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { customFieldFilterParam } from '@/components/shared/custom-field-filters';
 import { useMeConfig } from '@/hooks/use-me-config';
 import {
   customFieldErrorsFromApi,
@@ -87,6 +88,20 @@ export function useCustomFieldForm(moduleKey: string) {
 }
 
 export type CustomFieldForm = ReturnType<typeof useCustomFieldForm>;
+
+/** State for a list's filters on searchable custom fields. `param` goes in the list request as `cf`. */
+export function useCustomFieldFilters(moduleKey: string, onChanged?: () => void) {
+  const fields = useCustomFields(moduleKey);
+  const [values, setValues] = useState<CustomFieldValues>({});
+  const change = useCallback(
+    (key: string, value: unknown) => {
+      setValues((current) => ({ ...current, [key]: value }));
+      onChanged?.();
+    },
+    [onChanged],
+  );
+  return { fields, values, change, param: customFieldFilterParam(values) };
+}
 
 /** Table columns for a module's custom fields, placed before Actions by {@link withCustomFieldColumns}. */
 export function customFieldColumns<Row extends { customFields?: unknown }>(fields: CustomField[]): TableColumn<Row>[] {

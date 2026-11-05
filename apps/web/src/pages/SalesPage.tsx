@@ -17,6 +17,8 @@ import { EmptyState, LoadingSkeleton, SearchInput, CreatePageLayout } from '@/co
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { CustomFieldFilters } from '@/components/shared/custom-field-filters';
+import { useCustomFieldFilters } from '@/hooks/use-custom-fields';
 import { CustomFieldsSection } from '@/components/shared/custom-fields-section';
 import { useCustomFieldForm, withCustomFieldColumns } from '@/hooks/use-custom-fields';
 import { Input } from '@/components/ui/input';
@@ -271,7 +273,8 @@ export function SalesPage({ createOnly = false }: { createOnly?: boolean }) {
   const { data: shops = [] } = useShops();
   const { data: customers = [] } = useCustomers(undefined, { fetchAll: true });
   const { data: quotations = [] } = useSalesQuotations();
-  const { data: salesOrders = [], isLoading } = useSalesOrders();
+  const customFieldFilters = useCustomFieldFilters('sales');
+  const { data: salesOrders = [], isLoading } = useSalesOrders({ customFieldFilter: customFieldFilters.param });
   const createOrder = useCreateSalesOrder();
   const updateOrder = useUpdateSalesOrder();
   const deleteOrder = useDeleteSalesOrder();
@@ -893,6 +896,7 @@ export function SalesPage({ createOnly = false }: { createOnly?: boolean }) {
                     className="w-full min-w-[200px] sm:max-w-xs"
                   />
                   <ColumnPicker columns={columns} tableLabel="sales order" />
+                  <CustomFieldFilters fields={customFieldFilters.fields} values={customFieldFilters.values} onChange={customFieldFilters.change} />
                   <Select value={customerFilter} onValueChange={setCustomerFilter}>
                     <SelectTrigger className="h-9 w-full sm:w-[180px]">
                       <SelectValue placeholder="Customer" />

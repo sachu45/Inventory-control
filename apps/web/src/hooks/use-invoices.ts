@@ -32,12 +32,12 @@ const keys = {
   list: () => [...keys.all, 'list'] as const,
 };
 
-export function useInvoices() {
+export function useInvoices(customFieldFilter?: string) {
   return useQuery({
-    queryKey: keys.list(),
+    queryKey: [...keys.list(), customFieldFilter ?? ''],
     queryFn: async () => {
       // Newest 100; the API caps a page at 100.
-      return fetchAllCursorPages<Invoice>('/invoices', { take: 100 });
+      return fetchAllCursorPages<Invoice>('/invoices', { take: 100, cf: customFieldFilter });
     },
   });
 }

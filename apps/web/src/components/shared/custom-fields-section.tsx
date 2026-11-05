@@ -2,6 +2,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { TableCell, TableHead } from '@/components/ui/table';
 import type { CustomFieldForm } from '@/hooks/use-custom-fields';
 import { formatCustomFieldValue, type CustomField } from '@/lib/custom-fields';
 
@@ -144,5 +145,32 @@ export function CustomFieldValuesList({ fields, values }: { fields: CustomField[
         </div>
       ))}
     </dl>
+  );
+}
+
+/** Header cells for a table that isn't built on the shared column system. */
+export function CustomFieldHeads({ fields, className }: { fields: CustomField[]; className?: string }) {
+  return (
+    <>
+      {fields.map((field) => (
+        <TableHead key={field.fieldKey} className={className}>
+          {field.label}
+        </TableHead>
+      ))}
+    </>
+  );
+}
+
+/** Row cells to match {@link CustomFieldHeads}. */
+export function CustomFieldCells({ fields, values }: { fields: CustomField[]; values: unknown }) {
+  const stored = (values ?? {}) as Record<string, unknown>;
+  return (
+    <>
+      {fields.map((field) => (
+        <TableCell key={field.fieldKey} className="text-sm text-muted-foreground">
+          {formatCustomFieldValue(field, stored[field.fieldKey]) || '—'}
+        </TableCell>
+      ))}
+    </>
   );
 }

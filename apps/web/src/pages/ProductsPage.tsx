@@ -118,7 +118,7 @@ import { useSuccessPulse } from '@/hooks/use-success-pulse';
 import { showActionSuccess } from '@/lib/action-feedback';
 import { Card, CardContent } from '@/components/ui/card';
 import { CustomFieldFilters, customFieldFilterParam } from '@/components/shared/custom-field-filters';
-import { CustomFieldsSection } from '@/components/shared/custom-fields-section';
+import { CustomFieldsSection, CustomFieldValuesList } from '@/components/shared/custom-fields-section';
 import { useCustomFieldForm, useCustomFields, withCustomFieldColumns } from '@/hooks/use-custom-fields';
 import type { CustomFieldValues } from '@/lib/custom-fields';
 import { downloadCsv, toCsv, type CsvColumn } from '@/lib/csv';
@@ -2688,6 +2688,11 @@ export function ProductsPage({ createOnly = false }: { createOnly?: boolean }) {
                 )}
               </div>
             </dl>
+          )}
+          {viewingProduct && (
+            <div className="mt-6">
+              <CustomFieldValuesList fields={customFields} values={viewingProduct.customFields} />
+            </div>
           )}
         </SheetContent>
       </Sheet>

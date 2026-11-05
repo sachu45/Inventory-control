@@ -92,12 +92,12 @@ function normalizeSupplier(raw: unknown): Supplier {
   };
 }
 
-export function useSuppliers(search?: string) {
+export function useSuppliers(search?: string, customFieldFilter?: string) {
   const tenant = currentTenantKey();
   return useQuery({
-    queryKey: keys.list(tenant, search),
+    queryKey: [...keys.list(tenant, search), customFieldFilter ?? ''],
     queryFn: async () => {
-      const res = await api.get('/suppliers', { params: { search, take: 100 } });
+      const res = await api.get('/suppliers', { params: { search, take: 100, cf: customFieldFilter } });
       const payload = res.data as { data?: unknown };
       const rows = Array.isArray(payload?.data) ? payload.data : [];
       // API returns newest-first; reverse so newest appears at the bottom of the table.
