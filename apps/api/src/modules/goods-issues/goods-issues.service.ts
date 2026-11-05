@@ -14,6 +14,7 @@ import { InventoryLotService } from '../stock/inventory-lot.service';
 import { DocumentAlreadyPostedException, InsufficientStockException } from '../../common/exceptions/domain.exceptions';
 import { AuditService } from '../audit/audit.service';
 import { customFieldsInput } from '../../common/config/custom-field-values';
+import { withCustomFieldFilter } from '../../common/config/custom-field-values';
 
 type Line = { productId: string; quantity: number; uom: string };
 
@@ -67,7 +68,7 @@ export class GoodsIssuesService {
 
   async list(
     user: RequestUser,
-    query: { shop_id?: string; date_from?: string; date_to?: string; status?: DocumentStatus; cursor?: string; take?: number },
+    query: { cf?: string; shop_id?: string; date_from?: string; date_to?: string; status?: DocumentStatus; cursor?: string; take?: number },
   ) {
     const take = clampTake(query.take);
     if (query.shop_id) assertShopScope(user, query.shop_id);
@@ -84,7 +85,7 @@ export class GoodsIssuesService {
     }
 
     const rows = await this.prisma.goodsIssueHeader.findMany({
-      where,
+      where: withCustomFieldFilter(where, query.cf) as Prisma.GoodsIssueHeaderWhereInput,
       take: take + 1,
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],

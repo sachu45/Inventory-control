@@ -66,6 +66,8 @@ export type Product = {
 };
 
 export type ProductFilters = {
+  /** JSON filter on searchable custom fields. */
+  customFieldFilter?: string;
   page?: number;
   limit?: number;
   search?: string;
@@ -272,6 +274,7 @@ function productListParams(filters: ProductFilters) {
   if (filters.isActive !== undefined) params.set('is_active', String(filters.isActive));
   if (filters.shopId) params.set('shop_id', filters.shopId);
   if (filters.companyCatalog) params.set('company_catalog', 'true');
+  if (filters.customFieldFilter) params.set('cf', filters.customFieldFilter);
   return params;
 }
 

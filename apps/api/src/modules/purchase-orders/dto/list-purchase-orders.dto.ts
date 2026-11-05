@@ -2,11 +2,15 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsEnum, IsIn, IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 import { PurchaseOrderStatus } from '@prisma/client';
+import { CustomFieldFilterProperty } from '../../../common/config/custom-field-values';
 
 export const PO_LIFECYCLES = ['DRAFT', 'CONFIRMED', 'PARTIALLY_RECEIVED', 'FULLY_RECEIVED', 'CANCELLED'] as const;
 export type PoLifecycle = (typeof PO_LIFECYCLES)[number];
 
 export class ListPurchaseOrdersDto {
+  @CustomFieldFilterProperty()
+  cf?: string;
+
   @ApiPropertyOptional({ description: 'Filter by shop (respects user scope)' })
   @IsOptional()
   @IsUUID()

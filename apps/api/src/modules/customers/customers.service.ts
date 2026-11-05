@@ -15,6 +15,7 @@ import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { runSerializableTxWithRetry } from '../../common/utils/serializable-tx';
 import { customFieldsInput } from '../../common/config/custom-field-values';
+import { withCustomFieldFilter } from '../../common/config/custom-field-values';
 
 type CustomerDuplicateRow = {
   id: string;
@@ -32,7 +33,7 @@ export class CustomersService {
 
   async list(
     user: RequestUser,
-    query: { search?: string; cursor?: string; take?: number } = {},
+    query: { cf?: string; search?: string; cursor?: string; take?: number } = {},
   ) {
     const take = clampTake(query.take);
     const search = query.search?.trim();
@@ -49,7 +50,7 @@ export class CustomersService {
     };
 
     const rows = await this.prisma.customer.findMany({
-      where,
+      where: withCustomFieldFilter(where, query.cf) as Prisma.CustomerWhereInput,
       take: take + 1,
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       orderBy: { id: 'asc' },

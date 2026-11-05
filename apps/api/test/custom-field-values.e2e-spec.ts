@@ -150,6 +150,106 @@ describe('Custom field values (e2e)', () => {
     }
   });
 
+  describe('filtering lists by searchable fields', () => {
+    const rowsOf = (body: unknown) => {
+      const data = unwrap<Row[] | { data?: Row[]; items?: Row[] }>(body as Row[]);
+      return Array.isArray(data) ? data : (data.data ?? data.items ?? []);
+    };
+    const filter = (value: Record<string, unknown>) => ({ cf: JSON.stringify(value) });
+
+    it('every module list filters on a searchable field', async () => {
+      if (!E2E_DB_ENABLED) return;
+      const tenant = await seedWorkflowMasterData(app);
+      for (const moduleKey of MODULES) await define(tenant.companyId, { moduleKey, fieldKey: 'tag', searchable: true });
+      await publish(tenant.companyId);
+      const api = authed(app, tenant.token);
+      const today = todayDateString();
+      const code = () => uniqueCode('F');
+      const receipt = unwrap<Row>((await api.post('/api/v1/goods-receipts').send({ grDate: today, shopId: tenant.shopId, supplierName: 'S', items: [grLineItem({ productId: tenant.productId, storageLocationId: tenant.storageLocationId, quantity: 50, purchaseRate: 5 })] }).expect(201)).body);
+      await api.post(`/api/v1/goods-receipts/${receipt.id}/post`).expect(201);
+      const bodies: Record<string, () => Record<string, unknown>> = {
+        products: () => ({ productCode: `SKU-${code()}`.slice(0, 40), description: 'Filter test', uom: 'PCS', category: 'e2e', purchasePrice: 1, sellingPrice: 2, plants: [{ shopId: tenant.shopId, openingStock: 0, minStockLevel: 0 }] }),
+        suppliers: () => { const c = code(); return { supplierCode: `S-${c}`.slice(0, 30), supplierName: c, email: `${c.toLowerCase()}@e2e.local`, phone: '+94771234568' }; },
+        customers: () => { const c = code(); return { customerCode: `C-${c}`.slice(0, 30), customerName: c, email: `${c.toLowerCase()}@e2e.local`, phone: '+94771234569', shopId: tenant.shopId }; },
+        'purchase-orders': () => ({ poDate: today, shopId: tenant.shopId, supplier: 'S', items: [{ productId: tenant.productId, orderQty: 1, rate: 5 }] }),
+        'goods-receipts': () => ({ grDate: today, shopId: tenant.shopId, supplierName: 'S', items: [grLineItem({ productId: tenant.productId, storageLocationId: tenant.storageLocationId, quantity: 1, purchaseRate: 5 })] }),
+        'sales-orders': () => ({ shopId: tenant.shopId, orderDate: today, customerId: tenant.customerId, items: [{ productId: tenant.productId, quantity: 1, uom: 'PCS', unitPrice: 10 }] }),
+        'goods-issues': () => ({ giDate: today, shopId: tenant.shopId, issueReason: 'E2E', items: [{ productId: tenant.productId, quantity: 1, uom: 'PCS' }] }),
+        invoices: () => ({ shopId: tenant.shopId, customerId: tenant.customerId, invoiceDate: today, totalValue: 100 }),
+      };
+      for (const [path, body] of Object.entries(bodies)) {
+        const url = `/api/v1/${path}`;
+        const create = async (tag: string) => {
+          const res = await api.post(url).send({ ...body(), customFields: { tag } });
+          expect({ url, status: res.status, body: res.status === 201 ? null : res.body }).toEqual({ url, status: 201, body: null });
+          return unwrap<Row>(res.body);
+        };
+        const hit = await create('yes');
+        const miss = await create('no');
+        const ids = rowsOf((await api.get(url).query(filter({ tag: 'yes' })).expect(200)).body).map((r) => r.id);
+        expect({ url, hit: ids.includes(hit.id), miss: ids.includes(miss.id) }).toEqual({ url, hit: true, miss: false });
+        // No filter: both are listed.
+        const all = rowsOf((await api.get(url).expect(200)).body).map((r) => r.id);
+        expect({ url, both: all.includes(hit.id) && all.includes(miss.id) }).toEqual({ url, both: true });
+      }
+    });
+
+    it('matches numbers, booleans and multiple-choice values, and combines fields', async () => {
+      if (!E2E_DB_ENABLED) return;
+      const tenant = await seedWorkflowMasterData(app);
+      await define(tenant.companyId, { moduleKey: 'suppliers', fieldKey: 'score', fieldType: 'number', searchable: true });
+      await define(tenant.companyId, { moduleKey: 'suppliers', fieldKey: 'active_flag', fieldType: 'boolean', searchable: true });
+      await define(tenant.companyId, { moduleKey: 'suppliers', fieldKey: 'regions', fieldType: 'multiselect', searchable: true, options: [{ value: 'n', label: 'N' }, { value: 's', label: 'S' }] });
+      await publish(tenant.companyId);
+      const api = authed(app, tenant.token);
+      const make = async (customFields: Record<string, unknown>) => {
+        const c = uniqueCode('V');
+        return unwrap<Row>((await api.post('/api/v1/suppliers').send({ supplierCode: `S-${c}`.slice(0, 30), supplierName: c, email: `${c.toLowerCase()}@e2e.local`, phone: '+94771234568', customFields }).expect(201)).body).id;
+      };
+      const a = await make({ score: 5, active_flag: true, regions: ['n', 's'] });
+      const b = await make({ score: 7, active_flag: false, regions: ['s'] });
+      const ids = async (value: Record<string, unknown>) => rowsOf((await api.get('/api/v1/suppliers').query(filter(value)).expect(200)).body).map((r) => r.id);
+
+      expect(await ids({ score: 5 })).toEqual([a]);
+      expect(await ids({ active_flag: false })).toEqual([b]);
+      expect(await ids({ regions: 'n' })).toEqual([a]);
+      expect((await ids({ regions: 's' })).sort()).toEqual([a, b].sort());
+      expect(await ids({ regions: 's', score: 7 })).toEqual([b]);
+      expect(await ids({ score: 99 })).toEqual([]);
+    });
+
+    it('refuses bad filters, and never lets a role probe a field it cannot read', async () => {
+      if (!E2E_DB_ENABLED) return;
+      const tenant = await seedWorkflowMasterData(app);
+      await define(tenant.companyId, { moduleKey: 'products', fieldKey: 'open_tag', searchable: true });
+      await define(tenant.companyId, { moduleKey: 'products', fieldKey: 'plain_note' });
+      await define(tenant.companyId, { moduleKey: 'products', fieldKey: 'cost_tag', searchable: true, readRoles: ['OWNER'] });
+      await define(tenant.companyId, { moduleKey: 'products', fieldKey: 'qty', fieldType: 'number', searchable: true });
+      await publish(tenant.companyId);
+      const api = authed(app, tenant.token);
+      const list = (cf: string) => api.get('/api/v1/products').query({ cf });
+
+      await list('{"open_tag":"x"}').expect(200);
+      await list('{"cost_tag":"x"}').expect(200); // The owner may read it.
+      await list('not json').expect(422);
+      await list('["open_tag"]').expect(422);
+      await list('{"plain_note":"x"}').expect(422); // Not searchable.
+      await list('{"nope":"x"}').expect(422);
+      await list('{"qty":"5"}').expect(422); // Wrong type, no coercion.
+      await list(`{"open_tag":"${'x'.repeat(2_100)}"}`).expect(422);
+
+      const salesRole = await prisma.role.findFirstOrThrow({ where: { name: RoleName.SALES } });
+      const email = `probe-${randomUUID().slice(0, 8)}@e2e.local`;
+      await prisma.user.create({ data: { name: 'Probe', email, passwordHash: await bcrypt.hash(PASSWORD, 4), roleId: salesRole.id, shopId: tenant.shopId, isActive: true } });
+      const prober = authed(app, (await login(app, email, PASSWORD)).accessToken);
+      const hidden = await prober.get('/api/v1/products').query({ cf: '{"cost_tag":"x"}' }).expect(422);
+      const unknown = await prober.get('/api/v1/products').query({ cf: '{"cost_tag2":"x"}' }).expect(422);
+      // The same message either way, so the response doesn't reveal that the field exists.
+      const message = (body: unknown) => JSON.stringify(body).replace(/"requestId":"[^"]*"/, '').replace(/cost_tag2?/g, 'F');
+      expect(message(hidden.body)).toBe(message(unknown.body));
+    });
+  });
+
   it('applies types without coercion, and defaults on create', async () => {
     if (!E2E_DB_ENABLED) return;
     const made = unwrap<Row>((await owner().post('/api/v1/products').send(productBody({ customFields: { weight: 2.5 } })).expect(201)).body);

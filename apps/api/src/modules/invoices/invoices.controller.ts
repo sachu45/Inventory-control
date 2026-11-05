@@ -9,6 +9,7 @@ import { InvoicesService } from './invoices.service';
 import { RequiresModule } from '../../common/config/requires-module.decorator';
 import { ModuleFields, ModuleFieldsWrite } from '../../common/config/module-fields.interceptor';
 import { CustomFieldsWrite } from '../../common/config/custom-field-values';
+import { CustomFieldsFilter } from '../../common/config/custom-field-values';
 
 @ApiTags('invoices')
 @ApiBearerAuth()
@@ -19,6 +20,7 @@ export class InvoicesController {
   constructor(private readonly invoices: InvoicesService) {}
 
   @RequirePermission('shop:read')
+  @CustomFieldsFilter()
   @Get()
   @ApiOperation({ summary: 'List invoices (paginated, shop-scoped, filterable)' })
   list(@CurrentUser() user: RequestUser, @Query() query: ListInvoicesDto) {

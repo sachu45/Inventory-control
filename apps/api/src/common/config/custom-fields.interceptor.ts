@@ -5,9 +5,11 @@ import { PrismaService } from '../../prisma/prisma.service';
 import type { RequestUser } from '../types/request-user';
 import { ConfigResolverService } from './config-resolver.service';
 import {
+  CUSTOM_FIELDS_FILTER_KEY,
   CUSTOM_FIELDS_PASSTHROUGH_KEY,
   CUSTOM_FIELDS_WRITE_KEY,
   CustomFieldValuesException,
+  customFieldFilterIssues,
   redactCustomFields,
   resolveCustomFieldWrite,
 } from './custom-field-values';
@@ -55,7 +57,7 @@ export class CustomFieldsInterceptor implements NestInterceptor {
     if (this.reflector.getAllAndOverride<boolean>(CUSTOM_FIELDS_PASSTHROUGH_KEY, targets)) return next.handle();
 
     const moduleKey = this.reflector.getAllAndOverride<ModuleKey | undefined>(REQUIRES_MODULE_KEY, targets);
-    const req = context.switchToHttp().getRequest<{ user?: RequestUser; body?: unknown; params?: { id?: string } }>();
+    const req = context.switchToHttp().getRequest<{ user?: RequestUser; body?: unknown; params?: { id?: string }; query?: { cf?: unknown } }>();
     const user = req.user;
     const holdsValues = moduleKey !== undefined && CUSTOM_FIELD_TABLES[moduleKey] !== undefined;
 
@@ -75,6 +77,12 @@ export class CustomFieldsInterceptor implements NestInterceptor {
       if (issues.length) throw new CustomFieldValuesException(issues);
       if (values) body.customFields = values;
       else delete body.customFields;
+    }
+
+    const filter = req.query?.cf;
+    if (filter !== undefined && this.reflector.get<boolean>(CUSTOM_FIELDS_FILTER_KEY, context.getHandler())) {
+      const issues = customFieldFilterIssues(filter, fields, user.role);
+      if (issues.length) throw new CustomFieldValuesException(issues);
     }
 
     return next.handle().pipe(map((value) => redactCustomFields(value, fields, user.role)));

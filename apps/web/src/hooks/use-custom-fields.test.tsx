@@ -1,7 +1,8 @@
-import { act, render, renderHook, screen } from '@testing-library/react';
+import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MeConfig } from '@/api/me-config';
+import { CustomFieldFilters, customFieldFilterParam } from '@/components/shared/custom-field-filters';
 import { CustomFieldsSection, CustomFieldValuesList } from '@/components/shared/custom-fields-section';
 import {
   customFieldErrorsFromApi,
@@ -240,5 +241,39 @@ describe('row normalizers keep custom field values', () => {
     const { normalizeProduct } = await import('@/hooks/use-products');
     expect(normalizeProduct({ id: 'p', customFields: { grade: 'a' } }).customFields).toEqual({ grade: 'a' });
     expect(normalizeProduct({ id: 'p' }).customFields).toBeNull();
+  });
+});
+
+describe('CustomFieldFilters', () => {
+  it('builds the list parameter from set values only', () => {
+    expect(customFieldFilterParam({})).toBeUndefined();
+    expect(customFieldFilterParam({ a: null, b: '' })).toBeUndefined();
+    expect(customFieldFilterParam({ a: 'x', b: null, c: 0, d: false })).toBe('{"a":"x","c":0,"d":false}');
+  });
+
+  it('shows only searchable fields, and nothing when there are none', () => {
+    const { container, rerender } = render(<CustomFieldFilters fields={[field({ fieldKey: 'a' })]} values={{}} onChange={() => undefined} />);
+    expect(container).toBeEmptyDOMElement();
+    rerender(<CustomFieldFilters fields={[field({ fieldKey: 'a', label: 'A' }), field({ fieldKey: 'b', label: 'B', searchable: true })]} values={{}} onChange={() => undefined} />);
+    expect(screen.getByLabelText('Filter by B')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Filter by A')).not.toBeInTheDocument();
+  });
+
+  it('a choice filter sets and clears, and booleans stay booleans', async () => {
+    const onChange = vi.fn();
+    const u = userEvent.setup();
+    render(<CustomFieldFilters fields={[field({ fieldKey: 'flag', label: 'Flag', fieldType: 'boolean', searchable: true })]} values={{}} onChange={onChange} />);
+    await u.click(screen.getByRole('combobox', { name: 'Filter by Flag' }));
+    await u.click(await screen.findByRole('option', { name: 'No' }));
+    expect(onChange).toHaveBeenLastCalledWith('flag', false);
+  });
+
+  it('a number filter sends a number after typing pauses', async () => {
+    const onChange = vi.fn();
+    const u = userEvent.setup();
+    render(<CustomFieldFilters fields={[field({ fieldKey: 'n', label: 'N', fieldType: 'number', searchable: true })]} values={{}} onChange={onChange} />);
+    await u.type(screen.getByLabelText('Filter by N'), '42');
+    expect(onChange).not.toHaveBeenCalledWith('n', 4);
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith('n', 42));
   });
 });

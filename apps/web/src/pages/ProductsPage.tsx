@@ -117,8 +117,10 @@ import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useSuccessPulse } from '@/hooks/use-success-pulse';
 import { showActionSuccess } from '@/lib/action-feedback';
 import { Card, CardContent } from '@/components/ui/card';
+import { CustomFieldFilters, customFieldFilterParam } from '@/components/shared/custom-field-filters';
 import { CustomFieldsSection } from '@/components/shared/custom-fields-section';
-import { useCustomFieldForm, withCustomFieldColumns } from '@/hooks/use-custom-fields';
+import { useCustomFieldForm, useCustomFields, withCustomFieldColumns } from '@/hooks/use-custom-fields';
+import type { CustomFieldValues } from '@/lib/custom-fields';
 import { downloadCsv, toCsv, type CsvColumn } from '@/lib/csv';
 
 /** Lets users clear a numeric field while typing; commits 0 on blur if left empty. */
@@ -725,9 +727,17 @@ export function ProductsPage({ createOnly = false }: { createOnly?: boolean }) {
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const { pulseClass, triggerPulse } = useSuccessPulse();
 
+  const customFields = useCustomFields('products');
+  const [customFieldFilters, setCustomFieldFilters] = useState<CustomFieldValues>({});
+  const changeCustomFieldFilter = useCallback((key: string, value: unknown) => {
+    setCustomFieldFilters((current) => ({ ...current, [key]: value }));
+    setPage(1);
+  }, []);
+
   const filters: ProductFilters = {
     page,
     limit: PAGE_SIZE,
+    customFieldFilter: customFieldFilterParam(customFieldFilters),
     search: debouncedSearch || undefined,
     category: categoryFilter !== 'all' ? categoryFilter : undefined,
     isActive: statusFilter === 'all' ? undefined : statusFilter === 'active',
@@ -2368,6 +2378,7 @@ export function ProductsPage({ createOnly = false }: { createOnly?: boolean }) {
               />
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <ColumnPicker columns={columns} tableLabel="product" />
+                <CustomFieldFilters fields={customFields} values={customFieldFilters} onChange={changeCustomFieldFilter} />
                 <Select
                   value={categoryFilter}
                   onValueChange={(v) => {

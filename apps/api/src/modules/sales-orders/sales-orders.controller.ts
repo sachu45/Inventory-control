@@ -10,6 +10,7 @@ import { SalesOrdersService } from './sales-orders.service';
 import { RequiresModule } from '../../common/config/requires-module.decorator';
 import { ModuleFields, ModuleFieldsWrite } from '../../common/config/module-fields.interceptor';
 import { CustomFieldsWrite } from '../../common/config/custom-field-values';
+import { CustomFieldsFilter } from '../../common/config/custom-field-values';
 
 @ApiTags('sales-orders')
 @ApiBearerAuth()
@@ -20,6 +21,7 @@ export class SalesOrdersController {
   constructor(private readonly salesOrders: SalesOrdersService) {}
 
   @RequirePermission('shop:read')
+  @CustomFieldsFilter()
   @Get()
   @ApiOperation({ summary: 'List sales orders (paginated, shop-scoped, filterable)' })
   @ApiResponse({ status: 200, description: 'Page of sales orders with cursor-pagination meta.' })

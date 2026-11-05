@@ -20,6 +20,7 @@ import { UpdateSupplierDto } from './dto/update-supplier.dto';
 import { SuppliersService } from './suppliers.service';
 import { RequiresModule } from '../../common/config/requires-module.decorator';
 import { CustomFieldsWrite } from '../../common/config/custom-field-values';
+import { CustomFieldsFilter } from '../../common/config/custom-field-values';
 
 @ApiTags('suppliers')
 @RequiresModule('suppliers')
@@ -36,6 +37,7 @@ export class SuppliersController {
 
   @ApiBearerAuth()
   @RequirePermission('supplier:read')
+  @CustomFieldsFilter()
   @Get()
   @ApiOperation({ summary: 'List suppliers (paginated)' })
   list(@CurrentUser() user: RequestUser, @Query() query: ListSuppliersDto) {

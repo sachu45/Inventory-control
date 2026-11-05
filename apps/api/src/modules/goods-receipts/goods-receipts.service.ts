@@ -31,6 +31,7 @@ import { buildReceiveGoodsAudit } from '../../common/state-machines/inventory-au
 import { assertGrMutationAllowed } from '../../common/utils/procurement-downstream';
 import { OutboxService } from '../../common/event-platform/outbox.service';
 import { customFieldsInput } from '../../common/config/custom-field-values';
+import { withCustomFieldFilter } from '../../common/config/custom-field-values';
 
 @Injectable()
 export class GoodsReceiptsService {
@@ -183,7 +184,7 @@ export class GoodsReceiptsService {
 
   async list(
     user: RequestUser,
-    query: { shop_id?: string; date_from?: string; date_to?: string; status?: DocumentStatus; cursor?: string; take?: number },
+    query: { cf?: string; shop_id?: string; date_from?: string; date_to?: string; status?: DocumentStatus; cursor?: string; take?: number },
   ) {
     const take = clampTake(query.take);
     if (query.shop_id) assertShopScope(user, query.shop_id);
@@ -200,7 +201,7 @@ export class GoodsReceiptsService {
     }
 
     const rows = await this.prisma.goodsReceiptHeader.findMany({
-      where,
+      where: withCustomFieldFilter(where, query.cf) as Prisma.GoodsReceiptHeaderWhereInput,
       take: take + 1,
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       orderBy: { createdAt: 'desc' },

@@ -10,6 +10,7 @@ import { UpdateGoodsIssueDto } from './dto/update-goods-issue.dto';
 import { GoodsIssuesService } from './goods-issues.service';
 import { RequiresModule } from '../../common/config/requires-module.decorator';
 import { CustomFieldsWrite } from '../../common/config/custom-field-values';
+import { CustomFieldsFilter } from '../../common/config/custom-field-values';
 
 @ApiTags('goods-issues')
 @ApiBearerAuth()
@@ -19,6 +20,7 @@ export class GoodsIssuesController {
   constructor(private readonly service: GoodsIssuesService) {}
 
   @RequirePermission('goods_issue:read')
+  @CustomFieldsFilter()
   @Get()
   list(
     @CurrentUser() user: RequestUser,
@@ -28,8 +30,10 @@ export class GoodsIssuesController {
     @Query('status') status?: DocumentStatus,
     @Query('cursor') cursor?: string,
     @Query('take') take?: string,
+    @Query('cf') cf?: string,
   ) {
     return this.service.list(user, {
+      cf,
       shop_id: shopId,
       date_from: dateFrom,
       date_to: dateTo,

@@ -17,6 +17,7 @@ import { RequestPoCancelDto, ConfirmPoCancelDto } from './dto/cancel-purchase-or
 import { RequiresModule } from '../../common/config/requires-module.decorator';
 import { ModuleFields, ModuleFieldsWrite } from '../../common/config/module-fields.interceptor';
 import { CustomFieldsWrite } from '../../common/config/custom-field-values';
+import { CustomFieldsFilter } from '../../common/config/custom-field-values';
 
 @ApiTags('purchase-orders')
 @ApiBearerAuth()
@@ -31,6 +32,7 @@ export class PurchaseOrdersController {
   ) {}
 
   @RequirePermission('purchase_order:read')
+  @CustomFieldsFilter()
   @Get()
   list(
     @CurrentUser() user: RequestUser,

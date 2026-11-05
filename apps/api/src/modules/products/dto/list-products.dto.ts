@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { IsBoolean, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { CustomFieldFilterProperty } from '../../../common/config/custom-field-values';
 
 /**
  * Canonical query params for the products list endpoint.
@@ -10,6 +11,9 @@ import { IsBoolean, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-
  * compatibility but are deprecated and will be removed in a future release.
  */
 export class ListProductsDto {
+  @CustomFieldFilterProperty()
+  cf?: string;
+
   @ApiPropertyOptional({ description: 'Restrict to a shop. Required for multi-shop accounts.' })
   @IsOptional()
   @IsUUID()

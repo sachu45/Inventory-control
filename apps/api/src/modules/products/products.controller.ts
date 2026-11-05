@@ -29,6 +29,7 @@ import { ProductsService } from './products.service';
 import { RequiresModule } from '../../common/config/requires-module.decorator';
 import { ModuleFields, ModuleFieldsWrite } from '../../common/config/module-fields.interceptor';
 import { CustomFieldsWrite } from '../../common/config/custom-field-values';
+import { CustomFieldsFilter } from '../../common/config/custom-field-values';
 
 @ApiTags('products')
 @ApiBearerAuth()
@@ -42,10 +43,12 @@ export class ProductsController {
   ) {}
 
   @RequirePermission('product:read')
+  @CustomFieldsFilter()
   @Get()
   @ApiOperation({ summary: 'List products (paginated, shop-scoped, filterable)' })
   list(@CurrentUser() user: RequestUser, @Query() query: ListProductsDto) {
     return this.products.list(user, {
+      cf: query.cf,
       shop_id: query.shop_id ?? query.shopId,
       category: query.category,
       is_active: query.is_active ?? query.isActive,

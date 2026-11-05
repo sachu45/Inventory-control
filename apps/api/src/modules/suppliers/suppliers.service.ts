@@ -16,6 +16,7 @@ import {
 import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
 import { customFieldsInput } from '../../common/config/custom-field-values';
+import { withCustomFieldFilter } from '../../common/config/custom-field-values';
 
 const SUPPLIER_DELETE_TOKEN_TYP = 'supplier-delete-confirm';
 
@@ -28,7 +29,7 @@ export class SuppliersService {
     private readonly config: ConfigService,
   ) {}
 
-  async list(user: RequestUser, query: { search?: string; is_active?: boolean; cursor?: string; take?: number }) {
+  async list(user: RequestUser, query: { cf?: string; search?: string; is_active?: boolean; cursor?: string; take?: number }) {
     const take = clampTake(query.take);
     const search = query.search?.trim();
     const where: Prisma.SupplierWhereInput = {
@@ -46,7 +47,7 @@ export class SuppliersService {
     };
 
     const rows = await this.prisma.supplier.findMany({
-      where,
+      where: withCustomFieldFilter(where, query.cf) as Prisma.SupplierWhereInput,
       take: take + 1,
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       orderBy: { createdAt: 'desc' },

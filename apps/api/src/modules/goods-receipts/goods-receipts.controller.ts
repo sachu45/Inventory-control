@@ -10,6 +10,7 @@ import { UpdateGoodsReceiptDto } from './dto/update-goods-receipt.dto';
 import { GoodsReceiptsService } from './goods-receipts.service';
 import { RequiresModule } from '../../common/config/requires-module.decorator';
 import { CustomFieldsWrite } from '../../common/config/custom-field-values';
+import { CustomFieldsFilter } from '../../common/config/custom-field-values';
 
 @ApiTags('goods-receipts')
 @ApiBearerAuth()
@@ -19,6 +20,7 @@ export class GoodsReceiptsController {
   constructor(private readonly service: GoodsReceiptsService) {}
 
   @RequirePermission('goods_receipt:read')
+  @CustomFieldsFilter()
   @Get()
   list(
     @CurrentUser() user: RequestUser,
@@ -28,8 +30,10 @@ export class GoodsReceiptsController {
     @Query('status') status?: DocumentStatus,
     @Query('cursor') cursor?: string,
     @Query('take') take?: string,
+    @Query('cf') cf?: string,
   ) {
     return this.service.list(user, {
+      cf,
       shop_id: shopId,
       date_from: dateFrom,
       date_to: dateTo,

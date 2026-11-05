@@ -35,6 +35,7 @@ import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
 import type { PurchaseOrderEmailContent } from '../../common/mail/purchase-order-supplier.template';
 import type { ListPurchaseOrdersDto, PoLifecycle } from './dto/list-purchase-orders.dto';
 import { customFieldsInput } from '../../common/config/custom-field-values';
+import { withCustomFieldFilter } from '../../common/config/custom-field-values';
 
 const RECEIPT_INCLUDE = {
   select: {
@@ -558,8 +559,9 @@ export class PurchaseOrdersService {
       ? { id: 'asc' }
       : [{ poDate: 'desc' }, { createdAt: 'desc' }];
 
+    const filtered = withCustomFieldFilter(where, query.cf) as Prisma.PurchaseOrderHeaderWhereInput;
     const findArgs: Prisma.PurchaseOrderHeaderFindManyArgs = {
-      where,
+      where: filtered,
       orderBy,
       include: { items: ITEM_WITH_PRODUCT, goodsReceipts: RECEIPT_INCLUDE, supplierReturns: RETURN_INCLUDE },
       take: useCursor ? take + 1 : take,
@@ -573,7 +575,7 @@ export class PurchaseOrdersService {
 
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.purchaseOrderHeader.findMany(findArgs),
-      this.prisma.purchaseOrderHeader.count({ where }),
+      this.prisma.purchaseOrderHeader.count({ where: filtered }),
     ]);
 
     const cursorMeta = buildMeta(rows, take);

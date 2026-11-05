@@ -16,8 +16,10 @@ import type { InvoiceCreatedEmailContent } from '../../common/mail/transactional
 import { formatEmailDate, formatEmailMoney } from '../../common/mail/email-formatters';
 import { DocumentEmailService } from '../document-email/document-email.service';
 import { customFieldsInput } from '../../common/config/custom-field-values';
+import { withCustomFieldFilter } from '../../common/config/custom-field-values';
 
 export type InvoiceListQuery = {
+  cf?: string;
   shop_id?: string;
   status?: InvoiceStatus;
   customer_id?: string;
@@ -55,7 +57,7 @@ export class InvoicesService {
     }
 
     const rows = await this.prisma.invoiceHeader.findMany({
-      where,
+      where: withCustomFieldFilter(where, query.cf) as Prisma.InvoiceHeaderWhereInput,
       take: take + 1,
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       // Newest first; id is the unique tiebreaker that keeps cursor paging stable.

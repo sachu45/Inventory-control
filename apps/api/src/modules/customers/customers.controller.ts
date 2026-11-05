@@ -9,6 +9,7 @@ import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { CustomersService } from './customers.service';
 import { RequiresModule } from '../../common/config/requires-module.decorator';
 import { CustomFieldsWrite } from '../../common/config/custom-field-values';
+import { CustomFieldsFilter } from '../../common/config/custom-field-values';
 
 @ApiTags('customers')
 @ApiBearerAuth()
@@ -18,6 +19,7 @@ export class CustomersController {
   constructor(private readonly customers: CustomersService) {}
 
   @RequirePermission('shop:read')
+  @CustomFieldsFilter()
   @Get()
   @ApiOperation({ summary: 'List customers (paginated, shop-scoped)' })
   list(@CurrentUser() user: RequestUser, @Query() query: ListCustomersDto) {

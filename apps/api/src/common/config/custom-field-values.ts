@@ -1,7 +1,7 @@
 import { applyDecorators, HttpException, HttpStatus, SetMetadata } from '@nestjs/common';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import type { Prisma } from '@prisma/client';
-import { IsObject, IsOptional } from 'class-validator';
+import { IsObject, IsOptional, IsString } from 'class-validator';
 import { isCalendarDate, type CustomFieldSnapshot } from './custom-fields';
 
 export type CustomFieldIssue = { path: string; message: string };
@@ -23,6 +23,18 @@ export const CustomFieldsWrite = (mode: 'create' | 'update') => SetMetadata(CUST
 /** A route that returns config itself, where `customFields` means definitions rather than a record's values. */
 export const CUSTOM_FIELDS_PASSTHROUGH_KEY = 'customFieldsPassthrough';
 export const CustomFieldsPassthrough = () => SetMetadata(CUSTOM_FIELDS_PASSTHROUGH_KEY, true);
+
+/** Marks a list handler that accepts `?cf={"key":"value"}`, checked by CustomFieldsInterceptor. */
+export const CUSTOM_FIELDS_FILTER_KEY = 'customFieldsFilter';
+export const CustomFieldsFilter = () => SetMetadata(CUSTOM_FIELDS_FILTER_KEY, true);
+
+/** On a list DTO: a JSON object of field keys and values. */
+export const CustomFieldFilterProperty = () =>
+  applyDecorators(
+    ApiPropertyOptional({ type: 'string', description: 'JSON filter on searchable custom fields, e.g. {"grade":"a"}' }),
+    IsOptional(),
+    IsString(),
+  );
 
 /** On a DTO: the shape only. The values were already checked against published definitions by the interceptor. */
 export const CustomFieldsProperty = () =>
@@ -141,6 +153,65 @@ export function resolveCustomFieldWrite(args: {
   if (issues.length) return { issues };
   if (submitted === undefined && !defaulted) return { issues: [] };
   return { issues: [], values: next };
+}
+
+const MAX_FILTER_LENGTH = 2_000;
+
+function parseFilter(raw: string): Values | null {
+  if (raw.length > MAX_FILTER_LENGTH) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return isPlainObject(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function filterValueFits(field: CustomFieldSnapshot, value: unknown): boolean {
+  switch (field.fieldType) {
+    case 'number':
+      return typeof value === 'number' && Number.isFinite(value);
+    case 'boolean':
+      return typeof value === 'boolean';
+    default:
+      return typeof value === 'string' && value.length > 0;
+  }
+}
+
+/**
+ * Why a list filter is refused. A field must be searchable and readable by this role:
+ * filtering on a hidden field would reveal its values one guess at a time, so hidden,
+ * unsearchable and unknown fields all get the same answer.
+ */
+export function customFieldFilterIssues(raw: unknown, fields: CustomFieldSnapshot[], role: string): CustomFieldIssue[] {
+  const filter = typeof raw === 'string' ? parseFilter(raw) : null;
+  if (!filter) return [{ path: 'cf', message: 'Must be a JSON object of field keys and values' }];
+  const issues: CustomFieldIssue[] = [];
+  for (const [key, value] of Object.entries(filter)) {
+    const field = fields.find((f) => f.fieldKey === key);
+    if (!field || !field.searchable || !canReadField(field, role)) {
+      issues.push({ path: `cf.${key}`, message: 'Cannot filter by this field' });
+    } else if (!filterValueFits(field, value)) {
+      issues.push({ path: `cf.${key}`, message: `Not a valid value for ${field.label}` });
+    }
+  }
+  return issues;
+}
+
+/**
+ * Adds a filter the interceptor already checked to a list's where clause. Each field matches
+ * a single value exactly, or a multiple-choice value that contains it.
+ */
+export function withCustomFieldFilter<Where extends object>(where: Where, raw?: string): Where | { AND: unknown[] } {
+  const filter = raw ? parseFilter(raw) : null;
+  if (!filter || Object.keys(filter).length === 0) return where;
+  const clauses = Object.entries(filter).map(([key, value]) => ({
+    OR: [
+      { customFields: { path: [key], equals: value } },
+      { customFields: { path: [key], array_contains: [value] } },
+    ],
+  }));
+  return { AND: [where, ...clauses] };
 }
 
 const isRecordWithId = (node: Values) => 'id' in node;

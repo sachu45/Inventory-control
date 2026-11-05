@@ -3,8 +3,12 @@ import { SalesOrderStatus } from '@prisma/client';
 import { IsEnum, IsOptional, IsUUID } from 'class-validator';
 import { CursorPageDto } from '../../../common/dto/cursor-page.dto';
 import { DateRangeQueryDto } from '../../../common/dto/date-range.dto';
+import { CustomFieldFilterProperty } from '../../../common/config/custom-field-values';
 
 export class ListSalesOrdersDto extends IntersectionType(CursorPageDto, DateRangeQueryDto) {
+  @CustomFieldFilterProperty()
+  cf?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsUUID()

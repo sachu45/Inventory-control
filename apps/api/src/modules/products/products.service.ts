@@ -24,6 +24,7 @@ import {
   type ProductChangedFields,
 } from '../../common/state-machines/product-audit';
 import { customFieldsInput } from '../../common/config/custom-field-values';
+import { withCustomFieldFilter } from '../../common/config/custom-field-values';
 
 const PRODUCT_INCLUDE = {
   plants: {
@@ -280,6 +281,7 @@ export class ProductsService {
       page?: number;
       limit?: number;
       company_catalog?: boolean;
+      cf?: string;
     },
   ) {
     const limit = query.limit ? Math.min(500, Math.max(1, query.limit)) : clampTake(query.limit);
@@ -311,15 +313,16 @@ export class ProductsService {
       ...(plantScope ? { plants: { some: plantScope } } : {}),
     };
 
+    const filtered = withCustomFieldFilter(where, query.cf) as Prisma.ProductWhereInput;
     const [products, total] = await this.prisma.$transaction([
       this.prisma.product.findMany({
-        where,
+        where: filtered,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: PRODUCT_INCLUDE,
       }),
-      this.prisma.product.count({ where }),
+      this.prisma.product.count({ where: filtered }),
     ]);
 
     const productIds = products.map((p) => p.id);

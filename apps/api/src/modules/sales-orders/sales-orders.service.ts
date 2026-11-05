@@ -31,8 +31,10 @@ import type { SalesOrderCustomerEmailContent } from '../../common/mail/transacti
 import { formatEmailDate, formatEmailMoney } from '../../common/mail/email-formatters';
 import { DocumentEmailService } from '../document-email/document-email.service';
 import { customFieldsInput } from '../../common/config/custom-field-values';
+import { withCustomFieldFilter } from '../../common/config/custom-field-values';
 
 export type SalesOrderListQuery = {
+  cf?: string;
   shop_id?: string;
   status?: SalesOrderStatus;
   customer_id?: string;
@@ -72,7 +74,7 @@ export class SalesOrdersService {
     }
 
     const rows = await this.prisma.salesOrderHeader.findMany({
-      where,
+      where: withCustomFieldFilter(where, query.cf) as Prisma.SalesOrderHeaderWhereInput,
       take: take + 1,
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       orderBy: [{ orderDate: 'desc' }, { createdAt: 'desc' }],
