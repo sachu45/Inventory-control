@@ -7,11 +7,13 @@ import { ConfigAdminService } from './config-admin.service';
 import { PlatformCustomFieldsController } from './platform-custom-fields.controller';
 import { PlatformCustomFieldsService } from './platform-custom-fields.service';
 import { PlatformFeatureFlagsController } from './platform-feature-flags.controller';
+import { PlatformWorkflowsController } from './platform-workflows.controller';
+import { PlatformWorkflowsService } from './platform-workflows.service';
 import { PlatformFeatureFlagsService } from './platform-feature-flags.service';
 
 @Module({
   imports: [TenantConfigModule, PlatformModule, WorkflowEngineModule],
-  controllers: [ConfigAdminController, PlatformFeatureFlagsController, PlatformCustomFieldsController],
-  providers: [ConfigAdminService, PlatformFeatureFlagsService, PlatformCustomFieldsService],
+  controllers: [ConfigAdminController, PlatformFeatureFlagsController, PlatformCustomFieldsController, PlatformWorkflowsController],
+  providers: [ConfigAdminService, PlatformFeatureFlagsService, PlatformCustomFieldsService, PlatformWorkflowsService],
 })
 export class ConfigAdminModule {}

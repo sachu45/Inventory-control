@@ -98,6 +98,8 @@ import { TenantContext } from '../tenant/tenant-context';
     { provide: CUSTOMER_MESSAGE_SENDER, useClass: CompositeCustomerSender },
   ],
   exports: [
+    ActionRegistry,
+    ConditionRegistry,
     WorkflowEngineConsumer,
     WorkflowRegistryService,
     GraphDunningExecutor,

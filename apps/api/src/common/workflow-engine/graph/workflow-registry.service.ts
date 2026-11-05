@@ -133,6 +133,11 @@ export class WorkflowRegistryService {
     });
   }
 
+  /** For a change other than publishing, such as disabling a graph. Other instances catch up within the TTL. */
+  invalidateCache(): void {
+    this.publishedCache.clear();
+  }
+
   /** Resolve the currently-published workflow for a tenant (falls back to system). */
   async getPublished(companyId: string, key: string): Promise<PublishedWorkflow | null> {
     // Compiled-workflow cache (Plan §10 "Caching"): the published graph changes

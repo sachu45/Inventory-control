@@ -14,7 +14,8 @@ export type PlatformAuditAction =
   | 'platform_config_publish'
   | 'platform_config_rollback'
   | 'platform_feature_flag_set'
-  | 'platform_custom_field_set';
+  | 'platform_custom_field_set'
+  | 'platform_workflow_set';
 
 @Injectable()
 export class PlatformAuditService {
