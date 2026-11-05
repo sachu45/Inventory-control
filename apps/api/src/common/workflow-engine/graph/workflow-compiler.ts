@@ -26,7 +26,46 @@ export type CompileResult =
   | { readonly ok: true; readonly workflow: CompiledWorkflow }
   | { readonly ok: false; readonly errors: readonly CompileError[] };
 
+/** Most nodes a graph may have; keeps publish and every compile of it cheap. */
+export const MAX_WORKFLOW_NODES = 200;
+
+/** Structural problems that would stop the compiler from reading the graph at all. */
+function shapeErrors(def: unknown): CompileError[] {
+  const d = def as Partial<Record<keyof WorkflowGraphDef, unknown>> | null;
+  if (typeof d !== 'object' || d === null) return [{ code: 'BAD_SHAPE', message: 'Workflow must be an object.' }];
+  const errors: CompileError[] = [];
+  if (typeof d.name !== 'string' || !d.name.trim()) errors.push({ code: 'BAD_SHAPE', message: '"name" is required.' });
+  if (!Array.isArray(d.nodes)) {
+    errors.push({ code: 'BAD_SHAPE', message: '"nodes" must be an array.' });
+  } else {
+    if (d.nodes.length > MAX_WORKFLOW_NODES) {
+      errors.push({ code: 'TOO_MANY_NODES', message: `At most ${MAX_WORKFLOW_NODES} nodes are allowed.` });
+    }
+    d.nodes.forEach((n: unknown, i: number) => {
+      const node = n as { key?: unknown; kind?: unknown } | null;
+      if (typeof node !== 'object' || node === null || typeof node.key !== 'string' || !node.key || typeof node.kind !== 'string') {
+        errors.push({ code: 'BAD_SHAPE', message: `nodes[${i}] needs a string "key" and "kind".` });
+      }
+    });
+  }
+  if (!Array.isArray(d.edges)) {
+    errors.push({ code: 'BAD_SHAPE', message: '"edges" must be an array.' });
+  } else {
+    d.edges.forEach((e: unknown, i: number) => {
+      const edge = e as { from?: unknown; to?: unknown } | null;
+      if (typeof edge !== 'object' || edge === null || typeof edge.from !== 'string' || typeof edge.to !== 'string') {
+        errors.push({ code: 'BAD_SHAPE', message: `edges[${i}] needs string "from" and "to".` });
+      }
+    });
+  }
+  return errors;
+}
+
 export function compileWorkflow(def: WorkflowGraphDef): CompileResult {
+  // Authored graphs arrive as request bodies, so check the shape before reading it.
+  const shape = shapeErrors(def);
+  if (shape.length > 0) return { ok: false, errors: shape };
+
   const errors: CompileError[] = [];
   const nodes: Record<string, WorkflowNodeDef> = {};
 

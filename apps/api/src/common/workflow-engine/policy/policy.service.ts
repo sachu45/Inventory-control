@@ -19,6 +19,10 @@ export interface PolicyInput {
 const COMPARATORS = new Set(['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'in']);
 const PRIORITIES = new Set(['LOW', 'NORMAL', 'HIGH', 'CRITICAL']);
 const MAX_CONDITION_DEPTH = 10;
+/** Most children one "all"/"any" may have. With the depth cap this bounds evaluation cost. */
+export const MAX_CONDITION_BRANCHES = 50;
+/** Most values one "in" predicate may list. */
+export const MAX_IN_VALUES = 500;
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -31,6 +35,7 @@ export function conditionError(c: unknown, depth = 0): string | null {
   if ('all' in c || 'any' in c) {
     const list = 'all' in c ? c.all : c.any;
     if (!Array.isArray(list)) return '"all"/"any" must be an array';
+    if (list.length > MAX_CONDITION_BRANCHES) return `"all"/"any" may have at most ${MAX_CONDITION_BRANCHES} conditions`;
     for (const child of list) {
       const err = conditionError(child, depth + 1);
       if (err) return err;
@@ -41,6 +46,7 @@ export function conditionError(c: unknown, depth = 0): string | null {
   if (typeof c.fact !== 'string' || !c.fact) return 'predicate needs a "fact" name';
   if (typeof c.op !== 'string' || !COMPARATORS.has(c.op)) return `unknown comparator "${String(c.op)}"`;
   if (c.op === 'in' && !Array.isArray(c.value)) return '"in" needs an array value';
+  if (c.op === 'in' && (c.value as unknown[]).length > MAX_IN_VALUES) return `"in" may list at most ${MAX_IN_VALUES} values`;
   return null;
 }
 

@@ -1,9 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { compileWorkflow } from './workflow-compiler';
 import { CompiledWorkflow, WorkflowGraphDef } from './graph-types';
 import { SYSTEM_WORKFLOWS } from './default-workflows';
+
+function isUniqueViolation(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
+}
 
 export interface PublishedWorkflow {
   readonly graphId: string;
@@ -27,6 +31,8 @@ export interface PublishedWorkflow {
 export class WorkflowRegistryService {
   private readonly logger = new Logger(WorkflowRegistryService.name);
   private static readonly CACHE_TTL_MS = 60_000;
+  /** Tries before a unique-key race on publish is reported as 409. */
+  private static readonly PUBLISH_ATTEMPTS = 2;
   private readonly publishedCache = new Map<string, { at: number; value: PublishedWorkflow | null }>();
 
   constructor(private readonly prisma: PrismaService) {}
@@ -46,15 +52,48 @@ export class WorkflowRegistryService {
     }
   }
 
-  /** Compile + publish a new immutable version of a graph. Throws on invalid graphs. */
+  /**
+   * Compile + publish a new immutable version of a graph.
+   *
+   * An invalid graph is refused with 422 WORKFLOW_INVALID carrying every
+   * compiler error. Concurrent publishes of one graph are serialised by the row
+   * lock the version increment takes; a unique-key race that still slips
+   * through (two first publishes both creating the graph row) is retried once,
+   * then reported as 409 WORKFLOW_PUBLISH_CONFLICT.
+   */
   async publish(companyId: string | null, def: WorkflowGraphDef): Promise<PublishedWorkflow> {
     const compiled = compileWorkflow(def);
     if (!compiled.ok) {
-      const detail = compiled.errors.map((e) => `${e.code}${e.nodeKey ? `@${e.nodeKey}` : ''}: ${e.message}`).join('; ');
-      throw new Error(`Cannot publish workflow "${def.key}": ${detail}`);
+      throw new UnprocessableEntityException({
+        code: 'WORKFLOW_INVALID',
+        message: `Cannot publish workflow "${String(def?.key)}": it has ${compiled.errors.length} error(s)`,
+        details: compiled.errors,
+      });
     }
 
-    const published = await this.prisma.$transaction(async (tx) => {
+    let published: PublishedWorkflow | undefined;
+    for (let attempt = 1; !published; attempt++) {
+      try {
+        published = await this.writeVersion(companyId, def, compiled.workflow);
+      } catch (err) {
+        if (!isUniqueViolation(err)) throw err;
+        if (attempt >= WorkflowRegistryService.PUBLISH_ATTEMPTS) {
+          throw new ConflictException({
+            code: 'WORKFLOW_PUBLISH_CONFLICT',
+            message: `Workflow "${def.key}" was published concurrently; retry`,
+          });
+        }
+        this.logger.warn(`publish of "${def.key}" hit a unique-key race; retrying`);
+      }
+    }
+    // A new version invalidates every cached resolution (tenants may fall back
+    // to a system default that just changed).
+    this.publishedCache.clear();
+    return published;
+  }
+
+  private writeVersion(companyId: string | null, def: WorkflowGraphDef, workflow: CompiledWorkflow): Promise<PublishedWorkflow> {
+    return this.prisma.$transaction(async (tx) => {
       // findFirst + create rather than upsert: the composite unique (companyId,
       // key) can't be used as a where-unique when companyId is null (system
       // default graphs), which Prisma types as non-nullable.
@@ -63,7 +102,13 @@ export class WorkflowRegistryService {
         (await tx.workflowGraph.create({
           data: { companyId, key: def.key, name: def.name, latestVersion: 0 },
         }));
-      const version = graph.latestVersion + 1;
+      // Increment first: the UPDATE locks the graph row, so a concurrent publish
+      // waits here and then reads the committed number instead of reusing it.
+      const { latestVersion: version } = await tx.workflowGraph.update({
+        where: { id: graph.id },
+        data: { latestVersion: { increment: 1 }, name: def.name },
+        select: { latestVersion: true },
+      });
 
       const created = await tx.workflowVersion.create({
         data: {
@@ -84,17 +129,8 @@ export class WorkflowRegistryService {
         })),
       });
 
-      await tx.workflowGraph.update({
-        where: { id: graph.id },
-        data: { latestVersion: version, name: def.name },
-      });
-
-      return { graphId: graph.id, version, workflow: compiled.workflow };
+      return { graphId: graph.id, version, workflow };
     });
-    // A new version invalidates every cached resolution (tenants may fall back
-    // to a system default that just changed).
-    this.publishedCache.clear();
-    return published;
   }
 
   /** Resolve the currently-published workflow for a tenant (falls back to system). */
